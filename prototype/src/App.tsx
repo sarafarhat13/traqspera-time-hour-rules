@@ -236,11 +236,11 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
       role="tablist"
       style={{
         display: "flex",
-        alignItems: "flex-end",
-        gap: 4,
-        background: "#f1f1f6",
-        borderBottom: "1px solid #d0d1d9",
-        padding: "8px 16px 0",
+        alignItems: "center",
+        gap: 2,
+        background: "#f7f7fb",
+        borderBottom: "1px solid #e0e1e9",
+        padding: "10px 16px 0",
       }}
     >
       {tabs.map((t) => {
@@ -252,31 +252,29 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(t.key)}
+            className="tq-tab"
             style={{
               all: "unset",
               boxSizing: "border-box",
+              position: "relative",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              position: "relative",
-              zIndex: isActive ? 2 : 1,
-              minHeight: 34,
-              padding: "8px 16px",
-              marginBottom: isActive ? -1 : 0,
+              zIndex: isActive ? 10 : 0,
+              padding: "7px 14px",
+              marginBottom: -1,
               fontFamily: "Open Sans, sans-serif",
-              fontSize: 13,
-              fontWeight: isActive ? 600 : 500,
-              lineHeight: 1.2,
+              fontSize: 12,
+              fontWeight: 600,
+              lineHeight: 1.4,
               whiteSpace: "nowrap",
               cursor: "pointer",
               color: isActive ? "#0e416c" : "#6a6e79",
-              background: isActive ? "#ffffff" : "#e8e9ef",
-              borderTop: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
-              borderLeft: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
-              borderRight: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
-              borderBottom: isActive ? "1px solid #ffffff" : "1px solid transparent",
-              borderRadius: "6px 6px 0 0",
-              boxShadow: isActive ? "none" : "inset 0 -1px 0 rgba(0,0,0,0.04)",
+              background: isActive ? "#ffffff" : "transparent",
+              border: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
+              borderBottomColor: isActive ? "#ffffff" : "transparent",
+              borderRadius: "4px 4px 0 0",
+              transition: "color 0.15s",
             }}
           >
             {t.label}
@@ -366,7 +364,7 @@ function RuleSetForm({
         />
       </div>
 
-      <div style={{ padding: "20px", background: "#f5f5f8" }}>
+      <div style={{ padding: "16px 20px", background: "#ffffff" }}>
 
         {/* ── Daily Rules ── */}
         {activeTab === "daily" && (

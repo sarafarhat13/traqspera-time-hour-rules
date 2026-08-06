@@ -70,6 +70,10 @@ textarea {
 .border-\[\#ab1f26\] { border-color: #ab1f26; }
 .border-\[\#f0d080\] { border-color: #f0d080; }
 
+.tq-tab:hover[aria-selected="false"] {
+  color: #252a2e;
+}
+
 .focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }
