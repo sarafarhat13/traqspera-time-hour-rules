@@ -819,34 +819,79 @@ function PrecedenceSection() {
   };
 
   return (
-    <div>
-      <SectionDivider>Hour Rule Precedence</SectionDivider>
-      <SectionBody>
-        <div className="px-[20px] py-[14px]">
-          <div className="mb-[12px] flex items-start gap-[8px] rounded-[4px] bg-[#f5faff] border border-[#dcedf9] px-[12px] py-[10px]">
-            <Info size={14} className="mt-[1px] shrink-0 text-[#006fb0]" />
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px]">
-              Drag to arrange the order the rules are looked at, from top to bottom. The most generous rule will be taken when compared with State and Union rules.
-            </p>
-          </div>
-          <div className="flex flex-col gap-[4px]">
-            {order.map((label, idx) => (
-              <div key={label} draggable
+    <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e0e1e9", background: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+      <div style={{ background: "#0e416c", padding: "10px 20px" }}>
+        <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#ffffff" }}>
+          Hour Rule Precedence
+        </h2>
+      </div>
+      <div style={{ padding: "14px 20px", background: "#ffffff" }}>
+        <div style={{
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          borderRadius: 4,
+          background: "#dcedf9",
+          border: "1px solid #b8d9f0",
+          padding: "10px 12px",
+        }}>
+          <Info size={14} style={{ marginTop: 1, flexShrink: 0, color: "#006fb0" }} />
+          <p style={{ margin: 0, fontSize: 12, fontFamily: "Open Sans, sans-serif", color: "#0e416c", lineHeight: "18px" }}>
+            Drag to arrange the order the rules are looked at, from top to bottom. The most generous rule will be taken when compared with State and Union rules.
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {order.map((label, idx) => {
+            const isDragging = dragging === idx;
+            const isOver = dragOver === idx && dragging !== idx;
+            return (
+              <div
+                key={label}
+                draggable
                 onDragStart={() => setDragging(idx)}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(idx); }}
                 onDrop={() => handleDrop(idx)}
                 onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                className={`flex items-center gap-[10px] rounded-[4px] border px-[12px] py-[8px] cursor-grab transition-all select-none ${dragging === idx ? "opacity-40" : ""} ${dragOver === idx && dragging !== idx ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white"}`}>
-                <GripVertical size={16} className="text-[#cbced4] shrink-0" />
-                <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#0e416c] text-[10px] font-bold text-white font-['Open_Sans',sans-serif]">
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  borderRadius: 4,
+                  border: isOver ? "1px solid #006fb0" : "1px solid #e0e1e9",
+                  background: isOver ? "#f5faff" : "#ffffff",
+                  padding: "10px 12px",
+                  cursor: "grab",
+                  userSelect: "none",
+                  opacity: isDragging ? 0.4 : 1,
+                  transition: "border-color 0.15s, background 0.15s, opacity 0.15s",
+                }}
+              >
+                <GripVertical size={16} color="#9fa3ad" style={{ flexShrink: 0 }} />
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 22,
+                  height: 22,
+                  flexShrink: 0,
+                  borderRadius: "50%",
+                  background: "#0e416c",
+                  color: "#ffffff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fontFamily: "Open Sans, sans-serif",
+                }}>
                   {idx + 1}
                 </div>
-                <span className="text-[13px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e]">{label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e" }}>
+                  {label}
+                </span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      </SectionBody>
+      </div>
     </div>
   );
 }
