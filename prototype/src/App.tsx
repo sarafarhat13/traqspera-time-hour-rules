@@ -329,10 +329,11 @@ function RuleSetForm({
   const setMp = <K extends keyof MealPenaltyState>(key: K, val: MealPenaltyState[K]) =>
     onMealPenaltyChange({ ...mp, [key]: val });
 
-  const [waiverModalOpen, setWaiverModalOpen] = useState(false);
-  const onDutyGroupList = ON_DUTY_GROUPS.filter((g) => mp.onDutyGroups.includes(g.id));
-  const unassignedGroups = ON_DUTY_GROUPS.filter((g) => !mp.onDutyGroups.includes(g.id));
-  const onDutyMembers = ON_DUTY_ROSTER.filter((e) => mp.onDutyGroups.includes(e.groupId));
+  const [employeeModal, setEmployeeModal] = useState<WaiverFilter | null>(null);
+  const openEmployeeModal = (filter: WaiverFilter) => setEmployeeModal(filter);
+  const onDutyMembers = mp.onDutyScope === "all"
+    ? ON_DUTY_ROSTER
+    : ON_DUTY_ROSTER.filter((e) => mp.onDutyEmployees.includes(e.id));
   const onDutySigned = onDutyMembers.filter((e) => e.signedOn).length;
   const onDutyOutstanding = onDutyMembers.length - onDutySigned;
 
@@ -777,72 +778,69 @@ function RuleSetForm({
 
                 {/* Applies to */}
                 <div className="px-[20px] pt-[16px] pb-[18px]" style={{ borderTop: "1px solid #e0e1e9" }}>
-                  <div className="flex items-start justify-between gap-[16px] mb-[10px]">
-                    <div>
-                      <SectionLabel>Applies To</SectionLabel>
-                      <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] leading-[16px] -mt-[4px]">
-                        Only employees in these groups can record an on-duty meal.
-                      </p>
+                  <SectionLabel>Applies To</SectionLabel>
+                  <div className="grid grid-cols-2 gap-[12px] max-w-[520px]">
+                    <SoftOption
+                      selected={mp.onDutyScope === "all"}
+                      onSelect={() => setMp("onDutyScope", "all")}
+                      title="All employees"
+                      description="Anyone can record an on-duty meal"
+                    />
+                    <SoftOption
+                      selected={mp.onDutyScope === "selected"}
+                      onSelect={() => setMp("onDutyScope", "selected")}
+                      title="Specific employees"
+                      description="Only the employees you choose"
+                    />
+                  </div>
+
+                  <div className="mt-[12px] flex flex-wrap items-center justify-between gap-[12px] rounded-[6px] px-[12px] py-[10px]"
+                    style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
+                    <div className="flex items-center gap-[8px]">
+                      <Users size={14} style={{ color: "#6a6e79" }} />
+                      <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e]">
+                        {mp.onDutyScope === "all"
+                          ? `All ${ON_DUTY_ROSTER.length} employees covered`
+                          : onDutyMembers.length === 0
+                            ? "No employees assigned yet"
+                            : `${onDutyMembers.length} employees assigned`}
+                      </span>
+                      {onDutyMembers.length > 0 && (
+                        <span className="text-[11px] font-['Open_Sans',sans-serif]"
+                          style={{ color: onDutyOutstanding > 0 ? "#b45309" : "#15803d" }}>
+                          · {onDutySigned} signed
+                          {onDutyOutstanding > 0 ? `, ${onDutyOutstanding} outstanding` : ", all up to date"}
+                        </span>
+                      )}
                     </div>
-                    <button type="button" onClick={() => setWaiverModalOpen(true)}
-                      className="shrink-0 inline-flex items-center gap-[6px] rounded-[4px] text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#0063a3] transition-colors hover:bg-[#eef5fa]"
-                      style={{ background: "transparent", border: "1px solid #0063a3", cursor: "pointer", padding: "8px 14px" }}>
-                      <FileText size={13} /> View waiver status
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-[8px]">
-                    {onDutyGroupList.map((g) => (
-                      <span key={g.id}
-                        className="inline-flex items-center gap-[8px] rounded-full px-[12px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#0e416c]"
-                        style={{ background: "#e8f2fa", border: "1px solid #b8dcf5" }}>
-                        <Users size={12} />
-                        {g.name}
-                        <span className="text-[11px] text-[#6a6e79]">{g.department}</span>
-                        <button type="button" onClick={() => setMp("onDutyGroups", mp.onDutyGroups.filter((id) => id !== g.id))}
-                          aria-label={`Remove ${g.name}`}
-                          className="flex h-[16px] w-[16px] items-center justify-center rounded-full hover:bg-[#cfe6f7] transition-colors"
+                    <div className="flex items-center gap-[8px]">
+                      {onDutyOutstanding > 0 && (
+                        <button type="button" onClick={() => openEmployeeModal("unsigned")}
+                          className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#0063a3] hover:underline"
                           style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          <X size={11} />
+                          View outstanding
                         </button>
-                      </span>
-                    ))}
-                    {onDutyGroupList.length === 0 && (
-                      <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
-                        No groups assigned — no one can record an on-duty meal yet.
-                      </span>
-                    )}
-                    {unassignedGroups.length > 0 && (
-                      <div className="relative">
-                        <select
-                          value=""
-                          onChange={(e) => { if (e.target.value) setMp("onDutyGroups", [...mp.onDutyGroups, e.target.value]); }}
-                          aria-label="Add group"
-                          className="tq-field tq-field-select appearance-none rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#0063a3] outline-none cursor-pointer"
-                          style={{ border: "1px dashed #0063a3", fontSize: 12, paddingTop: 6, paddingBottom: 6 }}>
-                          <option value="">+ Add group</option>
-                          {unassignedGroups.map((g) => (
-                            <option key={g.id} value={g.id}>{g.name} · {g.department}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={13} className="absolute right-[10px] top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#0063a3" }} />
-                      </div>
-                    )}
+                      )}
+                      <button type="button" onClick={() => openEmployeeModal("all")}
+                        className="inline-flex items-center gap-[6px] rounded-[4px] text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#0063a3] transition-colors hover:bg-[#eef5fa]"
+                        style={{ background: "transparent", border: "1px solid #0063a3", cursor: "pointer", padding: "7px 14px" }}>
+                        <FileText size={13} />
+                        {mp.onDutyScope === "all" ? "View waiver status" : "Manage employees"}
+                      </button>
+                    </div>
                   </div>
-
-                  {onDutyGroupList.length > 0 && (
-                    <p className="mt-[10px] text-[11px] font-['Open_Sans',sans-serif] leading-[16px]"
-                      style={{ color: onDutyOutstanding > 0 ? "#b45309" : "#6a6e79" }}>
-                      {onDutySigned} of {onDutyMembers.length} employees have signed the on-duty meal agreement
-                      {onDutyOutstanding > 0 ? ` · ${onDutyOutstanding} outstanding` : " · all up to date"}
-                    </p>
-                  )}
                 </div>
               </div>
             </CardShell>
 
-            {waiverModalOpen && (
-              <OnDutyWaiverModal groupIds={mp.onDutyGroups} onClose={() => setWaiverModalOpen(false)} />
+            {employeeModal && (
+              <OnDutyEmployeeModal
+                scope={mp.onDutyScope}
+                selected={mp.onDutyEmployees}
+                initialFilter={employeeModal}
+                onApply={(ids) => setMp("onDutyEmployees", ids)}
+                onClose={() => setEmployeeModal(null)}
+              />
             )}
 
             {/* Free Meal */}
@@ -1431,33 +1429,28 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
 // ─── Meal & Penalties embedded section ───────────────────────────────────────
 type OnDutyMealAction = "flag" | "pay_time_worked" | "flag_and_pay";
 
-type OnDutyGroup = { id: string; name: string; department: string };
-type OnDutyEmployee = { id: string; name: string; groupId: string; role: string; signedOn: string | null };
+type OnDutyEmployee = { id: string; name: string; role: string; signedOn: string | null };
 
-const ON_DUTY_GROUPS: OnDutyGroup[] = [
-  { id: "security",  name: "Security Guards",       department: "Site Services" },
-  { id: "operators", name: "Equipment Operators",   department: "Field Operations" },
-  { id: "dispatch",  name: "Dispatch & Control",    department: "Logistics" },
-  { id: "medics",    name: "Site Medics",           department: "Health & Safety" },
-  { id: "utilities", name: "Utility Crew",          department: "Field Operations" },
-];
-
+// Stands in for a paged employee lookup; a real tenant roster is far larger.
 const ON_DUTY_ROSTER: OnDutyEmployee[] = [
-  { id: "e01", name: "Adam Reyes",        groupId: "security",  role: "Gate Guard",         signedOn: "2026-01-14" },
-  { id: "e02", name: "Priya Natarajan",   groupId: "security",  role: "Patrol Officer",     signedOn: "2026-01-14" },
-  { id: "e03", name: "Marcus Webb",       groupId: "security",  role: "Night Guard",        signedOn: null },
-  { id: "e04", name: "Dana Whitfield",    groupId: "security",  role: "Gate Guard",         signedOn: "2026-03-02" },
-  { id: "e05", name: "Luis Ferreira",     groupId: "operators", role: "Crane Operator",     signedOn: "2026-02-09" },
-  { id: "e06", name: "Grace Okonkwo",     groupId: "operators", role: "Loader Operator",    signedOn: null },
-  { id: "e07", name: "Tom Halvorsen",     groupId: "operators", role: "Excavator Operator", signedOn: "2026-02-09" },
-  { id: "e08", name: "Sofia Marchetti",   groupId: "operators", role: "Grader Operator",    signedOn: null },
-  { id: "e09", name: "Ray Kimura",        groupId: "dispatch",  role: "Dispatcher",         signedOn: "2025-11-20" },
-  { id: "e10", name: "Elena Vasquez",     groupId: "dispatch",  role: "Control Room Lead",  signedOn: "2025-11-20" },
-  { id: "e11", name: "Jordan Pace",       groupId: "dispatch",  role: "Dispatcher",         signedOn: null },
-  { id: "e12", name: "Nadia Farouk",      groupId: "medics",    role: "Site Medic",         signedOn: "2026-04-01" },
-  { id: "e13", name: "Colin Barrett",     groupId: "medics",    role: "Site Medic",         signedOn: "2026-04-01" },
-  { id: "e14", name: "Hannah Lindqvist",  groupId: "utilities", role: "Utility Tech",       signedOn: null },
-  { id: "e15", name: "Devon Achebe",      groupId: "utilities", role: "Utility Tech",       signedOn: "2026-05-18" },
+  { id: "e01", name: "Adam Reyes",        role: "Gate Guard",         signedOn: "2026-01-14" },
+  { id: "e02", name: "Priya Natarajan",   role: "Patrol Officer",     signedOn: "2026-01-14" },
+  { id: "e03", name: "Marcus Webb",       role: "Night Guard",        signedOn: null },
+  { id: "e04", name: "Dana Whitfield",    role: "Gate Guard",         signedOn: "2026-03-02" },
+  { id: "e05", name: "Luis Ferreira",     role: "Crane Operator",     signedOn: "2026-02-09" },
+  { id: "e06", name: "Grace Okonkwo",     role: "Loader Operator",    signedOn: null },
+  { id: "e07", name: "Tom Halvorsen",     role: "Excavator Operator", signedOn: "2026-02-09" },
+  { id: "e08", name: "Sofia Marchetti",   role: "Grader Operator",    signedOn: null },
+  { id: "e09", name: "Ray Kimura",        role: "Dispatcher",         signedOn: "2025-11-20" },
+  { id: "e10", name: "Elena Vasquez",     role: "Control Room Lead",  signedOn: "2025-11-20" },
+  { id: "e11", name: "Jordan Pace",       role: "Dispatcher",         signedOn: null },
+  { id: "e12", name: "Nadia Farouk",      role: "Site Medic",         signedOn: "2026-04-01" },
+  { id: "e13", name: "Colin Barrett",     role: "Site Medic",         signedOn: "2026-04-01" },
+  { id: "e14", name: "Hannah Lindqvist",  role: "Utility Tech",       signedOn: null },
+  { id: "e15", name: "Devon Achebe",      role: "Utility Tech",       signedOn: "2026-05-18" },
+  { id: "e16", name: "Mei Ling Chen",     role: "Site Supervisor",    signedOn: "2026-05-18" },
+  { id: "e17", name: "Owen Brady",        role: "Fuel Truck Driver",  signedOn: null },
+  { id: "e18", name: "Aisha Rahman",      role: "Weighbridge Clerk",  signedOn: "2026-06-02" },
 ];
 
 const formatSignedDate = (iso: string) => {
@@ -1474,7 +1467,7 @@ type MealPenaltyState = {
   freeMealEnabled: boolean; freeMealTrigger: FreeMealTrigger;
   freeMealMinutes: number; freeMealBeforeMinutes: number; freeMealPrompt: string;
   onDutyMealEnabled: boolean; onDutyRequireAgreement: boolean; onDutyNoAgreementAction: OnDutyMealAction;
-  onDutyGroups: string[];
+  onDutyScope: "all" | "selected"; onDutyEmployees: string[];
   penaltiesEnabled: boolean;
   stackingCap: number;
   violations: ViolationRule[];
@@ -1556,7 +1549,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
-  onDutyGroups: ["security", "operators"],
+  onDutyScope: "selected", onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
   penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(),
 });
 
@@ -2019,12 +2012,22 @@ function FilterInput({ placeholder, value, onChange, options }: {
   );
 }
 
-// ─── On-Duty Meal Waiver Status Modal ────────────────────────────────────────
-type WaiverFilter = "all" | "signed" | "unsigned";
+// ─── On-Duty Meal Employees Modal ────────────────────────────────────────────
+type WaiverFilter = "all" | "assigned" | "signed" | "unsigned";
 
-function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose: () => void }) {
-  const [filter, setFilter] = useState<WaiverFilter>("all");
+const PAGE_SIZE = 8;
+
+function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose }: {
+  scope: "all" | "selected";
+  selected: string[];
+  initialFilter: WaiverFilter;
+  onApply: (ids: string[]) => void;
+  onClose: () => void;
+}) {
+  const [filter, setFilter] = useState<WaiverFilter>(initialFilter);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [draft, setDraft] = useState<string[]>(selected);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -2032,41 +2035,51 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const groupName = (id: string) => ON_DUTY_GROUPS.find((g) => g.id === id)?.name ?? id;
-  const inScope = ON_DUTY_ROSTER.filter((e) => groupIds.includes(e.groupId));
+  const pickingEmployees = scope === "selected";
+  const inScope = pickingEmployees ? ON_DUTY_ROSTER.filter((e) => draft.includes(e.id)) : ON_DUTY_ROSTER;
   const signedCount = inScope.filter((e) => e.signedOn).length;
   const outstanding = inScope.length - signedCount;
 
-  const rows = inScope.filter((e) => {
+  const matches = ON_DUTY_ROSTER.filter((e) => {
+    if (filter === "assigned" && !draft.includes(e.id)) return false;
     if (filter === "signed" && !e.signedOn) return false;
     if (filter === "unsigned" && e.signedOn) return false;
     const q = query.trim().toLowerCase();
-    return !q || e.name.toLowerCase().includes(q) || e.role.toLowerCase().includes(q) || groupName(e.groupId).toLowerCase().includes(q);
+    return !q || e.name.toLowerCase().includes(q) || e.role.toLowerCase().includes(q);
   });
 
+  const pageCount = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const rows = matches.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  const setFilterAndReset = (f: WaiverFilter) => { setFilter(f); setPage(0); };
+  const toggle = (id: string) =>
+    setDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
+
   const tabs: { value: WaiverFilter; label: string; count: number }[] = [
-    { value: "all",      label: "All",        count: inScope.length },
-    { value: "signed",   label: "Signed",     count: signedCount },
-    { value: "unsigned", label: "Not signed", count: outstanding },
+    { value: "all",      label: "All",        count: ON_DUTY_ROSTER.length },
+    ...(pickingEmployees ? [{ value: "assigned" as const, label: "Assigned", count: draft.length }] : []),
+    { value: "signed",   label: "Signed",     count: ON_DUTY_ROSTER.filter((e) => e.signedOn).length },
+    { value: "unsigned", label: "Not signed", count: ON_DUTY_ROSTER.filter((e) => !e.signedOn).length },
   ];
 
   const th = "px-[16px] py-[10px] text-left text-[11px] font-semibold uppercase tracking-[0.4px] text-[#6a6e79]";
-  const td = "px-[16px] py-[12px] text-[13px] text-[#252a2e] align-middle";
+  const td = "px-[16px] py-[11px] text-[13px] text-[#252a2e] align-middle";
 
   return (
     <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 200, background: "rgba(0,0,0,0.45)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label="On-duty meal agreement status"
+      <div role="dialog" aria-modal="true" aria-label="On-duty meal employees"
         className="bg-white rounded-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.18)] flex flex-col font-['Open_Sans',sans-serif]"
-        style={{ width: 780, maxHeight: "88vh", overflow: "hidden" }}>
+        style={{ width: 720, maxHeight: "88vh", overflow: "hidden" }}>
         {/* Header */}
         <div className="flex items-start justify-between px-[24px] py-[18px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
           <div>
-            <p className="text-[18px] font-semibold text-[#252a2e]">On-Duty Meal Agreements</p>
+            <p className="text-[18px] font-semibold text-[#252a2e]">On-Duty Meal Employees</p>
             <p className="text-[12px] text-[#6a6e79] mt-[2px]">
-              {groupIds.length === 0
-                ? "No groups assigned to this rule yet."
-                : `${groupIds.map(groupName).join(", ")} · ${inScope.length} employees`}
+              {pickingEmployees
+                ? "Choose who can record an on-duty meal and review their signed agreements."
+                : "This rule applies to all employees. Review their signed agreements below."}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
@@ -2080,7 +2093,7 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
         <div className="px-[24px] pt-[16px]">
           <div className="flex items-center justify-between mb-[6px]">
             <span className="text-[12px] text-[#464b52]">
-              <strong className="text-[#252a2e]">{signedCount} of {inScope.length}</strong> have a signed agreement on file
+              <strong className="text-[#252a2e]">{signedCount} of {inScope.length}</strong> covered employees have a signed agreement
             </span>
             {outstanding > 0 && (
               <span className="text-[12px] font-semibold text-[#b45309]">{outstanding} outstanding</span>
@@ -2095,22 +2108,22 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
         <div className="flex items-center justify-between gap-[12px] px-[24px] py-[16px]">
           <div className="flex gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6" }}>
             {tabs.map((t) => (
-              <button key={t.value} type="button" onClick={() => setFilter(t.value)}
+              <button key={t.value} type="button" onClick={() => setFilterAndReset(t.value)}
                 className="rounded-[4px] text-[12px] transition-colors"
                 style={{
                   background: filter === t.value ? "#ffffff" : "transparent",
                   color: filter === t.value ? "#0e416c" : "#6a6e79",
                   fontWeight: filter === t.value ? 600 : 400,
-                  border: "none", cursor: "pointer", padding: "6px 14px",
+                  border: "none", cursor: "pointer", padding: "6px 12px",
                   boxShadow: filter === t.value ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
                 }}>
                 {t.label} ({t.count})
               </button>
             ))}
           </div>
-          <div className="relative" style={{ width: 240 }}>
+          <div className="relative" style={{ width: 220 }}>
             <Search size={14} className="absolute left-[10px] top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#6a6e79" }} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, role, or group"
+            <input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Search name or role"
               className="tq-field w-full rounded-[4px] bg-white text-[#252a2e] outline-none"
               style={{ border: "1px solid #6a6e79", paddingLeft: 32 }} />
           </div>
@@ -2122,52 +2135,54 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
             <table className="w-full border-collapse">
               <thead>
                 <tr style={{ background: "#f7f7fb" }}>
+                  {pickingEmployees && <th className={th} style={{ width: 44 }} aria-label="Assigned" />}
                   <th className={th}>Employee</th>
-                  <th className={th}>Group</th>
                   <th className={th}>Agreement</th>
                   <th className={th} style={{ textAlign: "right" }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((e, i) => (
-                  <tr key={e.id} style={{ borderTop: i === 0 ? "1px solid #e0e1e9" : "1px solid #eef0f3" }}>
-                    <td className={td}>
-                      <span className="font-semibold">{e.name}</span>
-                      <span className="block text-[11px] text-[#6a6e79]">{e.role}</span>
-                    </td>
-                    <td className={`${td} text-[#464b52]`}>{groupName(e.groupId)}</td>
-                    <td className={td}>
-                      {e.signedOn ? (
-                        <span className="inline-flex items-center gap-[6px] text-[12px] text-[#15803d]">
-                          <Check size={13} /> Signed {formatSignedDate(e.signedOn)}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-[6px] text-[12px] text-[#b45309]">
-                          <AlertTriangle size={13} /> Not signed
-                        </span>
+                {rows.map((e, i) => {
+                  const assigned = draft.includes(e.id);
+                  return (
+                    <tr key={e.id} style={{ borderTop: i === 0 ? "1px solid #e0e1e9" : "1px solid #eef0f3" }}>
+                      {pickingEmployees && (
+                        <td className={td}>
+                          <input type="checkbox" checked={assigned} onChange={() => toggle(e.id)}
+                            aria-label={`Assign ${e.name}`}
+                            style={{ width: 15, height: 15, accentColor: "#0063a3", cursor: "pointer" }} />
+                        </td>
                       )}
-                    </td>
-                    <td className={td} style={{ textAlign: "right" }}>
-                      {e.signedOn ? (
-                        <button type="button" onClick={() => toast.success(`Opened agreement for ${e.name}`)}
+                      <td className={td}>
+                        <span className="font-semibold">{e.name}</span>
+                        <span className="block text-[11px] text-[#6a6e79]">{e.role}</span>
+                      </td>
+                      <td className={td}>
+                        {e.signedOn ? (
+                          <span className="inline-flex items-center gap-[6px] text-[12px] text-[#15803d]">
+                            <Check size={13} /> Signed {formatSignedDate(e.signedOn)}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-[6px] text-[12px] text-[#b45309]">
+                            <AlertTriangle size={13} /> Not signed
+                          </span>
+                        )}
+                      </td>
+                      <td className={td} style={{ textAlign: "right" }}>
+                        <button type="button"
+                          onClick={() => toast.success(e.signedOn ? `Opened agreement for ${e.name}` : `Reminder sent to ${e.name}`)}
                           className="text-[12px] text-[#0063a3] hover:underline"
                           style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          View
+                          {e.signedOn ? "View" : "Send reminder"}
                         </button>
-                      ) : (
-                        <button type="button" onClick={() => toast.success(`Reminder sent to ${e.name}`)}
-                          className="text-[12px] text-[#0063a3] hover:underline"
-                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          Send reminder
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {rows.length === 0 && (
                   <tr style={{ borderTop: "1px solid #e0e1e9" }}>
-                    <td colSpan={4} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
-                      {inScope.length === 0 ? "Assign a group to this rule to see employees." : "No employees match this filter."}
+                    <td colSpan={pickingEmployees ? 4 : 3} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
+                      No employees match this search.
                     </td>
                   </tr>
                 )}
@@ -2176,9 +2191,33 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
           </div>
         </div>
 
+        {/* Paging */}
+        <div className="flex items-center justify-between px-[24px] py-[12px]">
+            <span className="text-[12px] text-[#6a6e79]">
+              {matches.length === 0 ? "No results" : `${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + rows.length} of ${matches.length}`}
+            </span>
+            <div className="flex items-center gap-[8px]">
+              <button type="button" onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0}
+                className="rounded-[4px] text-[12px]"
+                style={{ background: "transparent", border: "1px solid #cbced4", padding: "5px 10px",
+                  color: safePage === 0 ? "#a3a3a3" : "#464b52", cursor: safePage === 0 ? "not-allowed" : "pointer" }}>
+                Previous
+              </button>
+              <span className="text-[12px] text-[#6a6e79]">Page {safePage + 1} of {pageCount}</span>
+              <button type="button" onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))} disabled={safePage >= pageCount - 1}
+                className="rounded-[4px] text-[12px]"
+                style={{ background: "transparent", border: "1px solid #cbced4", padding: "5px 10px",
+                  color: safePage >= pageCount - 1 ? "#a3a3a3" : "#464b52", cursor: safePage >= pageCount - 1 ? "not-allowed" : "pointer" }}>
+                Next
+              </button>
+            </div>
+        </div>
+
         {/* Footer */}
-        <div className="flex items-center justify-between px-[24px] py-[16px] mt-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
-          <span className="text-[12px] text-[#6a6e79]">Showing {rows.length} of {inScope.length} employees</span>
+        <div className="flex items-center justify-between px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
+          <span className="text-[12px] text-[#6a6e79]">
+            {pickingEmployees ? `${draft.length} employees assigned` : `${ON_DUTY_ROSTER.length} employees covered`}
+          </span>
           <div className="flex items-center gap-[10px]">
             {outstanding > 0 && (
               <button type="button" onClick={() => toast.success(`Reminder sent to ${outstanding} employees`)}
@@ -2187,10 +2226,10 @@ function OnDutyWaiverModal({ groupIds, onClose }: { groupIds: string[]; onClose:
                 Remind all outstanding
               </button>
             )}
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={() => { onApply(draft); onClose(); }}
               className="rounded-[4px] text-[13px] font-semibold text-white transition-colors hover:bg-[#005a91]"
               style={{ background: "#0063a3", border: "none", cursor: "pointer", padding: "8px 20px" }}>
-              Close
+              {pickingEmployees ? "Save" : "Close"}
             </button>
           </div>
         </div>
