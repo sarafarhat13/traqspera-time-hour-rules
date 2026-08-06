@@ -207,6 +207,68 @@ const TABLE_HEADER_BG = "#f1f1f6";
 const TABLE_HEADER_BORDER = "#e0e1e9";
 const TABLE_HEADER_TEXT = "#464b52";
 
+// ─── Folder-style tabs for rule-set sections ──────────────────────────────────
+function InnerTabBar<T extends string>({ tabs, active, onChange }: {
+  tabs: { key: T; label: string }[];
+  active: T;
+  onChange: (t: T) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      style={{
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 4,
+        background: "#f1f1f6",
+        borderBottom: "1px solid #d0d1d9",
+        padding: "8px 16px 0",
+      }}
+    >
+      {tabs.map((t) => {
+        const isActive = t.key === active;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(t.key)}
+            style={{
+              all: "unset",
+              boxSizing: "border-box",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              zIndex: isActive ? 2 : 1,
+              minHeight: 34,
+              padding: "8px 16px",
+              marginBottom: isActive ? -1 : 0,
+              fontFamily: "Open Sans, sans-serif",
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              lineHeight: 1.2,
+              whiteSpace: "nowrap",
+              cursor: "pointer",
+              color: isActive ? "#0e416c" : "#6a6e79",
+              background: isActive ? "#ffffff" : "#e8e9ef",
+              borderTop: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
+              borderLeft: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
+              borderRight: isActive ? "1px solid #d0d1d9" : "1px solid #d8d9e0",
+              borderBottom: isActive ? "1px solid #ffffff" : "1px solid transparent",
+              borderRadius: "6px 6px 0 0",
+              boxShadow: isActive ? "none" : "inset 0 -1px 0 rgba(0,0,0,0.04)",
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 
 // ─── Reusable tabbed rule-set container ───────────────────────────────────────
 type RuleSetTab = "daily" | "weekly" | "break" | "kiosk" | "equipment" | "meal" | "penalties";
@@ -278,17 +340,11 @@ function RuleSetForm({
         </div>
       )}
 
-      <div style={{ padding: "0 16px", background: "#f7f7fb", borderBottom: "1px solid #e0e1e9" }}>
-        <ModusWcTabs
-          aria-label="Rule set sections"
-          size="sm"
-          tabStyle="lifted"
-          activeTabIndex={Math.max(0, visibleTabs.findIndex((t) => t.key === activeTab))}
-          tabs={visibleTabs.map((t) => ({ label: t.label }))}
-          onTabChange={(e) => {
-            const next = visibleTabs[e.detail.newTab];
-            if (next) setActiveTab(next.key);
-          }}
+      <div style={{ padding: "0", background: "#ffffff" }}>
+        <InnerTabBar
+          tabs={visibleTabs}
+          active={activeTab}
+          onChange={setActiveTab}
         />
       </div>
 
