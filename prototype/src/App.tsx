@@ -53,8 +53,7 @@ type RuleSetData = {
 
 // ─── Default data ──────────────────────────────────────────────────────────────
 const defaultDays = (): DayRow[] => [
-  { label: "Mon – Thur", totalHours: 0, regHours: 8, otHours: 2, ot2Hours: 0, travelHours: 1 },
-  { label: "Friday",     totalHours: 0, regHours: 8, otHours: 2, ot2Hours: 0, travelHours: 1 },
+  { label: "Mon – Fri",  totalHours: 0, regHours: 8, otHours: 2, ot2Hours: 0, travelHours: 1 },
   { label: "Saturday",   totalHours: 0, regHours: 6, otHours: 2, ot2Hours: 0, travelHours: 1 },
   { label: "Sunday",     totalHours: 0, regHours: 0, otHours: 4, ot2Hours: 2, travelHours: 1 },
   { label: "7th Consecutive Day", totalHours: 0, regHours: 0, otHours: 0, ot2Hours: 8, travelHours: 1 },
