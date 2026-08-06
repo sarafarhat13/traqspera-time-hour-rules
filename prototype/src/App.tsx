@@ -203,55 +203,6 @@ function CellInput({ value, onChange }: { value: number; onChange: (v: number) =
   );
 }
 
-// ─── Inner tab bar used inside each rule-set container ────────────────────────
-function InnerTabBar<T extends string>({ tabs, active, onChange }: {
-  tabs: { key: T; label: string }[];
-  active: T;
-  onChange: (t: T) => void;
-}) {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "flex-end",
-      gap: 0,
-      borderBottom: "1px solid #e0e1e9",
-      background: "#f1f1f6",
-      padding: "8px 16px 0",
-    }}>
-      {tabs.map((t) => {
-        const isActive = t.key === active;
-        return (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => onChange(t.key)}
-            style={{
-              position: "relative",
-              padding: "8px 14px",
-              fontSize: 12,
-              fontFamily: "Open Sans, sans-serif",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              cursor: "pointer",
-              borderTop: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
-              borderLeft: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
-              borderRight: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
-              borderBottom: isActive ? "1px solid #ffffff" : "1px solid transparent",
-              borderRadius: "4px 4px 0 0",
-              background: isActive ? "#ffffff" : "transparent",
-              color: isActive ? "#0063a3" : "#6a6e79",
-              marginBottom: isActive ? -1 : 0,
-              zIndex: isActive ? 1 : 0,
-            }}
-          >
-            {t.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 const TABLE_HEADER_BG = "#f1f1f6";
 const TABLE_HEADER_BORDER = "#e0e1e9";
 const TABLE_HEADER_TEXT = "#464b52";
@@ -327,11 +278,19 @@ function RuleSetForm({
         </div>
       )}
 
-      <InnerTabBar
-        tabs={visibleTabs}
-        active={activeTab}
-        onChange={setActiveTab}
-      />
+      <div style={{ padding: "0 16px", background: "#f7f7fb", borderBottom: "1px solid #e0e1e9" }}>
+        <ModusWcTabs
+          aria-label="Rule set sections"
+          size="sm"
+          tabStyle="lifted"
+          activeTabIndex={Math.max(0, visibleTabs.findIndex((t) => t.key === activeTab))}
+          tabs={visibleTabs.map((t) => ({ label: t.label }))}
+          onTabChange={(e) => {
+            const next = visibleTabs[e.detail.newTab];
+            if (next) setActiveTab(next.key);
+          }}
+        />
+      </div>
 
       <div className="px-[20px] py-[16px]">
 
