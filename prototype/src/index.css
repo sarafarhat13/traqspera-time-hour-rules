@@ -29,3 +29,47 @@ textarea {
 .traqspera-shell {
   font-family: "Open Sans", sans-serif;
 }
+
+/*
+  Modus WC styles ship an unlayered Tailwind-style preflight:
+    *, ::before, ::after { border: 0px solid ... }
+  Unlayered rules beat Tailwind v4 @layer utilities, so classes like
+  `border`, `border-b`, and `border-[#…]` never show. Re-declare the
+  utilities we rely on outside any @layer so they win the cascade.
+*/
+.border { border-width: 1px; border-style: solid; }
+.border-0 { border-width: 0; }
+.border-2 { border-width: 2px; border-style: solid; }
+.border-4 { border-width: 4px; border-style: solid; }
+.border-solid { border-style: solid; }
+.border-t { border-top-width: 1px; border-top-style: solid; }
+.border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+.border-l { border-left-width: 1px; border-left-style: solid; }
+.border-r { border-right-width: 1px; border-right-style: solid; }
+.border-x { border-left-width: 1px; border-right-width: 1px; border-left-style: solid; border-right-style: solid; }
+.border-y { border-top-width: 1px; border-bottom-width: 1px; border-top-style: solid; border-bottom-style: solid; }
+.border-t-0 { border-top-width: 0; }
+.border-b-0 { border-bottom-width: 0; }
+.border-l-0 { border-left-width: 0; }
+.border-r-0 { border-right-width: 0; }
+.first\:border-t-0:first-child { border-top-width: 0; }
+
+.border-\[\#6a6e79\] { border-color: #6a6e79; }
+.border-\[\#e0e1e9\] { border-color: #e0e1e9; }
+.border-\[\#f0f0f4\] { border-color: #f0f0f4; }
+.border-\[\#d0d1d9\] { border-color: #d0d1d9; }
+.border-\[\#cbced4\] { border-color: #cbced4; }
+.border-\[\#006fb0\] { border-color: #006fb0; }
+.border-\[\#dc3545\] { border-color: #dc3545; }
+.border-\[\#856404\] { border-color: #856404; }
+.border-\[\#fbad26\] { border-color: #fbad26; }
+.border-\[\#b8d9f0\] { border-color: #b8d9f0; }
+.border-\[\#dcedf9\] { border-color: #dcedf9; }
+.border-\[\#fde68a\] { border-color: #fde68a; }
+.border-\[\#fbbf24\] { border-color: #fbbf24; }
+.border-\[\#ab1f26\] { border-color: #ab1f26; }
+.border-\[\#f0d080\] { border-color: #f0d080; }
+
+.focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
+.hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
+.hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }

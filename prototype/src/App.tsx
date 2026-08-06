@@ -87,18 +87,23 @@ function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 64 
 }) {
   return (
     <div className="flex items-center gap-[6px]">
-      <div className="flex items-center rounded-[4px] border border-[#6a6e79] bg-white">
+      <div
+        className="flex items-center rounded-[4px] bg-white"
+        style={{ border: "1px solid #6a6e79" }}
+      >
         <input type="text" inputMode="decimal" value={value} min={min}
           onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }}
           className="rounded-l-[4px] px-[8px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none bg-transparent"
-          style={{ width }} />
-        <div className="flex flex-col border-l border-[#6a6e79]">
+          style={{ width, border: "none" }} />
+        <div className="flex flex-col" style={{ borderLeft: "1px solid #6a6e79" }}>
           <button type="button" onClick={() => onChange(Math.round((value + step) * 10) / 10)}
-            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-tr-[3px]">
+            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-tr-[3px]"
+            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
             <ChevronUp size={10} className="text-[#464b52]" />
           </button>
           <button type="button" onClick={() => onChange(Math.max(min, Math.round((value - step) * 10) / 10))}
-            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-br-[3px] border-t border-[#6a6e79]">
+            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-br-[3px]"
+            style={{ border: "none", borderTop: "1px solid #6a6e79", background: "transparent", padding: 0, cursor: "pointer" }}>
             <ChevronDown size={10} className="text-[#464b52]" />
           </button>
         </div>
@@ -114,8 +119,12 @@ function SelectField({ value, onChange, options, placeholder }: {
 }) {
   return (
     <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-[4px] border border-[#6a6e79] bg-white px-[8px] pr-[28px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] outline-none cursor-pointer w-full">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none rounded-[4px] bg-white px-[8px] pr-[28px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] outline-none cursor-pointer w-full"
+        style={{ border: "1px solid #6a6e79" }}
+      >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -554,7 +563,8 @@ function RuleSetForm({
                         description="Meal is scheduled at a specific clock time each day"
                       >
                         <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
-                          className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
+                          className="rounded-[4px] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                          style={{ border: "1px solid #6a6e79" }} />
                       </SoftOption>
                     </div>
                   </div>
@@ -612,7 +622,8 @@ function RuleSetForm({
                         description="Meal is scheduled at a specific clock time each day"
                       >
                         <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
-                          className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
+                          className="rounded-[4px] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                          style={{ border: "1px solid #6a6e79" }} />
                       </SoftOption>
                     </div>
                   </div>
@@ -759,7 +770,8 @@ function RuleSetForm({
                       onChange={(e) => setMp("freeMealPrompt", e.target.value)}
                       rows={3}
                       placeholder="Enter the message employees will see during their meal break..."
-                      className="w-full rounded-[4px] border border-[#6a6e79] bg-white px-[10px] py-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0] resize-none leading-[18px]"
+                      className="w-full rounded-[4px] bg-white px-[10px] py-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none resize-none leading-[18px]"
+                      style={{ border: "1px solid #6a6e79" }}
                     />
                     <p className="mt-[4px] text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
                       {mp.freeMealPrompt.length}/200 characters
