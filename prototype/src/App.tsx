@@ -159,7 +159,16 @@ function SectionDivider({ children }: { children: ReactNode }) {
 // White panel body below a SectionDivider
 function SectionBody({ children, rounded = "bottom" }: { children: ReactNode; rounded?: "bottom" | "all" }) {
   return (
-    <div className={`bg-white border border-[#e0e1e9] border-t-0 ${rounded === "bottom" ? "rounded-b-[6px]" : "rounded-[6px]"} shadow-[0_1px_3px_rgba(0,0,0,0.06)]`}>
+    <div
+      className={`${rounded === "bottom" ? "rounded-b-[6px]" : "rounded-[6px]"}`}
+      style={{
+        background: "#ffffff",
+        border: "1px solid #e0e1e9",
+        borderTop: "none",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        overflow: "hidden",
+      }}
+    >
       {children}
     </div>
   );
@@ -348,7 +357,7 @@ function RuleSetForm({
         />
       </div>
 
-      <div className="px-[20px] py-[16px]">
+      <div style={{ padding: "20px", background: "#f5f5f8" }}>
 
         {/* ── Daily Rules ── */}
         {activeTab === "daily" && (
@@ -519,54 +528,38 @@ function RuleSetForm({
 
         {/* ── Meal Periods ── */}
         {activeTab === "meal" && (
-          <div className="flex flex-col gap-[16px]">
+          <div className="flex flex-col gap-[24px]">
             {/* Meal 1 */}
             <CardShell title="First Meal Period" badge="Meal 1" badgeColor="blue"
               action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.meal1Enabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.meal1Enabled} onChange={(v) => setMp("meal1Enabled", v)} /></div>}>
               <div className={`transition-opacity duration-200 ${mp.meal1Enabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-2 gap-0 divide-x divide-[#f0f0f4] px-0 py-0">
+                <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
                   {/* Trigger */}
-                  <div className="px-[20px] py-[16px]">
+                  <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                     <SectionLabel>Meal Trigger</SectionLabel>
                     <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[12px] leading-[15px]">Choose when this meal period is required during a shift.</p>
-                    <div className="flex flex-col gap-[8px]">
-                      {/* Relative option */}
-                      <div onClick={() => setMp("meal1Schedule", "relative")}
-                        className={`cursor-pointer rounded-[6px] border-2 px-[14px] py-[10px] transition-all ${mp.meal1Schedule === "relative" ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white hover:border-[#b8d9f0]"}`}>
-                        <div className="flex items-center gap-[8px] mb-[6px]">
-                          <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${mp.meal1Schedule === "relative" ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                            {mp.meal1Schedule === "relative" && <div className="h-[7px] w-[7px] rounded-full bg-[#006fb0]" />}
-                          </div>
-                          <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Relative to shift start</span>
-                        </div>
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[8px] ml-[22px]">Meal must begin after this many hours worked</p>
-                        {mp.meal1Schedule === "relative" && (
-                          <div className="ml-[22px]">
-                            <NumberInput value={mp.meal1Trigger} onChange={(v) => setMp("meal1Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
-                          </div>
-                        )}
-                      </div>
-                      {/* Fixed option */}
-                      <div onClick={() => setMp("meal1Schedule", "fixed")}
-                        className={`cursor-pointer rounded-[6px] border-2 px-[14px] py-[10px] transition-all ${mp.meal1Schedule === "fixed" ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white hover:border-[#b8d9f0]"}`}>
-                        <div className="flex items-center gap-[8px] mb-[6px]">
-                          <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${mp.meal1Schedule === "fixed" ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                            {mp.meal1Schedule === "fixed" && <div className="h-[7px] w-[7px] rounded-full bg-[#006fb0]" />}
-                          </div>
-                          <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Fixed schedule time</span>
-                        </div>
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[8px] ml-[22px]">Meal is scheduled at a specific clock time each day</p>
-                        {mp.meal1Schedule === "fixed" && (
-                          <div className="ml-[22px]">
-                            <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
-                              className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex flex-col gap-[4px]">
+                      <SoftOption
+                        selected={mp.meal1Schedule === "relative"}
+                        onSelect={() => setMp("meal1Schedule", "relative")}
+                        title="Relative to shift start"
+                        description="Meal must begin after this many hours worked"
+                      >
+                        <NumberInput value={mp.meal1Trigger} onChange={(v) => setMp("meal1Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                      </SoftOption>
+                      <SoftOption
+                        selected={mp.meal1Schedule === "fixed"}
+                        onSelect={() => setMp("meal1Schedule", "fixed")}
+                        title="Fixed schedule time"
+                        description="Meal is scheduled at a specific clock time each day"
+                      >
+                        <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
+                          className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
+                      </SoftOption>
                     </div>
                   </div>
                   {/* Settings */}
-                  <div className="px-[20px] py-[16px] flex flex-col gap-[20px]">
+                  <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
                     <div>
                       <SectionLabel>Meal Duration</SectionLabel>
                       <FieldLabel>Minimum required length</FieldLabel>
@@ -580,7 +573,7 @@ function RuleSetForm({
                       </div>
                     </div>
                     {/* Summary pill */}
-                    <div className="mt-auto flex items-start gap-[8px] rounded-[4px] bg-[#f5f5f8] border border-[#e0e1e9] px-[10px] py-[8px]">
+                    <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal1Schedule === "relative"
@@ -598,47 +591,33 @@ function RuleSetForm({
             <CardShell title="Second Meal Period" badge="Meal 2" badgeColor="blue"
               action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.meal2Enabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.meal2Enabled} onChange={(v) => setMp("meal2Enabled", v)} /></div>}>
               <div className={`transition-opacity duration-200 ${mp.meal2Enabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-2 gap-0 divide-x divide-[#f0f0f4]">
+                <div className="grid grid-cols-2 gap-0">
                   {/* Trigger */}
-                  <div className="px-[20px] py-[16px]">
+                  <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                     <SectionLabel>Meal Trigger</SectionLabel>
                     <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[12px] leading-[15px]">Choose when this meal period is required during a shift.</p>
-                    <div className="flex flex-col gap-[8px]">
-                      <div onClick={() => setMp("meal2Schedule", "relative")}
-                        className={`cursor-pointer rounded-[6px] border-2 px-[14px] py-[10px] transition-all ${mp.meal2Schedule === "relative" ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white hover:border-[#b8d9f0]"}`}>
-                        <div className="flex items-center gap-[8px] mb-[6px]">
-                          <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${mp.meal2Schedule === "relative" ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                            {mp.meal2Schedule === "relative" && <div className="h-[7px] w-[7px] rounded-full bg-[#006fb0]" />}
-                          </div>
-                          <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Relative to shift start</span>
-                        </div>
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[8px] ml-[22px]">Meal must begin after this many hours worked</p>
-                        {mp.meal2Schedule === "relative" && (
-                          <div className="ml-[22px]">
-                            <NumberInput value={mp.meal2Trigger} onChange={(v) => setMp("meal2Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
-                          </div>
-                        )}
-                      </div>
-                      <div onClick={() => setMp("meal2Schedule", "fixed")}
-                        className={`cursor-pointer rounded-[6px] border-2 px-[14px] py-[10px] transition-all ${mp.meal2Schedule === "fixed" ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white hover:border-[#b8d9f0]"}`}>
-                        <div className="flex items-center gap-[8px] mb-[6px]">
-                          <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${mp.meal2Schedule === "fixed" ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                            {mp.meal2Schedule === "fixed" && <div className="h-[7px] w-[7px] rounded-full bg-[#006fb0]" />}
-                          </div>
-                          <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Fixed schedule time</span>
-                        </div>
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[8px] ml-[22px]">Meal is scheduled at a specific clock time each day</p>
-                        {mp.meal2Schedule === "fixed" && (
-                          <div className="ml-[22px]">
-                            <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
-                              className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex flex-col gap-[4px]">
+                      <SoftOption
+                        selected={mp.meal2Schedule === "relative"}
+                        onSelect={() => setMp("meal2Schedule", "relative")}
+                        title="Relative to shift start"
+                        description="Meal must begin after this many hours worked"
+                      >
+                        <NumberInput value={mp.meal2Trigger} onChange={(v) => setMp("meal2Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                      </SoftOption>
+                      <SoftOption
+                        selected={mp.meal2Schedule === "fixed"}
+                        onSelect={() => setMp("meal2Schedule", "fixed")}
+                        title="Fixed schedule time"
+                        description="Meal is scheduled at a specific clock time each day"
+                      >
+                        <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
+                          className="rounded-[4px] border border-[#6a6e79] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
+                      </SoftOption>
                     </div>
                   </div>
                   {/* Settings */}
-                  <div className="px-[20px] py-[16px] flex flex-col gap-[20px]">
+                  <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
                     <div>
                       <SectionLabel>Meal Duration</SectionLabel>
                       <FieldLabel>Minimum required length</FieldLabel>
@@ -651,7 +630,7 @@ function RuleSetForm({
                         <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] leading-[20px]">State-compliant waiver allowed when mutual written consent exists</span>
                       </div>
                     </div>
-                    <div className="mt-auto flex items-start gap-[8px] rounded-[4px] bg-[#f5f5f8] border border-[#e0e1e9] px-[10px] py-[8px]">
+                    <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal2Schedule === "relative"
@@ -669,7 +648,7 @@ function RuleSetForm({
             <CardShell title="On-Duty Meal" badge="CA Labor Code § 512(e)" badgeColor="blue"
               action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.onDutyMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyMealEnabled", v)} /></div>}>
               <div className={`transition-opacity duration-200 ${mp.onDutyMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-3 gap-[24px] px-[20px] py-[16px]">
+                <div className="grid grid-cols-3 gap-[28px] px-[20px] py-[18px]">
                   {/* Agreement requirement */}
                   <div>
                     <SectionLabel>Agreement Requirement</SectionLabel>
@@ -680,7 +659,7 @@ function RuleSetForm({
                       </span>
                     </div>
                     {mp.onDutyRequireAgreement && (
-                      <div className="mt-[10px] flex items-start gap-[8px] rounded-[4px] bg-[#f5faff] border border-[#dcedf9] px-[10px] py-[8px]">
+                      <div className="mt-[10px] flex items-start gap-[8px] rounded-[6px] bg-[#eef5fa] px-[10px] py-[8px]">
                         <Info size={13} className="mt-[1px] shrink-0 text-[#006fb0]" />
                         <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                           Employee must have a valid on-duty meal agreement on file before this meal type can be recorded.
@@ -692,19 +671,18 @@ function RuleSetForm({
                   {/* When no agreement */}
                   <div>
                     <SectionLabel>When Taken Without Agreement</SectionLabel>
-                    <div className="flex flex-col gap-[8px]">
+                    <div className="flex flex-col gap-[4px]">
                       {([
                         { value: "flag",          label: "Flag entry only" },
                         { value: "pay_time_worked", label: "Pay as time worked" },
                         { value: "flag_and_pay",  label: "Flag & pay as time worked" },
                       ] as { value: OnDutyMealAction; label: string }[]).map((opt) => (
-                        <label key={opt.value} className="flex cursor-pointer items-center gap-[8px]">
-                          <div onClick={() => setMp("onDutyNoAgreementAction", opt.value)}
-                            className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${mp.onDutyNoAgreementAction === opt.value ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                            {mp.onDutyNoAgreementAction === opt.value && <div className="h-[8px] w-[8px] rounded-full bg-[#006fb0]" />}
-                          </div>
-                          <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e]">{opt.label}</span>
-                        </label>
+                        <SoftOption
+                          key={opt.value}
+                          selected={mp.onDutyNoAgreementAction === opt.value}
+                          onSelect={() => setMp("onDutyNoAgreementAction", opt.value)}
+                          title={opt.label}
+                        />
                       ))}
                     </div>
                   </div>
@@ -712,7 +690,7 @@ function RuleSetForm({
                   {/* Summary */}
                   <div>
                     <SectionLabel>Effective Behavior</SectionLabel>
-                    <div className="rounded-[4px] bg-[#f5f5f8] border border-[#e0e1e9] px-[12px] py-[10px] flex flex-col gap-[6px]">
+                    <div className="rounded-[6px] bg-[#f1f1f6] px-[12px] py-[12px] flex flex-col gap-[8px]">
                       <div className="flex items-start gap-[6px]">
                         <Check size={12} className="mt-[2px] shrink-0 text-[#28a745]" />
                         <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
@@ -1068,7 +1046,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
   const configuredUnions = Object.keys(unionRulesMap);
 
   return (
-    <div className="flex flex-col gap-[20px]">
+    <div className="flex flex-col gap-[28px]">
       {/* Precedence */}
       <PrecedenceSection />
 
@@ -1358,21 +1336,94 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(),
 });
 
-function CardShell({ title, badge, badgeColor = "blue", action, children }: {
+function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", action, children }: {
   title: string; badge?: string; badgeColor?: "blue" | "amber" | "red";
   action?: ReactNode; children: ReactNode;
 }) {
-  const badgeStyles = { blue: "bg-[#dcedf9] text-[#006fb0]", amber: "bg-[#fff3cd] text-[#856404]", red: "bg-[#fce8e8] text-[#c62828]" };
   return (
-    <div className="rounded-[6px] border border-[#e0e1e9] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[12px]">
-        <div className="flex items-center gap-[10px]">
-          <span className="text-[13px] font-bold font-['Open_Sans',sans-serif] text-[#0e416c]">{title}</span>
-
-        </div>
+    <div
+      style={{
+        borderRadius: 8,
+        border: "1px solid #e0e1e9",
+        background: "#ffffff",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "14px 20px",
+          borderBottom: "1px solid #f0f0f4",
+          background: "#ffffff",
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#0e416c" }}>
+          {title}
+        </span>
         {action}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Soft selectable row used inside meal-period cards (matches Figma: tinted active group, plain inactive). */
+function SoftOption({
+  selected,
+  onSelect,
+  title,
+  description,
+  children,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      style={{
+        cursor: "pointer",
+        borderRadius: 8,
+        padding: "12px 14px",
+        background: selected ? "#eef5fa" : "transparent",
+        border: selected ? "1px solid #d4e6f3" : "1px solid transparent",
+        transition: "background 0.15s, border-color 0.15s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: description || (selected && children) ? 6 : 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 14,
+            height: 14,
+            flexShrink: 0,
+            borderRadius: "50%",
+            border: `2px solid ${selected ? "#006fb0" : "#cbced4"}`,
+          }}
+        >
+          {selected && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#006fb0" }} />}
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#252a2e" }}>
+          {title}
+        </span>
+      </div>
+      {description && (
+        <p style={{ margin: "0 0 8px 22px", fontSize: 11, fontFamily: "Open Sans, sans-serif", color: "#6a6e79", lineHeight: "15px" }}>
+          {description}
+        </p>
+      )}
+      {selected && children && <div style={{ marginLeft: 22 }} onClick={(e) => e.stopPropagation()}>{children}</div>}
     </div>
   );
 }
