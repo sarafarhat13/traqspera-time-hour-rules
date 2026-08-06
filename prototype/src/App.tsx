@@ -329,6 +329,16 @@ function RuleSetForm({
   const setMp = <K extends keyof MealPenaltyState>(key: K, val: MealPenaltyState[K]) =>
     onMealPenaltyChange({ ...mp, [key]: val });
 
+  // The meal window is only meaningful when it ends at or after it starts.
+  const setMealWindow = (meal: 1 | 2, edge: "start" | "end", val: number) => {
+    const startKey = meal === 1 ? "meal1Trigger" : "meal2Trigger";
+    const endKey = meal === 1 ? "meal1TriggerEnd" : "meal2TriggerEnd";
+    const next = { ...mp, [edge === "start" ? startKey : endKey]: val };
+    if (edge === "start" && next[endKey] < val) next[endKey] = val;
+    if (edge === "end" && val < next[startKey]) next[startKey] = val;
+    onMealPenaltyChange(next);
+  };
+
   const colHeaders = [
     { key: "totalHours",  label: "Total Hours\nAllowed" },
     { key: "regHours",    label: "Reg Hours\nAllowed" },
@@ -563,9 +573,18 @@ function RuleSetForm({
                         selected={mp.meal1Schedule === "relative"}
                         onSelect={() => setMp("meal1Schedule", "relative")}
                         title="Relative to shift start"
-                        description="Meal must begin after this many hours worked"
+                        description="Set the window the meal must fall within, measured from shift start"
                       >
-                        <NumberInput value={mp.meal1Trigger} onChange={(v) => setMp("meal1Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
+                            <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
+                            <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                          </div>
+                        </div>
                       </SoftOption>
                       <SoftOption
                         selected={mp.meal1Schedule === "fixed"}
@@ -598,7 +617,7 @@ function RuleSetForm({
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal1Schedule === "relative"
-                          ? `Meal required after ${mp.meal1Trigger} hrs worked · min ${mp.meal1Duration} min`
+                          ? `Meal required between ${mp.meal1Trigger} and ${mp.meal1TriggerEnd} hrs worked · min ${mp.meal1Duration} min`
                           : `Meal scheduled at ${mp.meal1FixedTime} · min ${mp.meal1Duration} min`}
                         {mp.meal1Waiver && " · waiver eligible"}
                       </p>
@@ -622,9 +641,18 @@ function RuleSetForm({
                         selected={mp.meal2Schedule === "relative"}
                         onSelect={() => setMp("meal2Schedule", "relative")}
                         title="Relative to shift start"
-                        description="Meal must begin after this many hours worked"
+                        description="Set the window the meal must fall within, measured from shift start"
                       >
-                        <NumberInput value={mp.meal2Trigger} onChange={(v) => setMp("meal2Trigger", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
+                            <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
+                            <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                          </div>
+                        </div>
                       </SoftOption>
                       <SoftOption
                         selected={mp.meal2Schedule === "fixed"}
@@ -656,7 +684,7 @@ function RuleSetForm({
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal2Schedule === "relative"
-                          ? `Meal required after ${mp.meal2Trigger} hrs worked · min ${mp.meal2Duration} min`
+                          ? `Meal required between ${mp.meal2Trigger} and ${mp.meal2TriggerEnd} hrs worked · min ${mp.meal2Duration} min`
                           : `Meal scheduled at ${mp.meal2FixedTime} · min ${mp.meal2Duration} min`}
                         {mp.meal2Waiver && " · waiver eligible"}
                       </p>
@@ -1321,9 +1349,9 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
 type OnDutyMealAction = "flag" | "pay_time_worked" | "flag_and_pay";
 
 type MealPenaltyState = {
-  meal1Enabled: boolean; meal1Trigger: number; meal1Duration: number; meal1Schedule: ScheduleType;
+  meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
   meal1FixedTime: string; meal1Waiver: boolean;
-  meal2Enabled: boolean; meal2Trigger: number; meal2Duration: number; meal2Schedule: ScheduleType;
+  meal2Enabled: boolean; meal2Trigger: number; meal2TriggerEnd: number; meal2Duration: number; meal2Schedule: ScheduleType;
   meal2FixedTime: string; meal2Waiver: boolean;
   freeMealEnabled: boolean; freeMealTrigger: FreeMealTrigger;
   freeMealMinutes: number; freeMealBeforeMinutes: number; freeMealPrompt: string;
@@ -1351,8 +1379,8 @@ const defaultViolations = (): ViolationRule[] => [
 ];
 
 const defaultMealPenalty = (): MealPenaltyState => ({
-  meal1Enabled: true, meal1Trigger: 5, meal1Duration: 30, meal1Schedule: "relative", meal1FixedTime: "12:00", meal1Waiver: true,
-  meal2Enabled: true, meal2Trigger: 10, meal2Duration: 30, meal2Schedule: "relative", meal2FixedTime: "17:00", meal2Waiver: false,
+  meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1FixedTime: "12:00", meal1Waiver: true,
+  meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2FixedTime: "17:00", meal2Waiver: false,
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
