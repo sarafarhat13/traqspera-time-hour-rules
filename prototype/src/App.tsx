@@ -368,8 +368,11 @@ function RuleSetForm({
         {/* ── Daily Rules ── */}
         {activeTab === "daily" && (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 4, overflow: "hidden" }}>
+            <div
+              className="overflow-x-auto"
+              style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 6, overflow: "hidden" }}
+            >
+              <table className="w-full border-collapse">
                 <thead>
                   <tr style={{ background: TABLE_HEADER_BG }}>
                     <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: TABLE_HEADER_TEXT, width: 150, borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }} />
@@ -392,16 +395,24 @@ function RuleSetForm({
                   </tr>
                 </thead>
                 <tbody>
-                  {data.days.map((day, idx) => (
-                    <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }}>
-                      <td style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
-                      {colHeaders.map((col) => (
-                        <td key={col.key} style={{ padding: "4px 6px", textAlign: "center", borderRight: `1px solid ${TABLE_HEADER_BORDER}` }}>
-                          <CellInput value={day[col.key]} onChange={(v) => updateDay(idx, col.key, v)} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  {data.days.map((day, idx) => {
+                    const isLastRow = idx === data.days.length - 1;
+                    return (
+                      <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
+                        <td style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}`, borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
+                        {colHeaders.map((col, ci) => (
+                          <td key={col.key} style={{
+                            padding: "4px 6px",
+                            textAlign: "center",
+                            borderRight: ci < colHeaders.length - 1 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined,
+                            borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}`,
+                          }}>
+                            <CellInput value={day[col.key]} onChange={(v) => updateDay(idx, col.key, v)} />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -421,8 +432,11 @@ function RuleSetForm({
             {/* ── Weekly Rules ── */}
             <div className="mt-[24px]">
               <p className="text-[13px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e] mb-[10px]">Weekly Rules</p>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse" style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 4, overflow: "hidden" }}>
+              <div
+                className="overflow-x-auto"
+                style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 6, overflow: "hidden" }}
+              >
+                <table className="w-full border-collapse">
                   <thead>
                     <tr style={{ background: TABLE_HEADER_BG }}>
                       {["Total Hours Per Week", "Reg Hours Per Week", "OT Hours Per Week", "Travel Hours Per Week"].map((h, i) => (
@@ -440,7 +454,7 @@ function RuleSetForm({
                     </tr>
                   </thead>
                   <tbody>
-                    <tr style={{ background: "#ffffff", borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }}>
+                    <tr style={{ background: "#ffffff" }}>
                       {(["weeklyTotal", "weeklyReg", "weeklyOT", "weeklyTravel"] as const).map((field, i) => (
                         <td key={field} style={{ padding: "6px 8px", textAlign: "center", borderRight: i < 3 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined }}>
                           <CellInput value={data[field]} onChange={(v) => onChange({ ...data, [field]: v })} />
