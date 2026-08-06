@@ -74,6 +74,21 @@ textarea {
   color: #252a2e;
 }
 
+/*
+  The same preflight also resets form controls (padding: 0, font-size: 100%),
+  so Tailwind sizing utilities never reach input, select, or textarea.
+  Declare field sizing unlayered so it applies.
+*/
+.tq-field {
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 8px 12px;
+}
+
+.tq-field-select {
+  padding-right: 32px;
+}
+
 .focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }

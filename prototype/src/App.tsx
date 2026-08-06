@@ -92,18 +92,18 @@ function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 64 
       >
         <input type="text" inputMode="decimal" value={value} min={min}
           onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }}
-          className="rounded-l-[4px] px-[8px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none bg-transparent"
+          className="tq-field rounded-l-[4px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none bg-transparent"
           style={{ width, border: "none" }} />
         <div className="flex flex-col" style={{ borderLeft: "1px solid #6a6e79" }}>
           <button type="button" onClick={() => onChange(Math.round((value + step) * 10) / 10)}
-            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-tr-[3px]"
+            className="flex h-[19px] w-[22px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-tr-[3px]"
             style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <ChevronUp size={10} className="text-[#464b52]" />
+            <ChevronUp size={11} className="text-[#464b52]" />
           </button>
           <button type="button" onClick={() => onChange(Math.max(min, Math.round((value - step) * 10) / 10))}
-            className="flex h-[14px] w-[20px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-br-[3px]"
+            className="flex h-[19px] w-[22px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-br-[3px]"
             style={{ border: "none", borderTop: "1px solid #6a6e79", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <ChevronDown size={10} className="text-[#464b52]" />
+            <ChevronDown size={11} className="text-[#464b52]" />
           </button>
         </div>
       </div>
@@ -121,13 +121,13 @@ function SelectField({ value, onChange, options, placeholder }: {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-[4px] bg-white px-[8px] pr-[28px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] outline-none cursor-pointer w-full"
+        className="tq-field tq-field-select appearance-none rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#464b52] outline-none cursor-pointer w-full"
         style={{ border: "1px solid #6a6e79" }}
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <ChevronDown size={12} className="pointer-events-none absolute right-[8px] top-1/2 -translate-y-1/2 text-[#464b52]" />
+      <ChevronDown size={14} className="pointer-events-none absolute right-[10px] top-1/2 -translate-y-1/2 text-[#464b52]" />
     </div>
   );
 }
@@ -205,12 +205,12 @@ function CellInput({ value, onChange }: { value: number; onChange: (v: number) =
       placeholder="—"
       onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
       style={{
-        width: 52,
-        borderRadius: 3,
+        width: 64,
+        borderRadius: 4,
         border: "1px solid #e0e1e9",
         background: "#ffffff",
-        padding: "4px 6px",
-        fontSize: 12,
+        padding: "8px 10px",
+        fontSize: 14,
         fontFamily: "Open Sans, sans-serif",
         color: "#252a2e",
         outline: "none",
@@ -399,10 +399,10 @@ function RuleSetForm({
                     const isLastRow = idx === data.days.length - 1;
                     return (
                       <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
-                        <td style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}`, borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}`, borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
                         {colHeaders.map((col, ci) => (
                           <td key={col.key} style={{
-                            padding: "4px 6px",
+                            padding: "8px 8px",
                             textAlign: "center",
                             borderRight: ci < colHeaders.length - 1 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined,
                             borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}`,
@@ -456,7 +456,7 @@ function RuleSetForm({
                   <tbody>
                     <tr style={{ background: "#ffffff" }}>
                       {(["weeklyTotal", "weeklyReg", "weeklyOT", "weeklyTravel"] as const).map((field, i) => (
-                        <td key={field} style={{ padding: "6px 8px", textAlign: "center", borderRight: i < 3 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined }}>
+                        <td key={field} style={{ padding: "10px 8px", textAlign: "center", borderRight: i < 3 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined }}>
                           <CellInput value={data[field]} onChange={(v) => onChange({ ...data, [field]: v })} />
                         </td>
                       ))}
@@ -574,7 +574,7 @@ function RuleSetForm({
                         description="Meal is scheduled at a specific clock time each day"
                       >
                         <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
-                          className="rounded-[4px] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                          className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
                           style={{ border: "1px solid #6a6e79" }} />
                       </SoftOption>
                     </div>
@@ -633,7 +633,7 @@ function RuleSetForm({
                         description="Meal is scheduled at a specific clock time each day"
                       >
                         <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
-                          className="rounded-[4px] bg-white px-[8px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                          className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
                           style={{ border: "1px solid #6a6e79" }} />
                       </SoftOption>
                     </div>
@@ -781,7 +781,7 @@ function RuleSetForm({
                       onChange={(e) => setMp("freeMealPrompt", e.target.value)}
                       rows={3}
                       placeholder="Enter the message employees will see during their meal break..."
-                      className="w-full rounded-[4px] bg-white px-[10px] py-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none resize-none leading-[18px]"
+                      className="tq-field w-full rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none resize-none"
                       style={{ border: "1px solid #6a6e79" }}
                     />
                     <p className="mt-[4px] text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
