@@ -1,0 +1,32 @@
+{
+  "name": "traqspera-time-hour-rules",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "postinstall": "mkdir -p public && cp -R node_modules/@trimble-oss/moduswebcomponents/assets public/ 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@trimble-oss/moduswebcomponents": "^1.13.0",
+    "@trimble-oss/moduswebcomponents-react": "^1.13.0-react19",
+    "lucide-react": "^1.29.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}
