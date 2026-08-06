@@ -592,9 +592,20 @@ function RuleSetForm({
                         title="Fixed schedule time"
                         description="Meal is scheduled at a specific clock time each day"
                       >
-                        <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
-                          className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
-                          style={{ border: "1px solid #6a6e79" }} />
+                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal starts at</p>
+                            <input type="time" value={mp.meal1FixedTime} onChange={(e) => setMp("meal1FixedTime", e.target.value)}
+                              className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                              style={{ border: "1px solid #6a6e79" }} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal ends at</p>
+                            <input type="time" value={mp.meal1FixedTimeEnd} onChange={(e) => setMp("meal1FixedTimeEnd", e.target.value)}
+                              className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                              style={{ border: "1px solid #6a6e79" }} />
+                          </div>
+                        </div>
                       </SoftOption>
                     </div>
                   </div>
@@ -618,7 +629,7 @@ function RuleSetForm({
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal1Schedule === "relative"
                           ? `Meal required between ${mp.meal1Trigger} and ${mp.meal1TriggerEnd} hrs worked · min ${mp.meal1Duration} min`
-                          : `Meal scheduled at ${mp.meal1FixedTime} · min ${mp.meal1Duration} min`}
+                          : `Meal scheduled ${formatClock(mp.meal1FixedTime)} – ${formatClock(mp.meal1FixedTimeEnd)} · min ${mp.meal1Duration} min`}
                         {mp.meal1Waiver && " · waiver eligible"}
                       </p>
                     </div>
@@ -660,9 +671,20 @@ function RuleSetForm({
                         title="Fixed schedule time"
                         description="Meal is scheduled at a specific clock time each day"
                       >
-                        <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
-                          className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
-                          style={{ border: "1px solid #6a6e79" }} />
+                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal starts at</p>
+                            <input type="time" value={mp.meal2FixedTime} onChange={(e) => setMp("meal2FixedTime", e.target.value)}
+                              className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                              style={{ border: "1px solid #6a6e79" }} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal ends at</p>
+                            <input type="time" value={mp.meal2FixedTimeEnd} onChange={(e) => setMp("meal2FixedTimeEnd", e.target.value)}
+                              className="tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none"
+                              style={{ border: "1px solid #6a6e79" }} />
+                          </div>
+                        </div>
                       </SoftOption>
                     </div>
                   </div>
@@ -685,7 +707,7 @@ function RuleSetForm({
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal2Schedule === "relative"
                           ? `Meal required between ${mp.meal2Trigger} and ${mp.meal2TriggerEnd} hrs worked · min ${mp.meal2Duration} min`
-                          : `Meal scheduled at ${mp.meal2FixedTime} · min ${mp.meal2Duration} min`}
+                          : `Meal scheduled ${formatClock(mp.meal2FixedTime)} – ${formatClock(mp.meal2FixedTimeEnd)} · min ${mp.meal2Duration} min`}
                         {mp.meal2Waiver && " · waiver eligible"}
                       </p>
                     </div>
@@ -1350,9 +1372,9 @@ type OnDutyMealAction = "flag" | "pay_time_worked" | "flag_and_pay";
 
 type MealPenaltyState = {
   meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
-  meal1FixedTime: string; meal1Waiver: boolean;
+  meal1FixedTime: string; meal1FixedTimeEnd: string; meal1Waiver: boolean;
   meal2Enabled: boolean; meal2Trigger: number; meal2TriggerEnd: number; meal2Duration: number; meal2Schedule: ScheduleType;
-  meal2FixedTime: string; meal2Waiver: boolean;
+  meal2FixedTime: string; meal2FixedTimeEnd: string; meal2Waiver: boolean;
   freeMealEnabled: boolean; freeMealTrigger: FreeMealTrigger;
   freeMealMinutes: number; freeMealBeforeMinutes: number; freeMealPrompt: string;
   onDutyMealEnabled: boolean; onDutyRequireAgreement: boolean; onDutyNoAgreementAction: OnDutyMealAction;
@@ -1378,9 +1400,18 @@ const defaultViolations = (): ViolationRule[] => [
   { id: "late",   label: "Late meal break (past trigger hour)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
+// Time inputs render in the viewer's locale, so summaries echo the same 12-hour form.
+const formatClock = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const period = h < 12 ? "AM" : "PM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+};
+
 const defaultMealPenalty = (): MealPenaltyState => ({
-  meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1FixedTime: "12:00", meal1Waiver: true,
-  meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2FixedTime: "17:00", meal2Waiver: false,
+  meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1FixedTime: "12:00", meal1FixedTimeEnd: "12:30", meal1Waiver: true,
+  meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2FixedTime: "17:00", meal2FixedTimeEnd: "17:30", meal2Waiver: false,
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
