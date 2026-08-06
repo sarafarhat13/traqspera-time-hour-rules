@@ -181,9 +181,25 @@ function SubCard({ title, action, children }: { title: string; action?: ReactNod
 // ─── Small number input for table cells ───────────────────────────────────────
 function CellInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <input type="number" value={value || ""} min={0} placeholder="—"
+    <input
+      type="number"
+      value={value || ""}
+      min={0}
+      placeholder="—"
       onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-      className="w-[52px] rounded-[3px] border border-[#e0e1e9] bg-white px-[6px] py-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0] text-center" />
+      style={{
+        width: 52,
+        borderRadius: 3,
+        border: "1px solid #e0e1e9",
+        background: "#ffffff",
+        padding: "4px 6px",
+        fontSize: 12,
+        fontFamily: "Open Sans, sans-serif",
+        color: "#252a2e",
+        outline: "none",
+        textAlign: "center",
+      }}
+    />
   );
 }
 
@@ -194,16 +210,40 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
   onChange: (t: T) => void;
 }) {
   return (
-    <div className="flex items-center gap-[2px] border-b border-[#e0e1e9] bg-[#f7f7fb] px-[16px] pt-[10px]">
+    <div style={{
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 0,
+      borderBottom: "1px solid #e0e1e9",
+      background: "#f1f1f6",
+      padding: "8px 16px 0",
+    }}>
       {tabs.map((t) => {
         const isActive = t.key === active;
         return (
-          <button key={t.key} onClick={() => onChange(t.key)}
-            className={`relative px-[14px] py-[7px] text-[12px] font-['Open_Sans',sans-serif] font-semibold transition-colors whitespace-nowrap rounded-t-[4px] ${
-              isActive
-                ? "bg-white border border-b-white border-[#e0e1e9] text-[#0e416c] -mb-px z-10"
-                : "text-[#6a6e79] hover:text-[#252a2e]"
-            }`}>
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onChange(t.key)}
+            style={{
+              position: "relative",
+              padding: "8px 14px",
+              fontSize: 12,
+              fontFamily: "Open Sans, sans-serif",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              cursor: "pointer",
+              borderTop: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
+              borderLeft: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
+              borderRight: isActive ? "1px solid #e0e1e9" : "1px solid transparent",
+              borderBottom: isActive ? "1px solid #ffffff" : "1px solid transparent",
+              borderRadius: "4px 4px 0 0",
+              background: isActive ? "#ffffff" : "transparent",
+              color: isActive ? "#0063a3" : "#6a6e79",
+              marginBottom: isActive ? -1 : 0,
+              zIndex: isActive ? 1 : 0,
+            }}
+          >
             {t.label}
           </button>
         );
@@ -211,6 +251,11 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
     </div>
   );
 }
+
+const TABLE_HEADER_BG = "#f1f1f6";
+const TABLE_HEADER_BORDER = "#e0e1e9";
+const TABLE_HEADER_TEXT = "#464b52";
+
 
 // ─── Reusable tabbed rule-set container ───────────────────────────────────────
 type RuleSetTab = "daily" | "weekly" | "break" | "kiosk" | "equipment" | "meal" | "penalties";
@@ -294,12 +339,23 @@ function RuleSetForm({
         {activeTab === "daily" && (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ borderRadius: 8, overflow: "hidden" }}>
+              <table className="w-full border-collapse" style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 4, overflow: "hidden" }}>
                 <thead>
-                  <tr style={{ background: "#252a2e" }}>
-                    <th className="px-[12px] py-[10px] text-left text-[11px] font-semibold font-['Open_Sans',sans-serif] text-white w-[150px]" style={{ borderBottom: "1px solid #3d4348" }} />
+                  <tr style={{ background: TABLE_HEADER_BG }}>
+                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: TABLE_HEADER_TEXT, width: 150, borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }} />
                     {colHeaders.map((col) => (
-                      <th key={col.key} className="px-[8px] py-[10px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-white text-center whitespace-pre-line leading-[13px]" style={{ borderBottom: "1px solid #3d4348", borderLeft: "1px solid #3d4348" }}>
+                      <th key={col.key} style={{
+                        padding: "10px 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        fontFamily: "Open Sans, sans-serif",
+                        color: TABLE_HEADER_TEXT,
+                        textAlign: "center",
+                        whiteSpace: "pre-line",
+                        lineHeight: "13px",
+                        borderBottom: `1px solid ${TABLE_HEADER_BORDER}`,
+                        borderLeft: `1px solid ${TABLE_HEADER_BORDER}`,
+                      }}>
                         {col.label}
                       </th>
                     ))}
@@ -307,10 +363,10 @@ function RuleSetForm({
                 </thead>
                 <tbody>
                   {data.days.map((day, idx) => (
-                    <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: "1px solid #e0e1e9" }}>
-                      <td className="px-[12px] py-[6px] text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e] whitespace-nowrap" style={{ borderRight: "1px solid #e0e1e9" }}>{day.label}</td>
+                    <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }}>
+                      <td style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
                       {colHeaders.map((col) => (
-                        <td key={col.key} className="px-[6px] py-[4px] text-center" style={{ borderRight: "1px solid #e0e1e9" }}>
+                        <td key={col.key} style={{ padding: "4px 6px", textAlign: "center", borderRight: `1px solid ${TABLE_HEADER_BORDER}` }}>
                           <CellInput value={day[col.key]} onChange={(v) => updateDay(idx, col.key, v)} />
                         </td>
                       ))}
@@ -336,18 +392,27 @@ function RuleSetForm({
             <div className="mt-[24px]">
               <p className="text-[13px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e] mb-[10px]">Weekly Rules</p>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse" style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 4, overflow: "hidden" }}>
                   <thead>
-                    <tr style={{ background: "#252a2e" }}>
+                    <tr style={{ background: TABLE_HEADER_BG }}>
                       {["Total Hours Per Week", "Reg Hours Per Week", "OT Hours Per Week", "Travel Hours Per Week"].map((h, i) => (
-                        <th key={h} className="px-[12px] py-[10px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-white text-center" style={{ borderBottom: "1px solid #3d4348", borderLeft: i > 0 ? "1px solid #3d4348" : undefined }}>{h}</th>
+                        <th key={h} style={{
+                          padding: "10px 12px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          fontFamily: "Open Sans, sans-serif",
+                          color: TABLE_HEADER_TEXT,
+                          textAlign: "center",
+                          borderBottom: `1px solid ${TABLE_HEADER_BORDER}`,
+                          borderLeft: i > 0 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined,
+                        }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    <tr style={{ background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+                    <tr style={{ background: "#ffffff", borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }}>
                       {(["weeklyTotal", "weeklyReg", "weeklyOT", "weeklyTravel"] as const).map((field, i) => (
-                        <td key={field} className="px-[8px] py-[6px] text-center" style={{ borderRight: i < 3 ? "1px solid #e0e1e9" : undefined }}>
+                        <td key={field} style={{ padding: "6px 8px", textAlign: "center", borderRight: i < 3 ? `1px solid ${TABLE_HEADER_BORDER}` : undefined }}>
                           <CellInput value={data[field]} onChange={(v) => onChange({ ...data, [field]: v })} />
                         </td>
                       ))}
