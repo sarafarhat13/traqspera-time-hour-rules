@@ -98,6 +98,13 @@ input.bg-white,
 select.bg-white,
 textarea.bg-white { background-color: #ffffff; }
 
+/* Modus search inputs render their own clear button; hide the native one. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }

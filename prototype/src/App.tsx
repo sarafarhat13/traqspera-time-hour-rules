@@ -8,6 +8,7 @@ import {
   ModusWcIcon,
   ModusWcSwitch,
   ModusWcTabs,
+  ModusWcTextInput,
 } from "@trimble-oss/moduswebcomponents-react";
 import {
   AlertTriangle, ChevronDown, ChevronUp, X, Check,
@@ -2106,10 +2107,10 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
 
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-[12px] px-[24px] py-[16px]">
-          <div className="flex gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6" }}>
+          <div className="flex shrink-0 gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6" }}>
             {tabs.map((t) => (
               <button key={t.value} type="button" onClick={() => setFilterAndReset(t.value)}
-                className="rounded-[4px] text-[12px] transition-colors"
+                className="rounded-[4px] text-[12px] whitespace-nowrap transition-colors"
                 style={{
                   background: filter === t.value ? "#ffffff" : "transparent",
                   color: filter === t.value ? "#0e416c" : "#6a6e79",
@@ -2121,11 +2122,18 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
               </button>
             ))}
           </div>
-          <div className="relative" style={{ width: 220 }}>
-            <Search size={14} className="absolute left-[10px] top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#6a6e79" }} />
-            <input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Search name or role"
-              className="tq-field w-full rounded-[4px] bg-white text-[#252a2e] outline-none"
-              style={{ border: "1px solid #6a6e79", paddingLeft: 32 }} />
+          <div style={{ width: 220, flexShrink: 1 }}>
+            <ModusWcTextInput
+              aria-label="Search employees"
+              type="search"
+              size="sm"
+              includeSearch
+              includeClear
+              placeholder="Search name or role"
+              value={query}
+              onInputChange={(e) => { setQuery(e.target.value); setPage(0); }}
+              onClearClick={() => { setQuery(""); setPage(0); }}
+            />
           </div>
         </div>
 
