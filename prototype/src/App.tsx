@@ -618,13 +618,6 @@ function RuleSetForm({
                       <FieldLabel>Minimum required length</FieldLabel>
                       <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" />
                     </div>
-                    <div>
-                      <SectionLabel>Waiver</SectionLabel>
-                      <div className="flex items-start gap-[10px]">
-                        <Toggle enabled={mp.meal1Waiver} onChange={(v) => setMp("meal1Waiver", v)} />
-                        <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] leading-[20px]">State-compliant waiver allowed for shifts ≤ 6.0 hrs</span>
-                      </div>
-                    </div>
                     {/* Summary pill */}
                     <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
@@ -632,7 +625,6 @@ function RuleSetForm({
                         {mp.meal1Schedule === "relative"
                           ? `Meal required between ${mp.meal1Trigger} and ${mp.meal1TriggerEnd} hrs worked · min ${mp.meal1Duration} min`
                           : `Meal window ${formatClock(mp.meal1WindowStart)} – ${formatClock(mp.meal1WindowEnd)} · min ${mp.meal1Duration} min`}
-                        {mp.meal1Waiver && " · waiver eligible"}
                       </p>
                     </div>
                   </div>
@@ -690,20 +682,12 @@ function RuleSetForm({
                       <FieldLabel>Minimum required length</FieldLabel>
                       <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" />
                     </div>
-                    <div>
-                      <SectionLabel>Waiver</SectionLabel>
-                      <div className="flex items-start gap-[10px]">
-                        <Toggle enabled={mp.meal2Waiver} onChange={(v) => setMp("meal2Waiver", v)} />
-                        <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] leading-[20px]">State-compliant waiver allowed when mutual written consent exists</span>
-                      </div>
-                    </div>
                     <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                       <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
                       <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
                         {mp.meal2Schedule === "relative"
                           ? `Meal required between ${mp.meal2Trigger} and ${mp.meal2TriggerEnd} hrs worked · min ${mp.meal2Duration} min`
                           : `Meal window ${formatClock(mp.meal2WindowStart)} – ${formatClock(mp.meal2WindowEnd)} · min ${mp.meal2Duration} min`}
-                        {mp.meal2Waiver && " · waiver eligible"}
                       </p>
                     </div>
                   </div>
@@ -1434,9 +1418,9 @@ const formatSignedDate = (iso: string) => {
 
 type MealPenaltyState = {
   meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
-  meal1WindowStart: string; meal1WindowEnd: string; meal1Waiver: boolean;
+  meal1WindowStart: string; meal1WindowEnd: string;
   meal2Enabled: boolean; meal2Trigger: number; meal2TriggerEnd: number; meal2Duration: number; meal2Schedule: ScheduleType;
-  meal2WindowStart: string; meal2WindowEnd: string; meal2Waiver: boolean;
+  meal2WindowStart: string; meal2WindowEnd: string;
   freeMealEnabled: boolean; freeMealTrigger: FreeMealTrigger;
   freeMealMinutes: number; freeMealBeforeMinutes: number; freeMealPrompt: string;
   onDutyMealEnabled: boolean; onDutyRequireAgreement: boolean; onDutyNoAgreementAction: OnDutyMealAction;
@@ -1517,8 +1501,8 @@ const formatClock = (hhmm: string) => {
 };
 
 const defaultMealPenalty = (): MealPenaltyState => ({
-  meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1WindowStart: "12:00", meal1WindowEnd: "13:00", meal1Waiver: true,
-  meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2WindowStart: "17:00", meal2WindowEnd: "18:00", meal2Waiver: false,
+  meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1WindowStart: "12:00", meal1WindowEnd: "13:00",
+  meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2WindowStart: "17:00", meal2WindowEnd: "18:00",
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
