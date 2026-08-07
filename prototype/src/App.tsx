@@ -1286,6 +1286,128 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
 // ─── Exclusions Tab ───────────────────────────────────────────────────────────
 type ExclusionItem = { id: number; label: string; subLabel?: string; enabled: boolean };
 
+type PhaseOption = { code: string; name: string };
+type JobOption = { code: string; name: string; phases: PhaseOption[] };
+
+// Stands in for the tenant job list the picker would load from the server.
+const JOB_CATALOG: JobOption[] = [
+  {
+    code: "003699", name: "AEP Carrollton Sub", phases: [
+      { code: "5554", name: "Renewal - Asphalt" },
+      { code: "5555", name: "Grading" },
+      { code: "5556", name: "Base Course" },
+    ],
+  },
+  {
+    code: "003700", name: "Kettle River Crossing", phases: [
+      { code: "6100", name: "Mobilization" },
+      { code: "6120", name: "Pier Construction" },
+      { code: "6140", name: "Deck Pour" },
+    ],
+  },
+  {
+    code: "003701", name: "Highway 12 Resurfacing", phases: [
+      { code: "7010", name: "Milling" },
+      { code: "7020", name: "Overlay" },
+    ],
+  },
+];
+
+const RATE_LEVEL_OPTIONS = ["Holiday", "Standby", "Shift Differential", "Apprentice"];
+
+type ExclusionKind = "job" | "phase" | "rate";
+
+const EXCLUSION_COPY: Record<ExclusionKind, { title: string; hint: string }> = {
+  job:   { title: "Exclude a Job",        hint: "Every phase on the selected job is excluded too." },
+  phase: { title: "Exclude a Phase",      hint: "Pick the job first, then the phase to exclude on it." },
+  rate:  { title: "Exclude a Rate Level", hint: "Hours at the selected rate level are skipped by the rules." },
+};
+
+function ExclusionPicker({ kind, existing, onClose, onAdd }: {
+  kind: ExclusionKind;
+  existing: ExclusionItem[];
+  onClose: () => void;
+  onAdd: (item: { label: string; subLabel?: string }) => void;
+}) {
+  const [jobCode, setJobCode] = useState(JOB_CATALOG[0].code);
+  const [phaseCode, setPhaseCode] = useState(JOB_CATALOG[0].phases[0].code);
+  const [rateLevel, setRateLevel] = useState(RATE_LEVEL_OPTIONS[0]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const job = JOB_CATALOG.find(j => j.code === jobCode) ?? JOB_CATALOG[0];
+  const phase = job.phases.find(p => p.code === phaseCode) ?? job.phases[0];
+
+  const draft =
+    kind === "job"   ? { label: job.code, subLabel: job.name } :
+    kind === "phase" ? { label: `${job.code} · ${phase.code}`, subLabel: `${job.name} — ${phase.name}` } :
+                       { label: rateLevel };
+
+  const duplicate = existing.some(item => item.label === draft.label);
+  const copy = EXCLUSION_COPY[kind];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={onClose}>
+      <div className="relative w-[440px] rounded-[8px] bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[14px]">
+          <span className="text-[14px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">{copy.title}</span>
+          <button onClick={onClose} className="text-[#6a6e79] hover:text-[#252a2e] transition-colors"><X size={18} /></button>
+        </div>
+        <div className="flex flex-col gap-[14px] px-[20px] py-[16px]">
+          {kind !== "rate" && (
+            <ModusWcSelect
+              label="Job"
+              size="sm"
+              value={jobCode}
+              options={JOB_CATALOG.map(j => ({ label: `${j.code} - ${j.name}`, value: j.code }))}
+              onInputChange={(e) => {
+                const next = e.target.value;
+                setJobCode(next);
+                // The phase list is scoped to the job, so the old pick may not exist here.
+                const nextJob = JOB_CATALOG.find(j => j.code === next);
+                if (nextJob) setPhaseCode(nextJob.phases[0].code);
+              }}
+            />
+          )}
+          {kind === "phase" && (
+            <ModusWcSelect
+              label="Phase"
+              size="sm"
+              value={phase.code}
+              options={job.phases.map(p => ({ label: `${p.code} - ${p.name}`, value: p.code }))}
+              onInputChange={(e) => setPhaseCode(e.target.value)}
+            />
+          )}
+          {kind === "rate" && (
+            <ModusWcSelect
+              label="Rate level"
+              size="sm"
+              value={rateLevel}
+              options={RATE_LEVEL_OPTIONS.map(r => ({ label: r, value: r }))}
+              onInputChange={(e) => setRateLevel(e.target.value)}
+            />
+          )}
+          <p className="text-[11px] font-['Open_Sans',sans-serif] leading-[16px]"
+            style={{ color: duplicate ? "#b45309" : "#6a6e79" }}>
+            {duplicate ? "This is already on the exclusion list." : copy.hint}
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-[8px] border-t border-[#e0e1e9] px-[20px] py-[12px]">
+          <ModusWcButton color="neutral" variant="outlined" size="sm" onButtonClick={onClose}>Cancel</ModusWcButton>
+          <ModusWcButton color="primary" variant="filled" size="sm"
+            disabled={duplicate} onButtonClick={() => { onAdd(draft); onClose(); }}>
+            Add exclusion
+          </ModusWcButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExclusionSection({ title, description, items, onToggle, onAdd }: {
   title: string; description: string;
   items: ExclusionItem[]; onToggle: (id: number) => void; onAdd: () => void;
@@ -1330,20 +1452,24 @@ function ExclusionSection({ title, description, items, onToggle, onAdd }: {
 
 function ExclusionsTab({ onSave }: { onSave: () => void }) {
   const [jobs, setJobs] = useState<ExclusionItem[]>([
-    { id: 1, label: "SDIC", subLabel: "Sick Hours", enabled: true },
-    { id: 2, label: "Vacation", subLabel: "Vacation", enabled: true },
+    { id: 1, label: "003699", subLabel: "AEP Carrollton Sub", enabled: true },
   ]);
   const [phases, setPhases] = useState<ExclusionItem[]>([]);
   const [rateLevels, setRateLevels] = useState<ExclusionItem[]>([
     { id: 1, label: "Holiday", enabled: true },
   ]);
+  const [picker, setPicker] = useState<ExclusionKind | null>(null);
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<ExclusionItem[]>>) => (id: number) => {
     setter((prev) => prev.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item));
     onSave();
   };
-  const addItem = (setter: React.Dispatch<React.SetStateAction<ExclusionItem[]>>, prefix: string) => () => {
-    setter((prev) => [...prev, { id: Date.now(), label: `${prefix} ${prev.length + 1}`, enabled: true }]);
+
+  const listFor = (kind: ExclusionKind) => kind === "job" ? jobs : kind === "phase" ? phases : rateLevels;
+  const setterFor = (kind: ExclusionKind) => kind === "job" ? setJobs : kind === "phase" ? setPhases : setRateLevels;
+
+  const addItem = (kind: ExclusionKind) => (item: { label: string; subLabel?: string }) => {
+    setterFor(kind)((prev) => [...prev, { id: Date.now(), enabled: true, ...item }]);
     onSave();
   };
 
@@ -1351,13 +1477,18 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
     <div className="flex flex-col gap-[20px]">
       <ExclusionSection title="Jobs To Exclude From Rules"
         description="You may specify jobs not to be calculated in hour rules. All Phases for this job will be excluded as well."
-        items={jobs} onToggle={toggle(setJobs)} onAdd={addItem(setJobs, "Job")} />
+        items={jobs} onToggle={toggle(setJobs)} onAdd={() => setPicker("job")} />
       <ExclusionSection title="Phases To Exclude From Rules"
         description="You may specify a Phase combination not to be calculated in hour rules."
-        items={phases} onToggle={toggle(setPhases)} onAdd={addItem(setPhases, "Phase")} />
+        items={phases} onToggle={toggle(setPhases)} onAdd={() => setPicker("phase")} />
       <ExclusionSection title="Rate Levels To Exclude From Rules"
         description="You may specify rate levels not to be calculated in hour rules."
-        items={rateLevels} onToggle={toggle(setRateLevels)} onAdd={addItem(setRateLevels, "Rate Level")} />
+        items={rateLevels} onToggle={toggle(setRateLevels)} onAdd={() => setPicker("rate")} />
+
+      {picker && (
+        <ExclusionPicker kind={picker} existing={listFor(picker)}
+          onClose={() => setPicker(null)} onAdd={addItem(picker)} />
+      )}
     </div>
   );
 }
