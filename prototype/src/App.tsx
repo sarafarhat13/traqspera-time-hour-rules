@@ -816,20 +816,11 @@ function RuleSetForm({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-[8px]">
-                      {onDutyOutstanding > 0 && (
-                        <button type="button" onClick={() => openEmployeeModal("unsigned")}
-                          className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#0063a3] hover:underline"
-                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          View outstanding
-                        </button>
-                      )}
-                      <ModusWcButton color="primary" variant="outlined" size="sm"
-                        onButtonClick={() => openEmployeeModal("all")}>
-                        <ModusWcIcon decorative name={mp.onDutyScope === "all" ? "document" : "manage_people"} size="xs" />
-                        {mp.onDutyScope === "all" ? "View waiver status" : "Manage employees"}
-                      </ModusWcButton>
-                    </div>
+                    <ModusWcButton color="primary" variant="outlined" size="sm"
+                      onButtonClick={() => openEmployeeModal("all")}>
+                      <ModusWcIcon decorative name={mp.onDutyScope === "all" ? "document" : "manage_people"} size="xs" />
+                      {mp.onDutyScope === "all" ? "View waiver status" : "Manage employees"}
+                    </ModusWcButton>
                   </div>
                 </div>
               </div>
