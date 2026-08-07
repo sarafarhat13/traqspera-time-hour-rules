@@ -17,7 +17,7 @@ import {
   GripVertical, Plus, Pencil, Info, Trash2,
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
-  AlignJustify, ChevronRight, Bell, HelpCircle, Search,
+  AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -2552,7 +2552,16 @@ const CLOCK_MOCK_ENTRIES = [
   { date: "Mon, Jul 28", jobNum: "740-EC2", start: "6:55 AM", end: "3:40 PM", dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt", payRule: "5b", reg: 8, ot: 0.75, ot2: 0, qty: 0, travel: 1.00, perDiem: 0 },
 ];
 
-function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: "out" | "in" | "break" }) {
+/*
+  An on-duty meal is its own state rather than a flavour of break: the employee
+  eats without leaving the job, stays clocked in, and is paid for the time,
+  which is what the signed on-duty meal agreement covers.
+*/
+type ClockState = "out" | "in" | "break" | "meal";
+
+const ON_DUTY_AGREEMENT_SIGNED = "Feb 9, 2026";
+
+function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockState }) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
@@ -2560,8 +2569,8 @@ function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: "out" | 
   const s = (elapsed % 60).toString().padStart(2, "0");
   const timeStr = `${h}:${m}:${s}`;
 
-  const statusColor = clocked === "break" ? "#d97706" : clocked === "in" ? "#10b981" : "#6a6e79";
-  const statusLabel = clocked === "break" ? "On Break" : clocked === "in" ? "On the Clock" : "Not Clocked In";
+  const statusColor = clocked === "break" ? "#d97706" : clocked === "meal" ? "#15803d" : clocked === "in" ? "#10b981" : "#6a6e79";
+  const statusLabel = clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal · Paid" : clocked === "in" ? "On the Clock" : "Not Clocked In";
 
   return (
     <div className="bg-white content-stretch flex flex-col items-start py-[8px] relative w-full">
@@ -2582,11 +2591,16 @@ function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: "out" | 
 }
 
 function ClockInOutPage() {
-  const [clocked, setClocked] = useState<"out" | "in" | "break">("out");
+  const [clocked, setClocked] = useState<ClockState>("out");
   const [elapsed, setElapsed] = useState(0);
   const [breakElapsed, setBreakElapsed] = useState(0);
+  const [mealElapsed, setMealElapsed] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [breakStart, setBreakStart] = useState<Date | null>(null);
+  const [mealStart, setMealStart] = useState<Date | null>(null);
+  const [mealRows, setMealRows] = useState<{ start: string; end: string | null }[]>([]);
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [mealAck, setMealAck] = useState(false);
   const [crew, setCrew] = useState("740 - Adam Hazey's Crew");
   const [dept, setDept] = useState("3300 - Job Cost");
   const [job, setJob] = useState("003699 - AEP Carrollton Sub");
@@ -2604,11 +2618,13 @@ function ClockInOutPage() {
   useEffect(() => {
     if (clocked === "out") return;
     const id = setInterval(() => {
-      if (clocked === "in" && startTime) setElapsed(Math.floor((Date.now() - startTime.getTime()) / 1000));
+      // An on-duty meal is paid time, so the shift clock keeps running through it.
+      if ((clocked === "in" || clocked === "meal") && startTime) setElapsed(Math.floor((Date.now() - startTime.getTime()) / 1000));
       if (clocked === "break" && breakStart) setBreakElapsed(Math.floor((Date.now() - breakStart.getTime()) / 1000));
+      if (clocked === "meal" && mealStart) setMealElapsed(Math.floor((Date.now() - mealStart.getTime()) / 1000));
     }, 1000);
     return () => clearInterval(id);
-  }, [clocked, startTime, breakStart]);
+  }, [clocked, startTime, breakStart, mealStart]);
 
 
 
@@ -2625,11 +2641,11 @@ function ClockInOutPage() {
   const totalTravel = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.travel, 0);
 
   // Colors per state
-  const stateColor = clocked === "out" ? "#0063a3" : clocked === "break" ? "#d97706" : "#ab1f26";
-  const stateColorLight = clocked === "out" ? "rgba(0,99,163,0.15)" : clocked === "break" ? "rgba(215,119,6,0.15)" : "rgba(171,31,38,0.15)";
-  const stateColorMid   = clocked === "out" ? "rgba(0,99,163,0.28)" : clocked === "break" ? "rgba(215,119,6,0.28)" : "rgba(171,31,38,0.28)";
-  const stateColorStrong= clocked === "out" ? "rgba(0,99,163,0.50)" : clocked === "break" ? "rgba(215,119,6,0.50)" : "rgba(171,31,38,0.50)";
-  const btnLabel = clocked === "out" ? "CLOCK IN" : clocked === "break" ? "END BREAK" : "CLOCK OUT";
+  const stateColor = clocked === "out" ? "#0063a3" : clocked === "break" ? "#d97706" : clocked === "meal" ? "#15803d" : "#ab1f26";
+  const stateColorLight = clocked === "out" ? "rgba(0,99,163,0.15)" : clocked === "break" ? "rgba(215,119,6,0.15)" : clocked === "meal" ? "rgba(21,128,61,0.15)" : "rgba(171,31,38,0.15)";
+  const stateColorMid   = clocked === "out" ? "rgba(0,99,163,0.28)" : clocked === "break" ? "rgba(215,119,6,0.28)" : clocked === "meal" ? "rgba(21,128,61,0.28)" : "rgba(171,31,38,0.28)";
+  const stateColorStrong= clocked === "out" ? "rgba(0,99,163,0.50)" : clocked === "break" ? "rgba(215,119,6,0.50)" : clocked === "meal" ? "rgba(21,128,61,0.50)" : "rgba(171,31,38,0.50)";
+  const btnLabel = clocked === "out" ? "CLOCK IN" : clocked === "break" ? "END BREAK" : clocked === "meal" ? "END MEAL" : "CLOCK OUT";
 
   const confirmEndBreak = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -2646,6 +2662,8 @@ function ClockInOutPage() {
     } else if (clocked === "in") {
       setClocked("out"); setStartTime(null); setElapsed(0);
       setTimeline(prev => [{ time: t, label: "Clocked Out", sub: `After ${fmt(elapsed)}`, color: "#ab1f26" }, ...prev]);
+    } else if (clocked === "meal") {
+      endOnDutyMeal();
     } else {
       if (breakElapsed < MANDATORY_BREAK) {
         setShowEarlyBreakModal(true);
@@ -2653,6 +2671,21 @@ function ClockInOutPage() {
         confirmEndBreak();
       }
     }
+  };
+
+  const startOnDutyMeal = () => {
+    const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    setClocked("meal"); setMealStart(new Date()); setMealElapsed(0);
+    setShowMealModal(false); setMealAck(false); setShowBreakAlert(false);
+    setTimeline(prev => [{ time: t, label: "On-Duty Meal Started", sub: "Staying on the clock", color: "#15803d" }, ...prev]);
+    setMealRows(prev => [...prev, { start: t, end: null }]);
+  };
+
+  const endOnDutyMeal = () => {
+    const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    setClocked("in"); setMealStart(null);
+    setTimeline(prev => [{ time: t, label: "On-Duty Meal Ended", sub: `After ${fmt(mealElapsed)} · paid`, color: "#0063a3" }, ...prev]);
+    setMealRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null ? { ...r, end: t } : r));
   };
 
   const handleBreak = () => {
@@ -2729,6 +2762,66 @@ function ClockInOutPage() {
         </div>
       )}
 
+      {/* On-duty meal confirmation */}
+      {showMealModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setShowMealModal(false)}>
+          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
+            style={{ width: 440, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-[12px] mb-[16px]">
+              <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full shrink-0" style={{ background: "#e8f7ed" }}>
+                <Utensils size={20} style={{ color: "#15803d" }} />
+              </div>
+              <p style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Start On-Duty Meal</p>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.6, marginBottom: 16 }}>
+              You stay clocked in and paid for this meal. Take it at your post when the
+              job can't be left unattended. If you can step away, take a regular unpaid
+              break instead.
+            </p>
+
+            <div className="flex items-center gap-[8px] px-[12px] py-[10px] rounded-[8px] mb-[20px]"
+              style={{ background: "#e8f7ed", border: "1px solid #bbe6ca" }}>
+              <Check size={16} strokeWidth={3} style={{ color: "#15803d", flexShrink: 0 }} />
+              <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>
+                On-duty meal agreement signed {ON_DUTY_AGREEMENT_SIGNED}
+              </p>
+            </div>
+
+            <button type="button" onClick={() => setMealAck(v => !v)}
+              className="flex items-start gap-[8px] text-left w-full"
+              style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", marginBottom: 24 }}>
+              <div className="h-[16px] w-[16px] rounded-[3px] flex items-center justify-center shrink-0"
+                style={{ background: mealAck ? "#15803d" : "#ffffff", border: `1px solid ${mealAck ? "#15803d" : "#cbced4"}`, marginTop: 2 }}>
+                {mealAck && <Check size={10} className="text-white" strokeWidth={3} />}
+              </div>
+              <span style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
+                I agree to take my meal on duty today.
+              </span>
+            </button>
+
+            <div className="flex gap-[12px]">
+              <button type="button" onClick={() => setShowMealModal(false)}
+                className="flex-1 py-[10px] rounded-[8px]"
+                style={{ border: "1px solid #e0e1e9", background: "#ffffff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS }}>
+                Cancel
+              </button>
+              <button type="button" onClick={startOnDutyMeal} disabled={!mealAck}
+                className="flex-1 py-[10px] rounded-[8px]"
+                style={{
+                  border: "none",
+                  background: mealAck ? "#15803d" : "#cbced4",
+                  cursor: mealAck ? "pointer" : "not-allowed",
+                  fontSize: 13, fontWeight: 600, color: "#ffffff", fontFamily: OS,
+                }}>
+                Start On-Duty Meal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top header */}
       <div className="px-[32px] pt-[24px] pb-[20px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#ffffff" }}>
         <p style={{ fontSize: 22, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock In &amp; Out</p>
@@ -2761,6 +2854,19 @@ function ClockInOutPage() {
                 style={{ background: "#d97706", border: "none", cursor: "pointer", color: "#ffffff", fontSize: 12, fontWeight: 600, fontFamily: OS }}>
                 Take Break
               </button>
+            </div>
+          )}
+
+          {clocked === "meal" && (
+            <div className="w-full flex items-center gap-[12px] mb-[24px] px-[16px] py-[12px] rounded-[8px]"
+              style={{ background: "#e8f7ed", border: "1px solid #bbe6ca", maxWidth: 420 }}>
+              <Utensils size={18} style={{ color: "#15803d", flexShrink: 0 }} />
+              <div className="flex-1">
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#15803d", fontFamily: OS, ...OS_FVS }}>On-Duty Meal · {fmt(mealElapsed)}</p>
+                <p style={{ fontSize: 12, color: "#3f7d55", fontFamily: OS, ...OS_FVS }}>
+                  You're still on the clock and being paid for this time.
+                </p>
+              </div>
             </div>
           )}
 
@@ -2813,7 +2919,14 @@ function ClockInOutPage() {
                 </div>
                 <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Take Break</p>
               </button>
-
+              <button type="button" onClick={() => { setMealAck(false); setShowMealModal(true); }}
+                className="flex flex-col items-center gap-[6px]"
+                style={{ background: "transparent", border: "none", cursor: "pointer" }}>
+                <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+                  <Utensils size={20} style={{ color: "#464b52" }} />
+                </div>
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>On-Duty Meal</p>
+              </button>
             </div>
           )}
 
@@ -2921,6 +3034,24 @@ function ClockInOutPage() {
                       <td colSpan={7} className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#b45309", fontFamily: OS, ...OS_FVS }}>—</p></td>
                     </tr>
                   ))}
+                  {mealRows.map((mr, i) => (
+                    <tr key={`meal-${i}`} style={{ background: "#f2fbf5", borderBottom: "1px solid #bbe6ca" }}>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>
+                        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      </p></td>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.start}</p></td>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.end ?? "—"}</p></td>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
+                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
+                      <td colSpan={8} className="px-[10px] py-[8px]">
+                        <div className="flex items-center gap-[8px]">
+                          <span style={{ fontSize: 11, fontWeight: 600, color: "#15803d", background: "#cdecd8", borderRadius: 4, padding: "2px 6px", fontFamily: OS, whiteSpace: "nowrap" }}>On-duty meal</span>
+                          <span style={{ fontSize: 12, color: "#3f7d55", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>Paid — counts toward hours</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                   <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
                     <td colSpan={8} className="px-[10px] py-[8px]"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Totals</p></td>
                     <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{totalReg.toFixed(2)}</p></td>
@@ -2955,7 +3086,7 @@ function ClockInOutPage() {
             <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Current Status</p>
             <div className="flex items-center gap-[8px]">
               <p style={{ fontSize: 14, fontWeight: 600, color: stateColor, fontFamily: OS, ...OS_FVS }}>
-                {clocked === "out" ? "Not active yet!" : clocked === "break" ? "On Break" : "On the Clock"}
+                {clocked === "out" ? "Not active yet!" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock"}
               </p>
               <div className="h-[8px] w-[8px] rounded-full" style={{ background: stateColor }} />
             </div>
@@ -2964,6 +3095,15 @@ function ClockInOutPage() {
             <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#fffbeb" }}>
               <p style={{ fontSize: 13, color: "#92400e", fontFamily: OS, ...OS_FVS }}>Break Duration</p>
               <p style={{ fontSize: 18, fontWeight: 700, color: "#d97706", fontFamily: OS, ...OS_FVS, letterSpacing: "-0.5px" }}>{fmt(breakElapsed)}</p>
+            </div>
+          )}
+          {clocked === "meal" && (
+            <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#f2fbf5" }}>
+              <div>
+                <p style={{ fontSize: 13, color: "#15803d", fontFamily: OS, ...OS_FVS }}>Meal Duration</p>
+                <p style={{ fontSize: 11, color: "#3f7d55", fontFamily: OS, ...OS_FVS }}>Paid — counts toward hours</p>
+              </div>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "#15803d", fontFamily: OS, ...OS_FVS, letterSpacing: "-0.5px" }}>{fmt(mealElapsed)}</p>
             </div>
           )}
           <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
