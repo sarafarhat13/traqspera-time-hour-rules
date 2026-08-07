@@ -3166,7 +3166,7 @@ function ComplianceDashboard() {
       {/* Main table — Traqspera table style */}
       <div style={{ background: "#ffffff", borderRadius: 8, boxShadow: "0px 1px 1px rgba(0,0,0,0.05)", overflow: "hidden" }}>
         {/* Toolbar */}
-        <div className="flex items-center gap-[12px] px-[16px] py-[10px] border-b" style={{ borderColor: "#0d3560", background: "#252a2e", minHeight: 48 }}>
+        <div className="flex items-center gap-[12px] px-[16px] py-[10px] border-b" style={{ borderColor: "#0d3560", background: "#0e416c", minHeight: 48 }}>
           {activeSection !== "all" && (
             <AlertBadge
               label={
