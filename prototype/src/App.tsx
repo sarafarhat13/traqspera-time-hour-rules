@@ -2508,11 +2508,11 @@ function AttestationPanel({ days }: { days: { label: string; date: number }[] })
               const done = attested.has(date);
               return (
                 <button key={date} type="button" onClick={() => setActiveDay({ label, date })}
-                  className="flex flex-col items-center justify-center rounded-[6px] transition-all"
+                  className="flex flex-col items-center justify-center rounded-[8px] transition-all"
                   style={{
                     width: 56, height: 64, cursor: "pointer",
                     background: done ? "#e8f5e9" : "#ffffff",
-                    border: `2px solid ${done ? "#2e7d32" : "#fbad26"}`,
+                    border: `1px solid ${done ? "#2e7d32" : "#fbad26"}`,
                   }}>
                   <div className="flex h-[18px] w-[18px] items-center justify-center rounded-full mb-[4px]"
                     style={{ background: done ? "#2e7d32" : "#fbad26" }}>
@@ -2733,7 +2733,7 @@ function ClockInOutPage() {
       {/* Early break modal */}
       {showEarlyBreakModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]" style={{ width: 420, maxWidth: "90vw" }}>
+          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]" style={{ width: 480, maxWidth: "90vw" }}>
             <div className="flex items-center gap-[12px] mb-[16px]">
               <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full shrink-0" style={{ background: "#fef3e2" }}>
                 <AlertTriangle size={20} style={{ color: "#d97706" }} />
@@ -2746,17 +2746,15 @@ function ClockInOutPage() {
             <p style={{ fontSize: 13, fontWeight: 600, color: "#d97706", fontFamily: OS, ...OS_FVS, marginBottom: 24 }}>
               Time remaining on break: {breakRemainingFmt}
             </p>
-            <div className="flex gap-[12px]">
-              <button type="button" onClick={() => setShowEarlyBreakModal(false)}
-                className="flex-1 py-[10px] rounded-[8px]"
-                style={{ border: "1px solid #e0e1e9", background: "#ffffff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS }}>
+            <div className="flex justify-end gap-[12px]">
+              <ModusWcButton color="primary" variant="outlined" size="md"
+                onButtonClick={() => setShowEarlyBreakModal(false)}>
                 Wait — Stay on Break
-              </button>
-              <button type="button" onClick={confirmEndBreak}
-                className="flex-1 py-[10px] rounded-[8px]"
-                style={{ border: "none", background: "#0063a3", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#ffffff", fontFamily: OS }}>
+              </ModusWcButton>
+              <ModusWcButton color="primary" variant="filled" size="md"
+                onButtonClick={confirmEndBreak}>
                 Confirm Early Clock In
-              </button>
+              </ModusWcButton>
             </div>
           </div>
         </div>
@@ -2801,22 +2799,15 @@ function ClockInOutPage() {
               </span>
             </button>
 
-            <div className="flex gap-[12px]">
-              <button type="button" onClick={() => setShowMealModal(false)}
-                className="flex-1 py-[10px] rounded-[8px]"
-                style={{ border: "1px solid #e0e1e9", background: "#ffffff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS }}>
+            <div className="flex justify-end gap-[12px]">
+              <ModusWcButton color="primary" variant="outlined" size="md"
+                onButtonClick={() => setShowMealModal(false)}>
                 Cancel
-              </button>
-              <button type="button" onClick={startOnDutyMeal} disabled={!mealAck}
-                className="flex-1 py-[10px] rounded-[8px]"
-                style={{
-                  border: "none",
-                  background: mealAck ? "#15803d" : "#cbced4",
-                  cursor: mealAck ? "pointer" : "not-allowed",
-                  fontSize: 13, fontWeight: 600, color: "#ffffff", fontFamily: OS,
-                }}>
+              </ModusWcButton>
+              <ModusWcButton color="success" variant="filled" size="md"
+                disabled={!mealAck} onButtonClick={startOnDutyMeal}>
                 Start On-Duty Meal
-              </button>
+              </ModusWcButton>
             </div>
           </div>
         </div>
