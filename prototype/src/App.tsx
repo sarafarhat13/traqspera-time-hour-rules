@@ -2018,6 +2018,17 @@ type WaiverFilter = "all" | "assigned" | "signed" | "unsigned";
 
 const PAGE_SIZE = 8;
 
+// Each filter carries its own semantic color so the counts read at a glance.
+const FILTER_STYLES: Record<WaiverFilter, {
+  tint: string; border: string; text: string;
+  badgeOn: string; badgeOnText: string; badgeOff: string; badgeOffText: string;
+}> = {
+  all:      { tint: "#e8f2fa", border: "#0063a3", text: "#0e416c", badgeOn: "#0063a3", badgeOnText: "#ffffff", badgeOff: "#cfe4f4", badgeOffText: "#0e416c" },
+  assigned: { tint: "#fdf4e3", border: "#d99a2b", text: "#7c4a03", badgeOn: "#e0a338", badgeOnText: "#3d2600", badgeOff: "#fae7c4", badgeOffText: "#7c4a03" },
+  signed:   { tint: "#e8f7ed", border: "#16a34a", text: "#15803d", badgeOn: "#16a34a", badgeOnText: "#ffffff", badgeOff: "#cbeed8", badgeOffText: "#15803d" },
+  unsigned: { tint: "#fdecec", border: "#d64545", text: "#a72020", badgeOn: "#d64545", badgeOnText: "#ffffff", badgeOff: "#f9d5d5", badgeOffText: "#a72020" },
+};
+
 function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose }: {
   scope: "all" | "selected";
   selected: string[];
@@ -2107,20 +2118,39 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
 
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-[12px] px-[24px] py-[16px]">
-          <div className="flex shrink-0 gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6" }}>
-            {tabs.map((t) => (
-              <button key={t.value} type="button" onClick={() => setFilterAndReset(t.value)}
-                className="rounded-[4px] text-[12px] whitespace-nowrap transition-colors"
-                style={{
-                  background: filter === t.value ? "#ffffff" : "transparent",
-                  color: filter === t.value ? "#0e416c" : "#6a6e79",
-                  fontWeight: filter === t.value ? 600 : 400,
-                  border: "none", cursor: "pointer", padding: "6px 12px",
-                  boxShadow: filter === t.value ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                }}>
-                {t.label} ({t.count})
-              </button>
-            ))}
+          <div className="flex shrink-0 items-center gap-[8px]">
+            {tabs.map((t) => {
+              const s = FILTER_STYLES[t.value];
+              const active = filter === t.value;
+              return (
+                <button key={t.value} type="button" onClick={() => setFilterAndReset(t.value)}
+                  aria-pressed={active}
+                  className="inline-flex items-center whitespace-nowrap transition-colors"
+                  style={{
+                    background: active ? s.tint : "#ffffff",
+                    color: active ? s.text : "#252a2e",
+                    fontWeight: active ? 700 : 400,
+                    border: `1px solid ${active ? s.border : "#e0e1e9"}`,
+                    borderRadius: 9999,
+                    cursor: "pointer",
+                    padding: "4px 5px 4px 12px",
+                    gap: 7,
+                    fontSize: 12,
+                    boxShadow: active ? `0 0 0 1px ${s.border}` : "0 1px 2px rgba(0,0,0,0.06)",
+                  }}>
+                  {t.label}
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    minWidth: 20, height: 20, padding: "0 6px", borderRadius: 9999,
+                    background: active ? s.badgeOn : s.badgeOff,
+                    color: active ? s.badgeOnText : s.badgeOffText,
+                    fontSize: 11, fontWeight: 700, lineHeight: 1,
+                  }}>
+                    {t.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div style={{ width: 220, flexShrink: 1 }}>
             <ModusWcTextInput
