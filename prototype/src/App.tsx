@@ -2136,7 +2136,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
                     padding: "4px 5px 4px 12px",
                     gap: 7,
                     fontSize: 12,
-                    boxShadow: active ? `0 0 0 1px ${s.border}` : "0 1px 2px rgba(0,0,0,0.06)",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                   }}>
                   {t.label}
                   <span style={{
