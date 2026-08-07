@@ -6,11 +6,14 @@ import {
   ModusWcButton,
   ModusWcCheckbox,
   ModusWcIcon,
+  ModusWcNumberInput,
   ModusWcPagination,
   ModusWcSelect,
   ModusWcSwitch,
   ModusWcTabs,
   ModusWcTextInput,
+  ModusWcTextarea,
+  ModusWcTimeInput,
 } from "@trimble-oss/moduswebcomponents-react";
 import {
   AlertTriangle, ChevronDown, ChevronUp, X, Check,
@@ -84,33 +87,24 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
   );
 }
 
-function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 64 }: {
+function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88 }: {
   value: number; onChange: (v: number) => void;
   step?: number; min?: number; suffix?: string; width?: number;
 }) {
   return (
     <div className="flex items-center gap-[6px]">
-      <div
-        className="flex items-center rounded-[4px] bg-white"
-        style={{ border: "1px solid #6a6e79" }}
-      >
-        <input type="text" inputMode="decimal" value={value} min={min}
-          onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }}
-          className="tq-field rounded-l-[4px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none bg-transparent"
-          style={{ width, border: "none" }} />
-        <div className="flex flex-col" style={{ borderLeft: "1px solid #6a6e79" }}>
-          <button type="button" onClick={() => onChange(Math.round((value + step) * 10) / 10)}
-            className="flex h-[19px] w-[22px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-tr-[3px]"
-            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <ChevronUp size={11} className="text-[#464b52]" />
-          </button>
-          <button type="button" onClick={() => onChange(Math.max(min, Math.round((value - step) * 10) / 10))}
-            className="flex h-[19px] w-[22px] items-center justify-center hover:bg-[#dcedf9] transition-colors rounded-br-[3px]"
-            style={{ border: "none", borderTop: "1px solid #6a6e79", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <ChevronDown size={11} className="text-[#464b52]" />
-          </button>
-        </div>
-      </div>
+      <ModusWcNumberInput
+        aria-label="Value"
+        size="sm"
+        min={min}
+        step={step}
+        value={String(value)}
+        onInputChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (!isNaN(v)) onChange(v);
+        }}
+        style={{ width }}
+      />
       {suffix && <span className="text-[12px] text-[#6a6e79] font-['Open_Sans',sans-serif]">{suffix}</span>}
     </div>
   );
@@ -121,18 +115,13 @@ function SelectField({ value, onChange, options, placeholder }: {
   options: { value: string; label: string }[]; placeholder?: string;
 }) {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="tq-field tq-field-select appearance-none rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#464b52] outline-none cursor-pointer w-full"
-        style={{ border: "1px solid #6a6e79" }}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-[10px] top-1/2 -translate-y-1/2 text-[#464b52]" />
-    </div>
+    <ModusWcSelect
+      aria-label={placeholder ?? "Select"}
+      size="sm"
+      value={value}
+      options={placeholder ? [{ label: placeholder, value: "" }, ...options] : options}
+      onInputChange={(e) => onChange(e.target.value)}
+    />
   );
 }
 
@@ -202,24 +191,14 @@ function SubCard({ title, action, children }: { title: string; action?: ReactNod
 // ─── Small number input for table cells ───────────────────────────────────────
 function CellInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <input
-      type="number"
-      value={value || ""}
+    <ModusWcNumberInput
+      aria-label="Hours allowed"
+      size="sm"
       min={0}
       placeholder="—"
-      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-      style={{
-        width: 64,
-        borderRadius: 4,
-        border: "1px solid #e0e1e9",
-        background: "#ffffff",
-        padding: "8px 10px",
-        fontSize: 14,
-        fontFamily: "Open Sans, sans-serif",
-        color: "#252a2e",
-        outline: "none",
-        textAlign: "center",
-      }}
+      value={value ? String(value) : ""}
+      onInputChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+      style={{ width: 96 }}
     />
   );
 }
@@ -497,12 +476,12 @@ function RuleSetForm({
               <div>
                 <FieldLabel>Minimum Hours Per Day</FieldLabel>
                 <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[6px]">Break is required once this threshold is reached</p>
-                <NumberInput value={data.breakMinHours} onChange={(v) => onChange({ ...data, breakMinHours: v })} step={0.5} min={0} suffix="hrs" width={56} />
+                <NumberInput value={data.breakMinHours} onChange={(v) => onChange({ ...data, breakMinHours: v })} step={0.5} min={0} suffix="hrs" />
               </div>
               <div>
                 <FieldLabel>Break Length Required</FieldLabel>
                 <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[6px]">Minimum duration of the required break</p>
-                <NumberInput value={data.breakLength} onChange={(v) => onChange({ ...data, breakLength: v })} step={0.25} min={0} suffix="hrs" width={56} />
+                <NumberInput value={data.breakLength} onChange={(v) => onChange({ ...data, breakLength: v })} step={0.25} min={0} suffix="hrs" />
               </div>
             </div>
 
@@ -546,11 +525,11 @@ function RuleSetForm({
             <div className="flex items-end gap-[24px]">
               <div>
                 <FieldLabel>Minimum Hours Per Day</FieldLabel>
-                <NumberInput value={kioskMinHours ?? 4} onChange={onKioskMinHours ?? (() => {})} step={0.5} min={0} width={56} />
+                <NumberInput value={kioskMinHours ?? 4} onChange={onKioskMinHours ?? (() => {})} step={0.5} min={0} />
               </div>
               <div>
                 <FieldLabel>Break Length Required (hours)</FieldLabel>
-                <NumberInput value={kioskBreakLength ?? 0.5} onChange={onKioskBreakLength ?? (() => {})} step={0.25} min={0} width={56} />
+                <NumberInput value={kioskBreakLength ?? 0.5} onChange={onKioskBreakLength ?? (() => {})} step={0.25} min={0} />
               </div>
             </div>
           </>
@@ -561,7 +540,7 @@ function RuleSetForm({
           <div className="flex items-end gap-[24px]">
             <div>
               <FieldLabel>Maximum Hours Per Day</FieldLabel>
-              <NumberInput value={equipMaxHours ?? 10} onChange={onEquipMaxHours ?? (() => {})} step={1} min={0} width={56} suffix="hrs" />
+              <NumberInput value={equipMaxHours ?? 10} onChange={onEquipMaxHours ?? (() => {})} step={1} min={0} suffix="hrs" />
             </div>
           </div>
         )}
@@ -588,11 +567,11 @@ function RuleSetForm({
                         <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                           <div>
                             <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
-                            <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                            <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
                           </div>
                           <div>
                             <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
-                            <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                            <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
                           </div>
                         </div>
                       </SoftOption>
@@ -652,11 +631,11 @@ function RuleSetForm({
                         <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                           <div>
                             <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
-                            <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                            <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
                           </div>
                           <div>
                             <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
-                            <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" width={52} />
+                            <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
                           </div>
                         </div>
                       </SoftOption>
@@ -825,7 +804,7 @@ function RuleSetForm({
                     {mp.freeMealTrigger === "before_threshold" && (
                       <div className="mt-[8px] flex flex-col gap-[6px]">
                         <div className="flex items-center gap-[6px]">
-                          <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" width={52} />
+                          <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" />
                         </div>
                         <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] leading-[15px]">
                           Employee is notified {mp.freeMealBeforeMinutes} min before the meal threshold is reached.
@@ -843,13 +822,13 @@ function RuleSetForm({
                   {/* Message */}
                   <div className="col-span-2">
                     <SectionLabel>Notification Message</SectionLabel>
-                    <textarea
+                    <ModusWcTextarea
+                      aria-label="Notification message"
                       value={mp.freeMealPrompt}
-                      onChange={(e) => setMp("freeMealPrompt", e.target.value)}
+                      onInputChange={(e) => setMp("freeMealPrompt", e.target.value)}
                       rows={3}
+                      maxLength={200}
                       placeholder="Enter the message employees will see during their meal break..."
-                      className="tq-field w-full rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none resize-none"
-                      style={{ border: "1px solid #6a6e79" }}
                     />
                     <p className="mt-[4px] text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
                       {mp.freeMealPrompt.length}/200 characters
@@ -920,7 +899,6 @@ function RuleSetForm({
                                   step={0.25}
                                   min={0}
                                   suffix={v.payType === "flat" ? "$" : "hr(s)"}
-                                  width={52}
                                 />
                               </div>
                             </td>
@@ -1464,21 +1442,22 @@ const MealWindowFields = ({ start, end, onStart, onEnd, duration }: {
 }) => {
   const span = windowMinutes(start, end);
   const tooShort = span !== null && span < duration;
-  const timeClass = "tq-field rounded-[4px] bg-white font-['Open_Sans',sans-serif] text-[#252a2e] outline-none";
   return (
     <div>
       <div className="flex flex-wrap items-end gap-x-[12px] gap-y-[10px]">
-        <div>
-          <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Window opens</p>
-          <input type="time" value={start} onChange={(e) => onStart(e.target.value)}
-            className={timeClass} style={{ border: "1px solid #6a6e79" }} />
-        </div>
+        <ModusWcTimeInput
+          label="Window opens"
+          size="sm"
+          value={start}
+          onInputChange={(e) => onStart(e.target.value)}
+        />
         <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79] pb-[9px]">to</span>
-        <div>
-          <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Window closes</p>
-          <input type="time" value={end} onChange={(e) => onEnd(e.target.value)}
-            className={timeClass} style={{ border: "1px solid #6a6e79" }} />
-        </div>
+        <ModusWcTimeInput
+          label="Window closes"
+          size="sm"
+          value={end}
+          onInputChange={(e) => onEnd(e.target.value)}
+        />
       </div>
       <p className="text-[11px] font-['Open_Sans',sans-serif] leading-[16px] mt-[8px]"
         style={{ color: tooShort ? "#b45309" : "#6a6e79" }}>
@@ -2258,9 +2237,12 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                   return (
                     <tr key={e.id} style={{ borderTop: i === 0 ? "1px solid #e0e1e9" : "1px solid #eef0f3" }}>
                       <td className={td}>
-                        <input type="checkbox" checked={assigned} onChange={() => toggle(e.id)}
+                        <ModusWcCheckbox
                           aria-label={`Assign ${e.name}`}
-                          style={{ width: 15, height: 15, accentColor: "#0063a3", cursor: "pointer" }} />
+                          size="sm"
+                          value={assigned}
+                          onInputChange={() => toggle(e.id)}
+                        />
                       </td>
                       <td className={td}>
                         <span className="font-semibold">{e.name}</span>
@@ -2380,13 +2362,11 @@ function AttestationModal({ day, onClose, onSubmit }: {
 
         <div className="overflow-y-auto flex-1 px-[24px] py-[20px] flex flex-col gap-[20px]">
           {/* Date selector */}
-          <div className="relative">
-            <select className="w-full appearance-none px-[12px] py-[10px] border border-[#e0e1e9] rounded-[6px] pr-[32px] outline-none"
-              style={{ fontSize: 14, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
-              <option>{dateStr}</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-[10px] top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#6a6e79" }} />
-          </div>
+          <ModusWcSelect
+            aria-label="Attestation date"
+            value={dateStr}
+            options={[{ label: dateStr, value: dateStr }]}
+          />
 
           {/* Summary */}
           <div>
@@ -2426,9 +2406,13 @@ function AttestationModal({ day, onClose, onSubmit }: {
               <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
                 Additional Comments <span style={{ color: "#ab1f26" }}>*</span>
               </p>
-              <input type="text" value={breakComment} onChange={e => setBreakComment(e.target.value)}
-                className="w-full px-[12px] py-[9px] rounded-[6px] outline-none"
-                style={{ border: `1px solid ${breakComment ? "#e0e1e9" : "#ab1f26"}`, fontSize: 14, fontFamily: OS, ...OS_FVS, color: "#252a2e" }} />
+              <ModusWcTextInput
+                aria-label="Additional comments about your breaks"
+                value={breakComment}
+                required
+                feedback={breakComment ? undefined : { level: "error", message: "A comment is required." }}
+                onInputChange={(e) => setBreakComment(e.target.value)}
+              />
             </div>
           </div>
 
@@ -2446,9 +2430,11 @@ function AttestationModal({ day, onClose, onSubmit }: {
               <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
                 Additional Comments
               </p>
-              <input type="text" value={hurtComment} onChange={e => setHurtComment(e.target.value)}
-                className="w-full px-[12px] py-[9px] rounded-[6px] outline-none"
-                style={{ border: "1px solid #e0e1e9", fontSize: 14, fontFamily: OS, ...OS_FVS, color: "#252a2e" }} />
+              <ModusWcTextInput
+                aria-label="Additional comments about injuries"
+                value={hurtComment}
+                onInputChange={(e) => setHurtComment(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -2705,17 +2691,13 @@ function ClockInOutPage() {
   }, [elapsed, clocked]);
 
   const SelectField = ({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) => (
-    <div>
-      <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
-      <div className="relative">
-        <select value={value} onChange={e => onChange(e.target.value)}
-          className="w-full appearance-none px-[10px] py-[8px] border border-[#e0e1e9] rounded-[6px] pr-[28px] outline-none bg-white"
-          style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
-          {options.map(o => <option key={o}>{o}</option>)}
-        </select>
-        <ChevronDown size={12} className="absolute right-[8px] top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#6a6e79" }} />
-      </div>
-    </div>
+    <ModusWcSelect
+      label={label}
+      size="sm"
+      value={value}
+      options={options.map(o => ({ label: o, value: o }))}
+      onInputChange={(e) => onChange(e.target.value)}
+    />
   );
 
   const fmtHMS = (s: number) => {
@@ -2787,17 +2769,14 @@ function ClockInOutPage() {
               </p>
             </div>
 
-            <button type="button" onClick={() => setMealAck(v => !v)}
-              className="flex items-start gap-[8px] text-left w-full"
-              style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", marginBottom: 24 }}>
-              <div className="h-[16px] w-[16px] rounded-[3px] flex items-center justify-center shrink-0"
-                style={{ background: mealAck ? "#15803d" : "#ffffff", border: `1px solid ${mealAck ? "#15803d" : "#cbced4"}`, marginTop: 2 }}>
-                {mealAck && <Check size={10} className="text-white" strokeWidth={3} />}
-              </div>
-              <span style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
-                I agree to take my meal on duty today.
-              </span>
-            </button>
+            <div style={{ marginBottom: 24 }}>
+              <ModusWcCheckbox
+                aria-label="I agree to take my meal on duty today."
+                label="I agree to take my meal on duty today."
+                value={mealAck}
+                onInputChange={() => setMealAck(v => !v)}
+              />
+            </div>
 
             <div className="flex justify-end gap-[12px]">
               <ModusWcButton color="primary" variant="outlined" size="md"
@@ -2932,31 +2911,38 @@ function ClockInOutPage() {
                   <SelectField label="Job" value={job} onChange={setJob} options={["003699 - AEP Carrollton Sub", "003700 - Job B", "003701 - Job C"]} />
                 </div>
                 <SelectField label="Phase" value={phase} onChange={setPhase} options={["5554 - Renewal - Asphalt", "5555 - Phase B", "5556 - Phase C"]} />
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Travel</p>
-                  <input type="text" value={travel} onChange={e => setTravel(e.target.value)}
-                    className="w-full px-[10px] py-[8px] border border-[#e0e1e9] rounded-[6px] outline-none bg-white"
-                    style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }} />
+                <ModusWcNumberInput
+                  label="Travel"
+                  size="sm"
+                  min={0}
+                  step={0.25}
+                  value={travel}
+                  onInputChange={(e) => setTravel(e.target.value)}
+                />
+                <ModusWcNumberInput
+                  label="Quantity"
+                  size="sm"
+                  min={0}
+                  value={qty}
+                  onInputChange={(e) => setQty(e.target.value)}
+                />
+                <div style={{ alignSelf: "center" }}>
+                  <ModusWcCheckbox
+                    aria-label="Per Diem"
+                    label="Per Diem"
+                    size="sm"
+                    value={perDiem}
+                    onInputChange={() => setPerDiem(v => !v)}
+                  />
                 </div>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Quantity</p>
-                  <input type="text" value={qty} onChange={e => setQty(e.target.value)}
-                    className="w-full px-[10px] py-[8px] border border-[#e0e1e9] rounded-[6px] outline-none bg-white"
-                    style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }} />
-                </div>
-                <button type="button" onClick={() => setPerDiem(v => !v)} className="flex items-center gap-[8px]"
-                  style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", alignSelf: "center" }}>
-                  <div className="h-[16px] w-[16px] rounded-[3px] flex items-center justify-center shrink-0"
-                    style={{ background: perDiem ? "#0063a3" : "#ffffff", border: `1px solid ${perDiem ? "#0063a3" : "#cbced4"}`, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                    {perDiem && <Check size={10} className="text-white" strokeWidth={3} />}
-                  </div>
-                  <span style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Per Diem</span>
-                </button>
                 <div className="col-span-2">
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Comment</p>
-                  <input type="text" value={comment} onChange={e => setComment(e.target.value)} placeholder="Optional note..."
-                    className="w-full px-[10px] py-[8px] border border-[#e0e1e9] rounded-[6px] outline-none bg-white placeholder-[#b0b7c3]"
-                    style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }} />
+                  <ModusWcTextInput
+                    label="Comment"
+                    size="sm"
+                    value={comment}
+                    placeholder="Optional note..."
+                    onInputChange={(e) => setComment(e.target.value)}
+                  />
                 </div>
               </div>
             </div>
@@ -3596,16 +3582,16 @@ function SettingsSubNav({ activePage, onNavigate, navW }: {
       <div className="flex flex-col bg-white rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.12)] border border-[#e0e1e9] h-full overflow-hidden" style={{ pointerEvents: "auto" }}>
         {/* Search */}
         <div className="px-[12px] py-[12px] border-b border-[#f0f0f4]">
-          <div className="relative">
-            {/* Flex centring rather than a transform: the Modus preflight resets `transform`. */}
-            <span className="pointer-events-none absolute left-[10px] top-0 bottom-0 flex items-center text-[#6a6e79]">
-              <Search size={15} />
-            </span>
-            <input type="text" placeholder="Search" value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-[4px] border border-[#e0e1e9] bg-[#f5f5f8] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]"
-              style={{ padding: "8px 10px 8px 32px", fontSize: 14, lineHeight: "20px" }} />
-          </div>
+          <ModusWcTextInput
+            aria-label="Search navigation"
+            type="search"
+            placeholder="Search"
+            includeSearch
+            includeClear
+            value={search}
+            customClass="tq-nav-search"
+            onInputChange={(e) => setSearch(e.target.value)}
+          />
         </div>
         {/* Items */}
         <div className="flex-1 overflow-y-auto py-[6px]" style={{ scrollbarWidth: "none" }}>

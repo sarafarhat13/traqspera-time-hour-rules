@@ -75,30 +75,6 @@ textarea {
 }
 
 /*
-  The same preflight also resets form controls (padding: 0, font-size: 100%),
-  so Tailwind sizing utilities never reach input, select, or textarea.
-  Declare field sizing unlayered so it applies.
-*/
-.tq-field {
-  font-size: 14px;
-  line-height: 1.4;
-  padding: 8px 12px;
-}
-
-.tq-field-select {
-  padding-right: 32px;
-}
-
-/*
-  Preflight also sets `background-color: transparent` on form controls, which
-  makes `bg-white` fields inherit whatever surface sits behind them. Scoped to
-  the reset elements so it can't outrank layered hover/focus utilities elsewhere.
-*/
-input.bg-white,
-select.bg-white,
-textarea.bg-white { background-color: #ffffff; }
-
-/*
   Modus ships no sizing rule for the icons inside a text input, so the SVG has
   no intrinsic width to defend and a narrow field shrinks it to zero. Pinning
   the icons means the text field is what gives, which needs min-width: 0 or the
@@ -112,6 +88,11 @@ textarea.bg-white { background-color: #ffffff; }
 
 .modus-wc-text-input > input {
   min-width: 0;
+}
+
+/* The side nav search keeps its light grey fill on top of the Modus field. */
+.tq-nav-search.modus-wc-text-input {
+  background-color: #f5f5f8;
 }
 
 /* Modus search inputs render their own clear button; hide the native one. */
