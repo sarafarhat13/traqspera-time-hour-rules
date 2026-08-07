@@ -89,6 +89,15 @@ textarea {
   padding-right: 32px;
 }
 
+/*
+  Preflight also sets `background-color: transparent` on form controls, which
+  makes `bg-white` fields inherit whatever surface sits behind them. Scoped to
+  the reset elements so it can't outrank layered hover/focus utilities elsewhere.
+*/
+input.bg-white,
+select.bg-white,
+textarea.bg-white { background-color: #ffffff; }
+
 .focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }
