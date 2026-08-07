@@ -1772,37 +1772,125 @@ type BreakEmployee = {
   penaltyAmount: number;
 };
 
-const MOCK_EMPLOYEES: BreakEmployee[] = [
+const BASE_EMPLOYEES: BreakEmployee[] = [
   // Crew A — three of four still owe a break
-  { id: "1",  name: "Marcus Rivera",  role: "Electrician", crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 12, penaltyCount: 0, penaltyAmount: 0 },
-  { id: "2",  name: "Dani Okonkwo",   role: "Foreman",     crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 8,  penaltyCount: 0, penaltyAmount: 0 },
-  { id: "3",  name: "Amy Fitzgerald", role: "Inspector",   crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "missed",    minutesPastWindow: 7,  penaltyCount: 1, penaltyAmount: 90 },
-  { id: "4",  name: "Nadia Volkov",   role: "Laborer",     crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:30", state: "late",      breakTakenAt: "12:52", minutesOutsideWindow: 22, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "1",  name: "Marcus Rivera",  role: "Electrician", crew: "Crew A", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 12, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "2",  name: "Dani Okonkwo",   role: "Foreman",     crew: "Crew A", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 8,  penaltyCount: 0, penaltyAmount: 0 },
+  { id: "3",  name: "Amy Fitzgerald", role: "Inspector",   crew: "Crew A", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "missed",    minutesPastWindow: 7,  penaltyCount: 1, penaltyAmount: 90 },
+  { id: "4",  name: "Nadia Volkov",   role: "Laborer",     crew: "Crew A", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:30", state: "late",      breakTakenAt: "12:52", minutesOutsideWindow: 22, penaltyCount: 1, penaltyAmount: 90 },
   // Crew B — nobody has started a break, the whole-crew intervention case
-  { id: "5",  name: "Priya Nair",     role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 22, penaltyCount: 0, penaltyAmount: 0 },
-  { id: "6",  name: "Luis Ferreira",  role: "Foreman",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 15, penaltyCount: 0, penaltyAmount: 0 },
-  { id: "7",  name: "Grace Bennett",  role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 19, penaltyCount: 0, penaltyAmount: 0 },
-  { id: "8",  name: "Linda Tran",     role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 18, penaltyCount: 1, penaltyAmount: 90 },
-  { id: "9",  name: "Sam Park",       role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 26, penaltyCount: 2, penaltyAmount: 180 },
+  { id: "5",  name: "Priya Nair",     role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake",     pm: "Renee Cole", job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 22, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "6",  name: "Luis Ferreira",  role: "Foreman",     crew: "Crew B", supervisor: "Tom Blake",     pm: "Renee Cole", job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 15, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "7",  name: "Grace Bennett",  role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake",     pm: "Renee Cole", job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 19, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "8",  name: "Linda Tran",     role: "Electrician", crew: "Crew B", supervisor: "Tom Blake",     pm: "Renee Cole", job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 18, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "9",  name: "Sam Park",       role: "Electrician", crew: "Crew B", supervisor: "Tom Blake",     pm: "Renee Cole", job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 26, penaltyCount: 2, penaltyAmount: 180 },
   // Crew C
-  { id: "10", name: "Jake Morales",   role: "Foreman",     crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-200", shiftStart: "07:00", state: "upcoming",  minutesUntilBreak: 5,  penaltyCount: 0, penaltyAmount: 0 },
-  { id: "11", name: "Carlos Vega",    role: "Laborer",     crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "missed",    minutesPastWindow: 34, penaltyCount: 1, penaltyAmount: 90 },
-  { id: "12", name: "Tomas Ruiz",     role: "Operator",    crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:41", minutesOutsideWindow: 16, penaltyCount: 1, penaltyAmount: 90 },
-  { id: "13", name: "Hana Suzuki",    role: "Inspector",   crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-200", shiftStart: "06:30", state: "compliant", breakTakenAt: "12:05", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "10", name: "Jake Morales",   role: "Foreman",     crew: "Crew C", supervisor: "Sara Chen",     pm: "Alex Doyle", job: "Job C", costCenter: "CC-300", shiftStart: "07:00", state: "upcoming",  minutesUntilBreak: 5,  penaltyCount: 0, penaltyAmount: 0 },
+  { id: "11", name: "Carlos Vega",    role: "Laborer",     crew: "Crew C", supervisor: "Sara Chen",     pm: "Alex Doyle", job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "missed",    minutesPastWindow: 34, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "12", name: "Tomas Ruiz",     role: "Operator",    crew: "Crew C", supervisor: "Sara Chen",     pm: "Alex Doyle", job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:41", minutesOutsideWindow: 16, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "13", name: "Hana Suzuki",    role: "Inspector",   crew: "Crew C", supervisor: "Sara Chen",     pm: "Alex Doyle", job: "Job C", costCenter: "CC-300", shiftStart: "06:30", state: "compliant", breakTakenAt: "12:05", penaltyCount: 0, penaltyAmount: 0 },
   // Crew D
-  { id: "14", name: "Devon King",     role: "Operator",    crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "05:30", state: "missed",    minutesPastWindow: 52, penaltyCount: 2, penaltyAmount: 180 },
-  { id: "15", name: "Rosa Mendez",    role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:38", minutesOutsideWindow: 13, penaltyCount: 1, penaltyAmount: 90 },
-  { id: "16", name: "Ivan Petrov",    role: "Operator",    crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:48", penaltyCount: 0, penaltyAmount: 0 },
-  { id: "17", name: "Mia Chen",       role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:52", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "14", name: "Devon King",     role: "Foreman",     crew: "Crew D", supervisor: "Sara Chen",     pm: "Renee Cole", job: "Job B", costCenter: "CC-300", shiftStart: "05:30", state: "missed",    minutesPastWindow: 52, penaltyCount: 2, penaltyAmount: 180 },
+  { id: "15", name: "Rosa Mendez",    role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen",     pm: "Renee Cole", job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:38", minutesOutsideWindow: 13, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "16", name: "Ivan Petrov",    role: "Operator",    crew: "Crew D", supervisor: "Sara Chen",     pm: "Renee Cole", job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:48", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "17", name: "Mia Chen",       role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen",     pm: "Renee Cole", job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:52", penaltyCount: 0, penaltyAmount: 0 },
+  // Crew E — second whole-crew case
+  { id: "18", name: "Omar Haddad",    role: "Foreman",     crew: "Crew E", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "06:00", state: "missed",    minutesPastWindow: 11, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "19", name: "Kelly Brennan",  role: "Laborer",     crew: "Crew E", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "06:00", state: "missed",    minutesPastWindow: 9,  penaltyCount: 1, penaltyAmount: 90 },
+  { id: "20", name: "Wes Duncan",     role: "Operator",    crew: "Crew E", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 17, penaltyCount: 0, penaltyAmount: 0 },
+  // Crew F — fully compliant
+  { id: "21", name: "Ana Duarte",     role: "Foreman",     crew: "Crew F", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:40", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "22", name: "Ben Iverson",    role: "Laborer",     crew: "Crew F", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:44", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "23", name: "Sofia Ramos",    role: "Electrician", crew: "Crew F", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:50", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "24", name: "Trent Wallace",  role: "Operator",    crew: "Crew F", supervisor: "Miguel Santos", pm: "Priya Shah", job: "Job D", costCenter: "CC-400", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:55", penaltyCount: 0, penaltyAmount: 0 },
+  // Crew G
+  { id: "25", name: "Nina Patel",     role: "Foreman",     crew: "Crew G", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "07:00", state: "upcoming",  minutesUntilBreak: 26, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "26", name: "Derek Osei",     role: "Laborer",     crew: "Crew G", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "07:00", state: "upcoming",  minutesUntilBreak: 24, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "27", name: "Clara Jensen",   role: "Inspector",   crew: "Crew G", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:30", state: "compliant", breakTakenAt: "12:10", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "28", name: "Hugo Marin",     role: "Operator",    crew: "Crew G", supervisor: "Tom Blake",     pm: "Alex Doyle", job: "Job A", costCenter: "CC-100", shiftStart: "06:30", state: "late",      breakTakenAt: "12:47", minutesOutsideWindow: 19, penaltyCount: 1, penaltyAmount: 90 },
+  // Crew H — fully compliant
+  { id: "29", name: "Ray Lozano",     role: "Foreman",     crew: "Crew H", supervisor: "Sara Chen",     pm: "Priya Shah", job: "Job C", costCenter: "CC-300", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:35", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "30", name: "Bea Kowalski",   role: "Laborer",     crew: "Crew H", supervisor: "Sara Chen",     pm: "Priya Shah", job: "Job C", costCenter: "CC-300", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:38", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "31", name: "Sanjay Rao",     role: "Operator",    crew: "Crew H", supervisor: "Sara Chen",     pm: "Priya Shah", job: "Job C", costCenter: "CC-300", shiftStart: "05:30", state: "compliant", breakTakenAt: "11:42", penaltyCount: 0, penaltyAmount: 0 },
 ];
 
+/*
+  Crews I–T are generated from a fixed seed rather than hand-written, so the
+  prototype can show what a 20-crew site looks like without 60 literal rows.
+*/
+function seededRandom(seed: number) {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function generateCrews(startId: number): BreakEmployee[] {
+  const rand = seededRandom(20260807);
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
+  const between = (lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
+  const clock = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+  const firstNames = ["Aaron", "Bianca", "Cesar", "Delia", "Emeka", "Farah", "Gavin", "Ines", "Ilya", "Jonah", "Kira", "Leo", "Marisol", "Noor", "Otto", "Paulo", "Quinn", "Rita", "Silas", "Tessa", "Ulric", "Vera", "Wyatt", "Yara", "Zane", "Bruno", "Camila", "Dario", "Elena", "Felix"];
+  const lastNames = ["Alvarez", "Bishop", "Castro", "Egan", "Fowler", "Grant", "Hollis", "Iqbal", "Jimenez", "Keller", "Lund", "Mbeki", "Novak", "Ortiz", "Pierce", "Quiroga", "Reyes", "Sandoval", "Turner", "Ueda", "Vance", "Whitfield", "Xiong", "Yates", "Zamora"];
+  const roles = ["Laborer", "Operator", "Electrician", "Inspector", "Carpenter"];
+  const supervisors = ["Tom Blake", "Sara Chen", "Miguel Santos", "Dana Whitfield"];
+  const pms = ["Alex Doyle", "Renee Cole", "Priya Shah"];
+  const jobs = ["Job A", "Job B", "Job C", "Job D", "Job E"];
+  const costCenters = ["CC-100", "CC-200", "CC-300", "CC-400"];
+  const shifts = ["05:30", "06:00", "06:30", "07:00"];
+
+  const out: BreakEmployee[] = [];
+  let id = startId;
+
+  for (const letter of "IJKLMNOPQRST") {
+    const crew = `Crew ${letter}`;
+    const size = between(3, 6);
+    const supervisor = pick(supervisors);
+    const pm = pick(pms);
+    const job = pick(jobs);
+    const costCenter = pick(costCenters);
+    // A crew-level "mood" keeps members correlated: crews run behind together.
+    const mood = rand();
+
+    for (let i = 0; i < size; i++) {
+      const base: BreakEmployee = {
+        id: String(id++),
+        name: `${pick(firstNames)} ${pick(lastNames)}`,
+        role: i === 0 ? "Foreman" : pick(roles),
+        crew, supervisor, pm, job, costCenter,
+        shiftStart: pick(shifts),
+        state: "compliant",
+        penaltyCount: 0,
+        penaltyAmount: 0,
+      };
+      const roll = rand();
+      const upcoming = () => ({ ...base, state: "upcoming" as const, minutesUntilBreak: between(4, 28) });
+      const missed = () => { const c = roll > 0.9 ? 2 : 1; return { ...base, state: "missed" as const, minutesPastWindow: between(5, 45), penaltyCount: c, penaltyAmount: c * 90 }; };
+      const late = () => ({ ...base, state: "late" as const, breakTakenAt: clock(between(750, 790)), minutesOutsideWindow: between(6, 25), penaltyCount: 1, penaltyAmount: 90 });
+      const onTime = () => ({ ...base, state: "compliant" as const, breakTakenAt: clock(between(690, 735)) });
+
+      if (mood < 0.2) {
+        out.push(roll < 0.5 ? upcoming() : missed());
+      } else if (mood < 0.6) {
+        out.push(roll < 0.3 ? upcoming() : roll < 0.5 ? missed() : roll < 0.68 ? late() : onTime());
+      } else {
+        out.push(roll < 0.85 ? onTime() : late());
+      }
+    }
+  }
+  return out;
+}
+
+const MOCK_EMPLOYEES: BreakEmployee[] = [...BASE_EMPLOYEES, ...generateCrews(32)];
+
 // Crew-level alerts go to the foreman, not to each worker individually.
-const CREW_FOREMAN: Record<string, string> = {
-  "Crew A": "Dani Okonkwo",
-  "Crew B": "Luis Ferreira",
-  "Crew C": "Jake Morales",
-  "Crew D": "Devon King",
-};
+const CREW_FOREMAN: Record<string, string> = Object.fromEntries(
+  MOCK_EMPLOYEES.filter(e => e.role === "Foreman").map(e => [e.crew, e.name])
+);
 
 const STATE_STYLE: Record<BreakState, { label: string; color: string; bg: string; border: string }> = {
   upcoming:  { label: "Upcoming",  color: "#0063a3", bg: "#e8f2fa", border: "#a3cced" },
@@ -1856,69 +1944,181 @@ const crewAlertMessage = (c: CrewStat) =>
     ? "Your whole crew hasn't started their break yet, please make sure you take your break."
     : `${c.notStarted} of ${c.size} on ${c.crew} haven't started their break yet, please make sure they take their break.`;
 
-function CrewCard({ stat, alerted, onAlert }: {
-  stat: CrewStat; alerted: boolean; onAlert: () => void;
+const CREW_PAGE_SIZE = 8;
+
+type CrewScope = "whole" | "attention" | "all";
+
+// Crews a supervisor can still act on float to the top; whole-crew cases first.
+const crewUrgency = (c: CrewStat) =>
+  c.notStarted === 0 ? 0 : c.notStarted === c.size ? 2 : 1;
+
+function CrewStatusPanel({ stats, alertedCrews, onAlert, onAlertAll }: {
+  stats: CrewStat[];
+  alertedCrews: Set<string>;
+  onAlert: (stat: CrewStat) => void;
+  onAlertAll: (stats: CrewStat[]) => void;
 }) {
-  const wholeCrew = stat.notStarted > 0 && stat.notStarted === stat.size;
-  const needsAction = stat.notStarted > 0;
+  const [scope, setScope] = useState<CrewScope>("attention");
+  const [crewSearch, setCrewSearch] = useState("");
+  const [page, setPage] = useState(0);
+
+  const wholeCrews   = stats.filter(c => c.notStarted > 0 && c.notStarted === c.size);
+  const needAttention = stats.filter(c => c.notStarted > 0);
+  const base = scope === "whole" ? wholeCrews : scope === "attention" ? needAttention : stats;
+
+  const q = crewSearch.trim().toLowerCase();
+  const rows = base
+    .filter(c => !q || c.crew.toLowerCase().includes(q) || c.foreman.toLowerCase().includes(q))
+    .sort((a, b) =>
+      crewUrgency(b) - crewUrgency(a) ||
+      b.notStarted - a.notStarted ||
+      b.missed - a.missed ||
+      a.crew.localeCompare(b.crew)
+    );
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / CREW_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const visible = rows.slice(safePage * CREW_PAGE_SIZE, safePage * CREW_PAGE_SIZE + CREW_PAGE_SIZE);
+
+  // Bulk notify follows what is on screen, so it never messages a crew out of view.
+  const unnotified = rows.filter(c => c.notStarted > 0 && !alertedCrews.has(c.crew));
+
+  const scopeTab = (value: CrewScope, label: string, count: number, accent: string, tint: string, text: string) => {
+    const active = scope === value;
+    return (
+      <button type="button" onClick={() => { setScope(value); setPage(0); }}
+        className="inline-flex items-center whitespace-nowrap transition-colors"
+        style={{
+          background: active ? tint : "#ffffff",
+          color: active ? text : "#252a2e",
+          fontWeight: active ? 700 : 400,
+          border: `1px solid ${active ? accent : "#e0e1e9"}`,
+          borderRadius: 4, cursor: "pointer", padding: "4px 10px", gap: 6, fontSize: 12, fontFamily: OS,
+        }}>
+        {label}
+        <span style={{ fontWeight: 700 }}>{count}</span>
+      </button>
+    );
+  };
 
   const chip = (label: string, count: number, s: { color: string; bg: string; border: string }) =>
     count === 0 ? null : (
-      <span key={label} className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
-        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
+      <span className="inline-flex items-center text-[12px] font-semibold whitespace-nowrap"
+        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 4, padding: "2px 7px", fontFamily: OS }}>
         {label} {count}
       </span>
     );
 
+  const th = "px-[16px] py-[8px] text-left text-[11px] font-semibold uppercase tracking-[0.4px]";
+
   return (
-    <div style={{
-      background: "#ffffff",
-      borderRadius: 8,
-      border: `1px solid ${wholeCrew ? "#eeb4b7" : "#e0e1e9"}`,
-      boxShadow: "0px 1px 1px rgba(0,0,0,0.05)",
-      padding: 16,
-    }}>
-      <div className="flex items-start justify-between gap-[12px] mb-[10px]">
-        <div>
-          <p className="font-bold text-[15px] leading-[20px]" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
-          <p className="text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, marginTop: 2 }}>
-            Foreman {stat.foreman} · {stat.size} on shift
+    <div style={{ background: "#ffffff", borderRadius: 8, boxShadow: "0px 1px 1px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+      <div className="flex flex-wrap items-center gap-[10px] px-[16px] py-[12px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
+        {scopeTab("whole", "Whole crew behind", wholeCrews.length, "#d64545", "#fdecec", "#a72020")}
+        {scopeTab("attention", "Needs attention", needAttention.length, "#0063a3", "#e8f2fa", "#0e416c")}
+        {scopeTab("all", "All crews", stats.length, "#0063a3", "#e8f2fa", "#0e416c")}
+        <div className="ml-auto flex items-center gap-[10px]">
+          <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>
+            {needAttention.length === 0
+              ? "Every crew has taken their break"
+              : `${needAttention.length} of ${stats.length} crews still owe a break`}
           </p>
+          <div style={{ width: 180 }}>
+            <ModusWcTextInput size="sm" type="search" placeholder="Find crew or foreman"
+              aria-label="Find crew or foreman" includeSearch includeClear value={crewSearch}
+              onInputChange={(e) => { setCrewSearch(e.target.value); setPage(0); }} />
+          </div>
+          {unnotified.length > 0 && (
+            <ModusWcButton color="primary" variant="outlined" size="sm"
+              onButtonClick={() => onAlertAll(unnotified)}>
+              <ModusWcIcon decorative name="notifications" size="xs" />
+              Notify {unnotified.length} foremen
+            </ModusWcButton>
+          )}
         </div>
-        {stat.penaltyAmount > 0 && (
-          <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#a35b06", fontFamily: OS }}>
-            ${stat.penaltyAmount.toFixed(2)}
-          </span>
-        )}
       </div>
 
-      <div className="flex flex-wrap gap-[6px] mb-[12px]">
-        {chip("Upcoming", stat.upcoming, STATE_STYLE.upcoming)}
-        {chip("Missed", stat.missed, STATE_STYLE.missed)}
-        {chip("Late", stat.late, STATE_STYLE.late)}
-        {stat.upcoming + stat.missed + stat.late === 0 && (
-          <span className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
-            style={{ background: STATE_STYLE.compliant.bg, color: STATE_STYLE.compliant.color, border: `1px solid ${STATE_STYLE.compliant.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
-            All breaks taken
-          </span>
-        )}
-      </div>
+      <table className="w-full border-collapse">
+        <thead>
+          <tr style={{ background: "#f7f7fb" }}>
+            <th className={th} style={{ color: "#6a6e79" }}>Crew</th>
+            <th className={th} style={{ color: "#6a6e79" }}>Foreman</th>
+            <th className={th} style={{ color: "#6a6e79" }}>Break Status</th>
+            <th className={th} style={{ color: "#6a6e79", textAlign: "right" }}>Premiums</th>
+            <th className={th} style={{ color: "#6a6e79", textAlign: "right" }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.length === 0 ? (
+            <tr style={{ borderTop: "1px solid #e0e1e9" }}>
+              <td colSpan={5} className="px-[16px] py-[24px] text-center text-[13px]" style={{ color: "#6a6e79", fontFamily: OS }}>
+                No crews to show.
+              </td>
+            </tr>
+          ) : visible.map((stat, i) => {
+            const wholeCrew = stat.notStarted > 0 && stat.notStarted === stat.size;
+            const alerted = alertedCrews.has(stat.crew);
+            return (
+              <tr key={stat.crew} style={{
+                borderTop: i === 0 ? "1px solid #e0e1e9" : "1px solid #eef0f3",
+                background: wholeCrew ? "#fdf6f6" : "#ffffff",
+              }}>
+                <td className="px-[16px] py-[10px]" style={{ borderLeft: wholeCrew ? "3px solid #ab1f26" : "3px solid transparent" }}>
+                  <p className="font-semibold text-[14px] leading-[20px] whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
+                  <p className="text-[11px] leading-[15px]" style={{ color: "#6a6e79", fontFamily: OS }}>{stat.size} on shift</p>
+                </td>
+                <td className="px-[16px] py-[10px]">
+                  <p className="text-[13px] leading-[18px] whitespace-nowrap" style={{ color: "#252a2e", fontFamily: OS }}>{stat.foreman}</p>
+                </td>
+                <td className="px-[16px] py-[10px]">
+                  <div className="flex flex-wrap items-center gap-[6px]">
+                    {wholeCrew && (
+                      <span className="inline-flex items-center text-[12px] font-bold whitespace-nowrap"
+                        style={{ background: "#ab1f26", color: "#ffffff", borderRadius: 4, padding: "2px 7px", fontFamily: OS }}>
+                        Whole crew
+                      </span>
+                    )}
+                    {chip("Upcoming", stat.upcoming, STATE_STYLE.upcoming)}
+                    {chip("Missed", stat.missed, STATE_STYLE.missed)}
+                    {chip("Late", stat.late, STATE_STYLE.late)}
+                    {stat.upcoming + stat.missed + stat.late === 0 && (
+                      <span className="inline-flex items-center text-[12px] font-semibold whitespace-nowrap"
+                        style={{ background: STATE_STYLE.compliant.bg, color: STATE_STYLE.compliant.color, border: `1px solid ${STATE_STYLE.compliant.border}`, borderRadius: 4, padding: "2px 7px", fontFamily: OS }}>
+                        All breaks taken
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-[16px] py-[10px]" style={{ textAlign: "right" }}>
+                  <p className="text-[13px] font-semibold whitespace-nowrap" style={{ color: stat.penaltyAmount > 0 ? "#a35b06" : "#a3a3a3", fontFamily: OS }}>
+                    {stat.penaltyAmount > 0 ? `$${stat.penaltyAmount.toFixed(2)}` : "—"}
+                  </p>
+                </td>
+                <td className="px-[16px] py-[10px]" style={{ textAlign: "right" }}>
+                  {stat.notStarted === 0 ? (
+                    <p className="text-[12px]" style={{ color: "#a3a3a3", fontFamily: OS }}>—</p>
+                  ) : (
+                    <ModusWcButton color="primary" variant={wholeCrew ? "filled" : "outlined"} size="sm"
+                      disabled={alerted} onButtonClick={() => onAlert(stat)}>
+                      <ModusWcIcon decorative name="notifications" size="xs" />
+                      {alerted ? "Notified" : "Notify foreman"}
+                    </ModusWcButton>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
 
-      {wholeCrew && (
-        <p className="text-[12px] font-semibold leading-[16px]" style={{ color: "#ab1f26", fontFamily: OS, marginBottom: 10 }}>
-          Whole crew still hasn't started their break.
+      <div className="flex items-center justify-between px-[16px] py-[10px]" style={{ borderTop: "1px solid #e0e1e9" }}>
+        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>
+          {rows.length === 0 ? "No crews" : `${safePage * CREW_PAGE_SIZE + 1}–${safePage * CREW_PAGE_SIZE + visible.length} of ${rows.length} crews`}
         </p>
-      )}
-
-      {needsAction ? (
-        <ModusWcButton color="primary" variant={wholeCrew ? "filled" : "outlined"} size="sm"
-          disabled={alerted} onButtonClick={onAlert}>
-          <ModusWcIcon decorative name="notifications" size="xs" />
-          {alerted ? `${stat.foreman} notified` : "Notify foreman"}
-        </ModusWcButton>
-      ) : (
-        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>No action needed.</p>
-      )}
+        <ModusWcPagination aria-label="Crew pages" size="sm"
+          count={pageCount} page={safePage + 1}
+          onPageChange={(e) => setPage(e.detail.newPage - 1)} />
+      </div>
     </div>
   );
 }
@@ -2990,8 +3190,11 @@ function ClockInOutPage() {
   );
 }
 
+const EMP_PAGE_SIZE = 10;
+
 function ComplianceDashboard() {
   const [activeSection, setActiveSection] = useState<ExceptionView>("all");
+  const [empPage, setEmpPage] = useState(0);
   const [alertedCrews, setAlertedCrews] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set());
@@ -3036,6 +3239,10 @@ function ComplianceDashboard() {
     activeSection === "premium"  ? premium :
     inScope;
 
+  const empPageCount = Math.max(1, Math.ceil(displayed.length / EMP_PAGE_SIZE));
+  const empSafePage = Math.min(empPage, empPageCount - 1);
+  const pageRows = displayed.slice(empSafePage * EMP_PAGE_SIZE, empSafePage * EMP_PAGE_SIZE + EMP_PAGE_SIZE);
+
   const crewStats: CrewStat[] = [...new Set(inScope.map(e => e.crew))].sort().map(crew => {
     const members = inScope.filter(e => e.crew === crew);
     return {
@@ -3058,13 +3265,22 @@ function ComplianceDashboard() {
     toast.success(`Alert sent to ${stat.foreman} — ${stat.crew}`, { description: crewAlertMessage(stat) });
   };
 
+  const onFilterChange = (setter: (v: string) => void) => (v: string) => { setter(v); setEmpPage(0); };
+
+  const notifyCrews = (stats: CrewStat[]) => {
+    setAlertedCrews(prev => new Set([...prev, ...stats.map(s => s.crew)]));
+    toast.success(`Alert sent to ${stats.length} foremen`, {
+      description: `${stats.map(s => s.crew).join(", ")} — each foreman was asked to get their crew on break.`,
+    });
+  };
+
   const SummaryCard = ({ label, count, sub, tone, section }: {
     label: string; count: number; sub: string;
     tone: { color: string; bg: string }; section: ExceptionView;
   }) => {
     const active = activeSection === section;
     return (
-      <button onClick={() => setActiveSection(active ? "all" : section)}
+      <button onClick={() => { setActiveSection(active ? "all" : section); setEmpPage(0); }}
         className="text-left transition-all w-full"
         style={{
           background: active ? tone.bg : "#ffffff",
@@ -3131,14 +3347,9 @@ function ComplianceDashboard() {
           Alert the foreman when a crew is running behind
         </p>
       </div>
-      <div className="grid grid-cols-4 gap-[16px] mb-[24px]">
-        {crewStats.length === 0 ? (
-          <p className="text-[14px]" style={{ color: "#6a6e79", fontFamily: OS }}>No crews match these filters.</p>
-        ) : crewStats.map(stat => (
-          <CrewCard key={stat.crew} stat={stat}
-            alerted={alertedCrews.has(stat.crew)}
-            onAlert={() => notifyCrew(stat)} />
-        ))}
+      <div className="mb-[24px]">
+        <CrewStatusPanel stats={crewStats} alertedCrews={alertedCrews}
+          onAlert={notifyCrew} onAlertAll={notifyCrews} />
       </div>
 
       {/* Filter matrix */}
@@ -3153,13 +3364,13 @@ function ComplianceDashboard() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-[8px]">
-          <FilterInput placeholder="Search" value={search} onChange={setSearch} />
-          <FilterInput placeholder="Employee" value={filterEmployee} onChange={setFilterEmployee} options={uniqueEmployees} />
-          <FilterInput placeholder="Crew" value={filterCrew} onChange={setFilterCrew} options={uniqueCrews} />
-          <FilterInput placeholder="Supervisor" value={filterSupervisor} onChange={setFilterSupervisor} options={uniqueSupervisors} />
-          <FilterInput placeholder="PM" value={filterPm} onChange={setFilterPm} options={uniquePms} />
-          <FilterInput placeholder="Job" value={filterJob} onChange={setFilterJob} options={uniqueJobs} />
-          <FilterInput placeholder="Cost Center" value={filterCostCenter} onChange={setFilterCostCenter} options={uniqueCostCenters} />
+          <FilterInput placeholder="Search" value={search} onChange={onFilterChange(setSearch)} />
+          <FilterInput placeholder="Employee" value={filterEmployee} onChange={onFilterChange(setFilterEmployee)} options={uniqueEmployees} />
+          <FilterInput placeholder="Crew" value={filterCrew} onChange={onFilterChange(setFilterCrew)} options={uniqueCrews} />
+          <FilterInput placeholder="Supervisor" value={filterSupervisor} onChange={onFilterChange(setFilterSupervisor)} options={uniqueSupervisors} />
+          <FilterInput placeholder="PM" value={filterPm} onChange={onFilterChange(setFilterPm)} options={uniquePms} />
+          <FilterInput placeholder="Job" value={filterJob} onChange={onFilterChange(setFilterJob)} options={uniqueJobs} />
+          <FilterInput placeholder="Cost Center" value={filterCostCenter} onChange={onFilterChange(setFilterCostCenter)} options={uniqueCostCenters} />
         </div>
       </div>
 
@@ -3217,14 +3428,14 @@ function ComplianceDashboard() {
               {/* Select-all checkbox */}
               <th className="px-[16px] py-[10px] w-[40px]" style={{ borderBottom: "2px solid #e0e1e9", background: "#e0e1e9" }}>
                 <StyledCheckbox
-                  checked={displayed.length > 0 && displayed.every(e => selectedIds.has(e.id))}
-                  indeterminate={displayed.some(e => selectedIds.has(e.id)) && !displayed.every(e => selectedIds.has(e.id))}
+                  checked={pageRows.length > 0 && pageRows.every(e => selectedIds.has(e.id))}
+                  indeterminate={pageRows.some(e => selectedIds.has(e.id)) && !pageRows.every(e => selectedIds.has(e.id))}
                   onChange={() => {
-                    const allSelected = displayed.every(e => selectedIds.has(e.id));
+                    const allSelected = pageRows.every(e => selectedIds.has(e.id));
                     if (allSelected) {
-                      setSelectedIds(prev => { const n = new Set(prev); displayed.forEach(e => n.delete(e.id)); return n; });
+                      setSelectedIds(prev => { const n = new Set(prev); pageRows.forEach(e => n.delete(e.id)); return n; });
                     } else {
-                      setSelectedIds(prev => new Set([...prev, ...displayed.map(e => e.id)]));
+                      setSelectedIds(prev => new Set([...prev, ...pageRows.map(e => e.id)]));
                     }
                   }} />
               </th>
@@ -3237,14 +3448,14 @@ function ComplianceDashboard() {
             </tr>
           </thead>
           <tbody>
-            {displayed.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-[16px] py-[32px] text-center">
                   <p className="font-semibold text-[14px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>No exceptions to display.</p>
                 </td>
               </tr>
             ) : (
-              displayed.map((emp, i) => (
+              pageRows.map((emp, i) => (
                 <EmployeeRow key={emp.id} emp={emp} idx={i}
                   selected={selectedIds.has(emp.id)}
                   onToggle={() => setSelectedIds(prev => { const n = new Set(prev); n.has(emp.id) ? n.delete(emp.id) : n.add(emp.id); return n; })}
@@ -3254,13 +3465,20 @@ function ComplianceDashboard() {
             )}
           </tbody>
         </table>
-        <div className="flex items-center justify-between px-[16px] py-[10px]" style={{ borderTop: "1px solid #e0e1e9", background: "#ffffff" }}>
+        <div className="flex items-center justify-between gap-[12px] px-[16px] py-[10px]" style={{ borderTop: "1px solid #e0e1e9", background: "#ffffff" }}>
           <p className="font-semibold text-[12px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-            Showing {displayed.length} of {MOCK_EMPLOYEES.length} employees
+            {displayed.length === 0
+              ? `0 of ${MOCK_EMPLOYEES.length} employees`
+              : `${empSafePage * EMP_PAGE_SIZE + 1}–${empSafePage * EMP_PAGE_SIZE + pageRows.length} of ${displayed.length} employees`}
           </p>
-          <p className="font-semibold text-[12px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-            Last refreshed: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </p>
+          <div className="flex items-center gap-[16px]">
+            <p className="font-semibold text-[12px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+              Last refreshed: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </p>
+            <ModusWcPagination aria-label="Exception pages" size="sm"
+              count={empPageCount} page={empSafePage + 1}
+              onPageChange={(e) => setEmpPage(e.detail.newPage - 1)} />
+          </div>
         </div>
       </div>
     </div>
