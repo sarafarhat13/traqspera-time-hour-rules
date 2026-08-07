@@ -6,6 +6,7 @@ import {
   ModusWcButton,
   ModusWcCheckbox,
   ModusWcIcon,
+  ModusWcPagination,
   ModusWcSwitch,
   ModusWcTabs,
   ModusWcTextInput,
@@ -2231,24 +2232,16 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
 
         {/* Paging */}
         <div className="flex items-center justify-between px-[24px] py-[12px]">
-            <span className="text-[12px] text-[#6a6e79]">
-              {matches.length === 0 ? "No results" : `${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + rows.length} of ${matches.length}`}
-            </span>
-            <div className="flex items-center gap-[8px]">
-              <button type="button" onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0}
-                className="rounded-[4px] text-[12px]"
-                style={{ background: "transparent", border: "1px solid #cbced4", padding: "5px 10px",
-                  color: safePage === 0 ? "#a3a3a3" : "#464b52", cursor: safePage === 0 ? "not-allowed" : "pointer" }}>
-                Previous
-              </button>
-              <span className="text-[12px] text-[#6a6e79]">Page {safePage + 1} of {pageCount}</span>
-              <button type="button" onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))} disabled={safePage >= pageCount - 1}
-                className="rounded-[4px] text-[12px]"
-                style={{ background: "transparent", border: "1px solid #cbced4", padding: "5px 10px",
-                  color: safePage >= pageCount - 1 ? "#a3a3a3" : "#464b52", cursor: safePage >= pageCount - 1 ? "not-allowed" : "pointer" }}>
-                Next
-              </button>
-            </div>
+          <span className="text-[12px] text-[#6a6e79]">
+            {matches.length === 0 ? "No results" : `${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + rows.length} of ${matches.length}`}
+          </span>
+          <ModusWcPagination
+            aria-label="Employee pages"
+            size="sm"
+            count={pageCount}
+            page={safePage + 1}
+            onPageChange={(e) => setPage(e.detail.newPage - 1)}
+          />
         </div>
 
         {/* Footer */}
