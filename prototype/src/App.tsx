@@ -334,9 +334,7 @@ function RuleSetForm({
 
   const [employeeModal, setEmployeeModal] = useState<WaiverFilter | null>(null);
   const openEmployeeModal = (filter: WaiverFilter) => setEmployeeModal(filter);
-  const onDutyMembers = mp.onDutyScope === "all"
-    ? ON_DUTY_ROSTER
-    : ON_DUTY_ROSTER.filter((e) => mp.onDutyEmployees.includes(e.id));
+  const onDutyMembers = ON_DUTY_ROSTER.filter((e) => mp.onDutyEmployees.includes(e.id));
   const onDutySigned = onDutyMembers.filter((e) => e.signedOn).length;
   const onDutyOutstanding = onDutyMembers.length - onDutySigned;
 
@@ -781,32 +779,15 @@ function RuleSetForm({
 
                 {/* Applies to */}
                 <div className="px-[20px] pt-[16px] pb-[18px]" style={{ borderTop: "1px solid #e0e1e9" }}>
-                  <SectionLabel>Applies To</SectionLabel>
-                  <div className="grid grid-cols-2 gap-[12px] max-w-[520px]">
-                    <SoftOption
-                      selected={mp.onDutyScope === "all"}
-                      onSelect={() => setMp("onDutyScope", "all")}
-                      title="All employees"
-                      description="Anyone can record an on-duty meal"
-                    />
-                    <SoftOption
-                      selected={mp.onDutyScope === "selected"}
-                      onSelect={() => setMp("onDutyScope", "selected")}
-                      title="Specific employees"
-                      description="Only the employees you choose"
-                    />
-                  </div>
-
-                  <div className="mt-[12px] flex flex-wrap items-center justify-between gap-[12px] rounded-[6px] px-[12px] py-[10px]"
+                  <SectionLabel>Assigned Employees</SectionLabel>
+                  <div className="flex flex-wrap items-center justify-between gap-[12px] rounded-[6px] px-[12px] py-[10px]"
                     style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
                     <div className="flex items-center gap-[8px]">
                       <Users size={14} style={{ color: "#6a6e79" }} />
                       <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e]">
-                        {mp.onDutyScope === "all"
-                          ? `All ${ON_DUTY_ROSTER.length} employees covered`
-                          : onDutyMembers.length === 0
-                            ? "No employees assigned yet"
-                            : `${onDutyMembers.length} employees assigned`}
+                        {onDutyMembers.length === 0
+                          ? "No employees assigned yet"
+                          : `${onDutyMembers.length} employees assigned`}
                       </span>
                       {onDutyMembers.length > 0 && (
                         <span className="text-[11px] font-['Open_Sans',sans-serif]"
@@ -818,8 +799,8 @@ function RuleSetForm({
                     </div>
                     <ModusWcButton color="primary" variant="outlined" size="sm"
                       onButtonClick={() => openEmployeeModal("all")}>
-                      <ModusWcIcon decorative name={mp.onDutyScope === "all" ? "document" : "manage_people"} size="xs" />
-                      {mp.onDutyScope === "all" ? "View waiver status" : "Manage employees"}
+                      <ModusWcIcon decorative name="manage_people" size="xs" />
+                      Manage employees
                     </ModusWcButton>
                   </div>
                 </div>
@@ -828,7 +809,6 @@ function RuleSetForm({
 
             {employeeModal && (
               <OnDutyEmployeeModal
-                scope={mp.onDutyScope}
                 selected={mp.onDutyEmployees}
                 initialFilter={employeeModal}
                 onApply={(ids) => setMp("onDutyEmployees", ids)}
@@ -1460,7 +1440,7 @@ type MealPenaltyState = {
   freeMealEnabled: boolean; freeMealTrigger: FreeMealTrigger;
   freeMealMinutes: number; freeMealBeforeMinutes: number; freeMealPrompt: string;
   onDutyMealEnabled: boolean; onDutyRequireAgreement: boolean; onDutyNoAgreementAction: OnDutyMealAction;
-  onDutyScope: "all" | "selected"; onDutyEmployees: string[];
+  onDutyEmployees: string[];
   penaltiesEnabled: boolean;
   stackingCap: number;
   violations: ViolationRule[];
@@ -1542,7 +1522,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
-  onDutyScope: "selected", onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
+  onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
   penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(),
 });
 
@@ -2021,8 +2001,7 @@ const FILTER_STYLES: Record<WaiverFilter, {
   unsigned: { tint: "#fdecec", border: "#d64545", text: "#a72020", badgeOn: "#d64545", badgeOnText: "#ffffff", badgeOff: "#f9d5d5", badgeOffText: "#a72020" },
 };
 
-function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose }: {
-  scope: "all" | "selected";
+function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
   selected: string[];
   initialFilter: WaiverFilter;
   onApply: (ids: string[]) => void;
@@ -2039,10 +2018,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const pickingEmployees = scope === "selected";
-  const inScope = pickingEmployees ? ON_DUTY_ROSTER.filter((e) => draft.includes(e.id)) : ON_DUTY_ROSTER;
-  const signedCount = inScope.filter((e) => e.signedOn).length;
-  const outstanding = inScope.length - signedCount;
+  const outstanding = ON_DUTY_ROSTER.filter((e) => draft.includes(e.id) && !e.signedOn).length;
 
   const matches = ON_DUTY_ROSTER.filter((e) => {
     if (filter === "assigned" && !draft.includes(e.id)) return false;
@@ -2062,7 +2038,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
 
   const tabs: { value: WaiverFilter; label: string; count: number }[] = [
     { value: "all",      label: "All",        count: ON_DUTY_ROSTER.length },
-    ...(pickingEmployees ? [{ value: "assigned" as const, label: "Assigned", count: draft.length }] : []),
+    { value: "assigned", label: "Assigned",   count: draft.length },
     { value: "signed",   label: "Signed",     count: ON_DUTY_ROSTER.filter((e) => e.signedOn).length },
     { value: "unsigned", label: "Not signed", count: ON_DUTY_ROSTER.filter((e) => !e.signedOn).length },
   ];
@@ -2081,9 +2057,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
           <div>
             <p className="text-[18px] font-semibold text-[#252a2e]">On-Duty Meal Employees</p>
             <p className="text-[12px] text-[#6a6e79] mt-[2px]">
-              {pickingEmployees
-                ? "Choose who can record an on-duty meal and review their signed agreements."
-                : "This rule applies to all employees. Review their signed agreements below."}
+              Choose who can record an on-duty meal and review their signed agreements.
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
@@ -2150,7 +2124,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
             <table className="w-full border-collapse">
               <thead>
                 <tr style={{ background: "#f7f7fb" }}>
-                  {pickingEmployees && <th className={th} style={{ width: 44 }} aria-label="Assigned" />}
+                  <th className={th} style={{ width: 44 }} aria-label="Assigned" />
                   <th className={th}>Employee</th>
                   <th className={th}>Agreement</th>
                   <th className={th} style={{ textAlign: "right" }}>Action</th>
@@ -2161,13 +2135,11 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
                   const assigned = draft.includes(e.id);
                   return (
                     <tr key={e.id} style={{ borderTop: i === 0 ? "1px solid #e0e1e9" : "1px solid #eef0f3" }}>
-                      {pickingEmployees && (
-                        <td className={td}>
-                          <input type="checkbox" checked={assigned} onChange={() => toggle(e.id)}
-                            aria-label={`Assign ${e.name}`}
-                            style={{ width: 15, height: 15, accentColor: "#0063a3", cursor: "pointer" }} />
-                        </td>
-                      )}
+                      <td className={td}>
+                        <input type="checkbox" checked={assigned} onChange={() => toggle(e.id)}
+                          aria-label={`Assign ${e.name}`}
+                          style={{ width: 15, height: 15, accentColor: "#0063a3", cursor: "pointer" }} />
+                      </td>
                       <td className={td}>
                         <span className="font-semibold">{e.name}</span>
                         <span className="block text-[11px] text-[#6a6e79]">{e.role}</span>
@@ -2196,7 +2168,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
                 })}
                 {rows.length === 0 && (
                   <tr style={{ borderTop: "1px solid #e0e1e9" }}>
-                    <td colSpan={pickingEmployees ? 4 : 3} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
+                    <td colSpan={4} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
                       No employees match this search.
                     </td>
                   </tr>
@@ -2223,7 +2195,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
         {/* Footer */}
         <div className="flex items-center justify-between px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
           <span className="text-[12px] text-[#6a6e79]">
-            {pickingEmployees ? `${draft.length} employees assigned` : `${ON_DUTY_ROSTER.length} employees covered`}
+            {draft.length} employees assigned
           </span>
           <div className="flex items-center gap-[10px]">
             {outstanding > 0 && (
@@ -2235,7 +2207,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
             )}
             <ModusWcButton color="primary" variant="filled" size="sm"
               onButtonClick={() => { onApply(draft); onClose(); }}>
-              {pickingEmployees ? "Save" : "Close"}
+              Save
             </ModusWcButton>
           </div>
         </div>
