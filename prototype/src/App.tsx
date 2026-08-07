@@ -1856,9 +1856,11 @@ const crewAlertMessage = (c: CrewStat) =>
     ? "Your whole crew hasn't started their break yet, please make sure you take your break."
     : `${c.notStarted} of ${c.size} on ${c.crew} haven't started their break yet, please make sure they take their break.`;
 
-function CrewCard({ stat, alerted, onAlert }: {
-  stat: CrewStat; alerted: boolean; onAlert: () => void;
+function CrewCard({ stat, alerted, selected, onSelect, onAlert }: {
+  stat: CrewStat; alerted: boolean;
+  selected: boolean; onSelect: () => void; onAlert: () => void;
 }) {
+  const [hover, setHover] = useState(false);
   const wholeCrew = stat.notStarted > 0 && stat.notStarted === stat.size;
   const needsAction = stat.notStarted > 0;
 
@@ -1870,17 +1872,36 @@ function CrewCard({ stat, alerted, onAlert }: {
       </span>
     );
 
+  const borderColor = selected ? "#0063a3" : wholeCrew ? "#eeb4b7" : "#e0e1e9";
+
   return (
-    <div style={{
-      background: "#ffffff",
-      borderRadius: 8,
-      border: `1px solid ${wholeCrew ? "#eeb4b7" : "#e0e1e9"}`,
-      boxShadow: "0px 1px 1px rgba(0,0,0,0.05)",
-      padding: 16,
-    }}>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`Filter the dashboard to ${stat.crew}`}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); }
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: selected ? "#f5fafd" : "#ffffff",
+        borderRadius: 8,
+        border: `1px solid ${borderColor}`,
+        boxShadow: selected
+          ? `0 0 0 1px #0063a3, 0px 1px 1px rgba(0,0,0,0.05)`
+          : hover
+            ? "0px 3px 6px rgba(0,0,0,0.12)"
+            : "0px 1px 1px rgba(0,0,0,0.05)",
+        padding: 16,
+        cursor: "pointer",
+        transition: "box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease",
+      }}>
       <div className="flex items-start justify-between gap-[12px] mb-[10px]">
         <div>
-          <p className="font-bold text-[15px] leading-[20px]" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
+          <p className="font-bold text-[15px] leading-[20px]" style={{ color: selected ? "#0e416c" : "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
           <p className="text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, marginTop: 2 }}>
             Foreman {stat.foreman} · {stat.size} on shift
           </p>
@@ -1911,14 +1932,21 @@ function CrewCard({ stat, alerted, onAlert }: {
       )}
 
       {needsAction ? (
-        <ModusWcButton color="primary" variant={wholeCrew ? "filled" : "outlined"} size="sm"
-          disabled={alerted} onButtonClick={onAlert}>
-          <ModusWcIcon decorative name="notifications" size="xs" />
-          {alerted ? `${stat.foreman} notified` : "Notify foreman"}
-        </ModusWcButton>
+        // Keep the alert action from also toggling the card's crew filter.
+        <div className="inline-flex" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <ModusWcButton color="primary" variant="outlined" size="sm"
+            disabled={alerted} onButtonClick={onAlert}>
+            <ModusWcIcon decorative name="notifications" size="xs" />
+            {alerted ? `${stat.foreman} notified` : "Notify foreman"}
+          </ModusWcButton>
+        </div>
       ) : (
         <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>No action needed.</p>
       )}
+
+      <p className="text-[11px] leading-[15px]" style={{ color: selected ? "#0063a3" : "#a3a3a3", fontFamily: OS, marginTop: 10 }}>
+        {selected ? "Filtering the dashboard by this crew — click to clear" : "Click to filter the dashboard by this crew"}
+      </p>
     </div>
   );
 }
@@ -3013,16 +3041,20 @@ function ComplianceDashboard() {
   const hasFilter = search || filterEmployee || filterCrew || filterJob || filterCostCenter || filterSupervisor || filterPm;
 
   // Filters apply first so every count on the page reflects the same slice.
-  const inScope = MOCK_EMPLOYEES.filter(e => {
+  const matchesFilters = (e: BreakEmployee, ignoreCrew = false) => {
     if (search && !e.name.toLowerCase().includes(search.toLowerCase()) && !e.role.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEmployee   && e.name       !== filterEmployee)   return false;
-    if (filterCrew       && e.crew       !== filterCrew)       return false;
+    if (!ignoreCrew && filterCrew && e.crew !== filterCrew)    return false;
     if (filterSupervisor && e.supervisor !== filterSupervisor) return false;
     if (filterPm         && e.pm         !== filterPm)         return false;
     if (filterJob        && e.job        !== filterJob)        return false;
     if (filterCostCenter && e.costCenter !== filterCostCenter) return false;
     return true;
-  });
+  };
+
+  const inScope = MOCK_EMPLOYEES.filter(e => matchesFilters(e));
+  // Cards ignore the crew filter itself, so picking a crew never hides the others.
+  const crewScope = MOCK_EMPLOYEES.filter(e => matchesFilters(e, true));
 
   const upcoming = inScope.filter(e => e.state === "upcoming");
   const missed   = inScope.filter(e => e.state === "missed");
@@ -3036,8 +3068,8 @@ function ComplianceDashboard() {
     activeSection === "premium"  ? premium :
     inScope;
 
-  const crewStats: CrewStat[] = [...new Set(inScope.map(e => e.crew))].sort().map(crew => {
-    const members = inScope.filter(e => e.crew === crew);
+  const crewStats: CrewStat[] = [...new Set(crewScope.map(e => e.crew))].sort().map(crew => {
+    const members = crewScope.filter(e => e.crew === crew);
     return {
       crew,
       foreman: CREW_FOREMAN[crew] ?? "Unassigned",
@@ -3137,6 +3169,8 @@ function ComplianceDashboard() {
         ) : crewStats.map(stat => (
           <CrewCard key={stat.crew} stat={stat}
             alerted={alertedCrews.has(stat.crew)}
+            selected={filterCrew === stat.crew}
+            onSelect={() => setFilterCrew(filterCrew === stat.crew ? "" : stat.crew)}
             onAlert={() => notifyCrew(stat)} />
         ))}
       </div>
