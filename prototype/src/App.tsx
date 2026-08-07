@@ -5,6 +5,7 @@ import {
   ModusWcBadge,
   ModusWcButton,
   ModusWcCheckbox,
+  ModusWcIcon,
   ModusWcSwitch,
   ModusWcTabs,
 } from "@trimble-oss/moduswebcomponents-react";
@@ -821,12 +822,11 @@ function RuleSetForm({
                           View outstanding
                         </button>
                       )}
-                      <button type="button" onClick={() => openEmployeeModal("all")}
-                        className="inline-flex items-center gap-[6px] rounded-[4px] text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#0063a3] transition-colors hover:bg-[#eef5fa]"
-                        style={{ background: "transparent", border: "1px solid #0063a3", cursor: "pointer", padding: "7px 14px" }}>
-                        <FileText size={13} />
+                      <ModusWcButton color="primary" variant="outlined" size="sm"
+                        onButtonClick={() => openEmployeeModal("all")}>
+                        <ModusWcIcon decorative name={mp.onDutyScope === "all" ? "document" : "manage_people"} size="xs" />
                         {mp.onDutyScope === "all" ? "View waiver status" : "Manage employees"}
-                      </button>
+                      </ModusWcButton>
                     </div>
                   </div>
                 </div>
