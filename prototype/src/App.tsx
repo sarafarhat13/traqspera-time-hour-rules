@@ -1425,7 +1425,7 @@ function ExclusionSection({ title, description, items, onDelete, onAdd }: {
             <div className="ml-[16px] shrink-0">
               <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={onAdd}>
                 <ModusWcIcon decorative name="add" size="xs" />
-                Add / Edit
+                Add
               </ModusWcButton>
             </div>
           </div>
