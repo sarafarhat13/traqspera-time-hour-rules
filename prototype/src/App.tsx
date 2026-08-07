@@ -1745,7 +1745,13 @@ const SETTINGS_NAV_W  = 232;
 
 // ─── Compliance Dashboard ─────────────────────────────────────────────────────
 
-type FilterKey = "job" | "employee" | "crew" | "supervisor" | "pm" | "cost_center";
+/*
+  Break state and premiums are tracked separately: a missed break is what earns
+  the premium, so an employee routinely belongs to both the "Missed" and the
+  "Premiums" view. Category counts therefore overlap and do not sum to the roster.
+*/
+type BreakState = "upcoming" | "missed" | "late" | "compliant";
+type ExceptionView = "all" | BreakState | "premium";
 
 type BreakEmployee = {
   id: string;
@@ -1753,31 +1759,60 @@ type BreakEmployee = {
   role: string;
   crew: string;
   supervisor: string;
+  pm: string;
   job: string;
   costCenter: string;
   shiftStart: string;
-  minutesUntilBreak?: number;
-  minutesLate?: number;
-  penaltyAmount?: number;
-  penaltyCount?: number;
-  status: "about_to" | "late" | "premium";
+  state: BreakState;
+  minutesUntilBreak?: number;   // upcoming: time left in the window
+  minutesPastWindow?: number;   // missed: time elapsed since the window closed
+  breakTakenAt?: string;        // late / compliant: clock time the break started
+  minutesOutsideWindow?: number; // late: how far outside the window it landed
+  penaltyCount: number;
+  penaltyAmount: number;
 };
 
 const MOCK_EMPLOYEES: BreakEmployee[] = [
-  { id: "1",  name: "Marcus Rivera",  role: "Electrician", crew: "Crew A", supervisor: "Tom Blake", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", minutesUntilBreak: 12, status: "about_to" },
-  { id: "2",  name: "Dani Okonkwo",   role: "Foreman",     crew: "Crew A", supervisor: "Tom Blake", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", minutesUntilBreak: 8,  status: "about_to" },
-  { id: "3",  name: "Priya Nair",     role: "Laborer",     crew: "Crew B", supervisor: "Sara Chen", job: "Job B", costCenter: "CC-200", shiftStart: "06:30", minutesUntilBreak: 22, status: "about_to" },
-  { id: "4",  name: "Jake Morales",   role: "Operator",    crew: "Crew C", supervisor: "Sara Chen", job: "Job C", costCenter: "CC-200", shiftStart: "07:00", minutesUntilBreak: 5,  status: "about_to" },
-  { id: "5",  name: "Linda Tran",     role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", job: "Job B", costCenter: "CC-200", shiftStart: "06:00", minutesLate: 18,       status: "late" },
-  { id: "6",  name: "Carlos Vega",    role: "Laborer",     crew: "Crew C", supervisor: "Sara Chen", job: "Job C", costCenter: "CC-300", shiftStart: "06:00", minutesLate: 34,       status: "late" },
-  { id: "7",  name: "Amy Fitzgerald", role: "Inspector",   crew: "Crew A", supervisor: "Tom Blake", job: "Job A", costCenter: "CC-100", shiftStart: "06:00", minutesLate: 7,        status: "late" },
-  { id: "8",  name: "Devon King",     role: "Supervisor",  crew: "Crew D", supervisor: "Tom Blake", job: "Job B", costCenter: "CC-300", shiftStart: "05:30", minutesLate: 52,       status: "late" },
-  { id: "9",  name: "Rosa Mendez",    role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", job: "Job C", costCenter: "CC-300", shiftStart: "06:00", penaltyAmount: 90.00,  penaltyCount: 1, status: "premium" },
-  { id: "10", name: "Sam Park",       role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", job: "Job B", costCenter: "CC-200", shiftStart: "06:00", penaltyAmount: 180.00, penaltyCount: 2, status: "premium" },
-  { id: "11", name: "Nadia Volkov",   role: "Foreman",     crew: "Crew A", supervisor: "Sara Chen", job: "Job A", costCenter: "CC-100", shiftStart: "06:30", penaltyAmount: 270.00, penaltyCount: 3, status: "premium" },
+  // Crew A — three of four still owe a break
+  { id: "1",  name: "Marcus Rivera",  role: "Electrician", crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 12, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "2",  name: "Dani Okonkwo",   role: "Foreman",     crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 8,  penaltyCount: 0, penaltyAmount: 0 },
+  { id: "3",  name: "Amy Fitzgerald", role: "Inspector",   crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:00", state: "missed",    minutesPastWindow: 7,  penaltyCount: 1, penaltyAmount: 90 },
+  { id: "4",  name: "Nadia Volkov",   role: "Laborer",     crew: "Crew A", supervisor: "Tom Blake", pm: "Alex Doyle",  job: "Job A", costCenter: "CC-100", shiftStart: "06:30", state: "late",      breakTakenAt: "12:52", minutesOutsideWindow: 22, penaltyCount: 1, penaltyAmount: 90 },
+  // Crew B — nobody has started a break, the whole-crew intervention case
+  { id: "5",  name: "Priya Nair",     role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 22, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "6",  name: "Luis Ferreira",  role: "Foreman",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:30", state: "upcoming",  minutesUntilBreak: 15, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "7",  name: "Grace Bennett",  role: "Laborer",     crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "upcoming",  minutesUntilBreak: 19, penaltyCount: 0, penaltyAmount: 0 },
+  { id: "8",  name: "Linda Tran",     role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 18, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "9",  name: "Sam Park",       role: "Electrician", crew: "Crew B", supervisor: "Tom Blake", pm: "Renee Cole",  job: "Job B", costCenter: "CC-200", shiftStart: "06:00", state: "missed",    minutesPastWindow: 26, penaltyCount: 2, penaltyAmount: 180 },
+  // Crew C
+  { id: "10", name: "Jake Morales",   role: "Foreman",     crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-200", shiftStart: "07:00", state: "upcoming",  minutesUntilBreak: 5,  penaltyCount: 0, penaltyAmount: 0 },
+  { id: "11", name: "Carlos Vega",    role: "Laborer",     crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "missed",    minutesPastWindow: 34, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "12", name: "Tomas Ruiz",     role: "Operator",    crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:41", minutesOutsideWindow: 16, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "13", name: "Hana Suzuki",    role: "Inspector",   crew: "Crew C", supervisor: "Sara Chen", pm: "Alex Doyle",  job: "Job C", costCenter: "CC-200", shiftStart: "06:30", state: "compliant", breakTakenAt: "12:05", penaltyCount: 0, penaltyAmount: 0 },
+  // Crew D
+  { id: "14", name: "Devon King",     role: "Operator",    crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "05:30", state: "missed",    minutesPastWindow: 52, penaltyCount: 2, penaltyAmount: 180 },
+  { id: "15", name: "Rosa Mendez",    role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job C", costCenter: "CC-300", shiftStart: "06:00", state: "late",      breakTakenAt: "12:38", minutesOutsideWindow: 13, penaltyCount: 1, penaltyAmount: 90 },
+  { id: "16", name: "Ivan Petrov",    role: "Operator",    crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:48", penaltyCount: 0, penaltyAmount: 0 },
+  { id: "17", name: "Mia Chen",       role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:52", penaltyCount: 0, penaltyAmount: 0 },
 ];
 
-const CREWS = ["Crew A", "Crew B", "Crew C", "Crew D"];
+// Crew-level alerts go to the foreman, not to each worker individually.
+const CREW_FOREMAN: Record<string, string> = {
+  "Crew A": "Dani Okonkwo",
+  "Crew B": "Luis Ferreira",
+  "Crew C": "Jake Morales",
+  "Crew D": "Devon King",
+};
+
+const STATE_STYLE: Record<BreakState, { label: string; color: string; bg: string; border: string }> = {
+  upcoming:  { label: "Upcoming",  color: "#0063a3", bg: "#e8f2fa", border: "#a3cced" },
+  missed:    { label: "Missed",    color: "#ab1f26", bg: "#faeaea", border: "#eeb4b7" },
+  late:      { label: "Late",      color: "#a35b06", bg: "#fef3e2", border: "#f2ce8f" },
+  compliant: { label: "On time",   color: "#15803d", bg: "#e8f7ed", border: "#a8dcbb" },
+};
+
+// An employee who has not clocked a break is who a foreman can still act on.
+const hasNotStartedBreak = (e: BreakEmployee) => e.state === "upcoming" || e.state === "missed";
 
 const OS = "Open Sans, sans-serif";
 const OS_FVS: CSSProperties = { fontVariationSettings: '"wdth" 100' };
@@ -1804,18 +1839,87 @@ function AlertBadge({ label, color }: { label: string; color: string }) {
   );
 }
 
-function CrewAlertButton({ crew, lateCount, onAlert, alerted }: { crew: string; lateCount: number; onAlert: () => void; alerted: boolean }) {
-  if (lateCount === 0) return null;
+type CrewStat = {
+  crew: string;
+  foreman: string;
+  size: number;
+  upcoming: number;
+  missed: number;
+  late: number;
+  notStarted: number;
+  penaltyAmount: number;
+};
+
+// The wording a foreman receives, taken from the story's example message.
+const crewAlertMessage = (c: CrewStat) =>
+  c.notStarted === c.size
+    ? "Your whole crew hasn't started their break yet, please make sure you take your break."
+    : `${c.notStarted} of ${c.size} on ${c.crew} haven't started their break yet, please make sure they take their break.`;
+
+function CrewCard({ stat, alerted, onAlert }: {
+  stat: CrewStat; alerted: boolean; onAlert: () => void;
+}) {
+  const wholeCrew = stat.notStarted > 0 && stat.notStarted === stat.size;
+  const needsAction = stat.notStarted > 0;
+
+  const chip = (label: string, count: number, s: { color: string; bg: string; border: string }) =>
+    count === 0 ? null : (
+      <span key={label} className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
+        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
+        {label} {count}
+      </span>
+    );
+
   return (
-    <ModusWcButton
-      color={alerted ? "neutral" : "primary"}
-      variant="filled"
-      size="sm"
-      disabled={alerted}
-      onButtonClick={onAlert}
-    >
-      {alerted ? `${crew} Notified` : `Send Alert — ${crew} (${lateCount} late)`}
-    </ModusWcButton>
+    <div style={{
+      background: "#ffffff",
+      borderRadius: 8,
+      border: `1px solid ${wholeCrew ? "#eeb4b7" : "#e0e1e9"}`,
+      boxShadow: "0px 1px 1px rgba(0,0,0,0.05)",
+      padding: 16,
+    }}>
+      <div className="flex items-start justify-between gap-[12px] mb-[10px]">
+        <div>
+          <p className="font-bold text-[15px] leading-[20px]" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
+          <p className="text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, marginTop: 2 }}>
+            Foreman {stat.foreman} · {stat.size} on shift
+          </p>
+        </div>
+        {stat.penaltyAmount > 0 && (
+          <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#a35b06", fontFamily: OS }}>
+            ${stat.penaltyAmount.toFixed(2)}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-[6px] mb-[12px]">
+        {chip("Upcoming", stat.upcoming, STATE_STYLE.upcoming)}
+        {chip("Missed", stat.missed, STATE_STYLE.missed)}
+        {chip("Late", stat.late, STATE_STYLE.late)}
+        {stat.upcoming + stat.missed + stat.late === 0 && (
+          <span className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
+            style={{ background: STATE_STYLE.compliant.bg, color: STATE_STYLE.compliant.color, border: `1px solid ${STATE_STYLE.compliant.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
+            All breaks taken
+          </span>
+        )}
+      </div>
+
+      {wholeCrew && (
+        <p className="text-[12px] font-semibold leading-[16px]" style={{ color: "#ab1f26", fontFamily: OS, marginBottom: 10 }}>
+          Whole crew still hasn't started their break.
+        </p>
+      )}
+
+      {needsAction ? (
+        <ModusWcButton color="primary" variant={wholeCrew ? "filled" : "outlined"} size="sm"
+          disabled={alerted} onButtonClick={onAlert}>
+          <ModusWcIcon decorative name="notifications" size="xs" />
+          {alerted ? `${stat.foreman} notified` : "Notify foreman"}
+        </ModusWcButton>
+      ) : (
+        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>No action needed.</p>
+      )}
+    </div>
   );
 }
 
@@ -1826,28 +1930,37 @@ function EmployeeRow({ emp, idx, selected, onToggle, alerted, onAlert }: {
 }) {
   const rowBg = selected ? "#e8f2fa" : idx % 2 === 0 ? "#ffffff" : "#fafafa";
 
-  const statusNode = () => {
-    if (emp.status === "about_to") return (
-      <p className="font-semibold text-[14px] leading-[20px] opacity-60" style={{ color: "#0063a3", fontFamily: OS, ...OS_FVS }}>
-        In {emp.minutesUntilBreak} min
+  const s = STATE_STYLE[emp.state];
+  const detail =
+    emp.state === "upcoming"  ? `Due in ${emp.minutesUntilBreak} min` :
+    emp.state === "missed"    ? `${emp.minutesPastWindow} min past window` :
+    emp.state === "late"      ? `Took ${emp.breakTakenAt} · ${emp.minutesOutsideWindow} min outside` :
+                                `Took ${emp.breakTakenAt}`;
+
+  const statusNode = () => (
+    <div>
+      <span className="inline-flex items-center text-[12px] font-bold"
+        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 4, padding: "2px 8px", fontFamily: OS }}>
+        {s.label}
+      </span>
+      <p className="text-[12px] leading-[16px] whitespace-nowrap" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginTop: 3 }}>
+        {detail}
       </p>
-    );
-    if (emp.status === "late") return (
-      <p className="font-semibold text-[14px] leading-[20px] opacity-60" style={{ color: "#ab1f26", fontFamily: OS, ...OS_FVS }}>
-        {emp.minutesLate}m overdue
+    </div>
+  );
+
+  const premiumNode = () => emp.penaltyCount === 0 ? (
+    <p className="text-[14px] leading-[20px]" style={{ color: "#a3a3a3", fontFamily: OS, ...OS_FVS }}>—</p>
+  ) : (
+    <div>
+      <p className="font-semibold text-[14px] leading-[20px]" style={{ color: "#a35b06", fontFamily: OS, ...OS_FVS }}>
+        ${emp.penaltyAmount.toFixed(2)}
       </p>
-    );
-    return (
-      <div>
-        <p className="font-semibold text-[14px] leading-[20px] opacity-60" style={{ color: "#d97706", fontFamily: OS, ...OS_FVS }}>
-          ${emp.penaltyAmount?.toFixed(2)}
-        </p>
-        <p className="text-[12px] leading-[16px] opacity-60" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-          {emp.penaltyCount} violation{(emp.penaltyCount ?? 0) > 1 ? "s" : ""}
-        </p>
-      </div>
-    );
-  };
+      <p className="text-[12px] leading-[16px] whitespace-nowrap" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+        {emp.penaltyCount} violation{emp.penaltyCount > 1 ? "s" : ""}
+      </p>
+    </div>
+  );
 
   return (
     <tr style={{ background: rowBg, borderBottom: "1px solid #e0e1e9" }}>
@@ -1873,25 +1986,30 @@ function EmployeeRow({ emp, idx, selected, onToggle, alerted, onAlert }: {
         <p className="font-semibold text-[14px] leading-[20px] opacity-60 whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{emp.supervisor}</p>
       </td>
       <td className="px-[16px] py-[12px]">
+        <p className="font-semibold text-[14px] leading-[20px] opacity-60 whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{emp.pm}</p>
+      </td>
+      <td className="px-[16px] py-[12px]">
         <p className="font-semibold text-[14px] leading-[20px] opacity-60 whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{emp.job}</p>
       </td>
       <td className="px-[16px] py-[12px]">
         <p className="font-semibold text-[14px] leading-[20px] opacity-60 whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{emp.costCenter}</p>
       </td>
-      <td className="px-[16px] py-[12px]">
-        <p className="font-semibold text-[14px] leading-[20px] opacity-60 whitespace-nowrap" style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS }}>{emp.shiftStart}</p>
-      </td>
       <td className="px-[16px] py-[12px]">{statusNode()}</td>
+      <td className="px-[16px] py-[12px]">{premiumNode()}</td>
       <td className="px-[16px] py-[12px]">
-        <ModusWcButton
-          color={alerted ? "neutral" : "primary"}
-          variant="filled"
-          size="sm"
-          disabled={alerted}
-          onButtonClick={onAlert}
-        >
-          {alerted ? "Notified" : "Send Alert"}
-        </ModusWcButton>
+        {hasNotStartedBreak(emp) ? (
+          <ModusWcButton
+            color={alerted ? "secondary" : "primary"}
+            variant="outlined"
+            size="sm"
+            disabled={alerted}
+            onButtonClick={onAlert}
+          >
+            {alerted ? "Notified" : "Send Alert"}
+          </ModusWcButton>
+        ) : (
+          <p className="text-[12px]" style={{ color: "#a3a3a3", fontFamily: OS }}>—</p>
+        )}
       </td>
     </tr>
   );
@@ -2873,7 +2991,7 @@ function ClockInOutPage() {
 }
 
 function ComplianceDashboard() {
-  const [activeSection, setActiveSection] = useState<"about_to" | "late" | "premium" | "all">("all");
+  const [activeSection, setActiveSection] = useState<ExceptionView>("all");
   const [alertedCrews, setAlertedCrews] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set());
@@ -2883,72 +3001,84 @@ function ComplianceDashboard() {
   const [filterJob, setFilterJob] = useState("");
   const [filterCostCenter, setFilterCostCenter] = useState("");
   const [filterSupervisor, setFilterSupervisor] = useState("");
+  const [filterPm, setFilterPm] = useState("");
 
   const uniqueEmployees   = [...new Set(MOCK_EMPLOYEES.map(e => e.name))];
   const uniqueCrews       = [...new Set(MOCK_EMPLOYEES.map(e => e.crew))];
   const uniqueSupervisors = [...new Set(MOCK_EMPLOYEES.map(e => e.supervisor))];
+  const uniquePms         = [...new Set(MOCK_EMPLOYEES.map(e => e.pm))];
   const uniqueJobs        = [...new Set(MOCK_EMPLOYEES.map(e => e.job))];
   const uniqueCostCenters = [...new Set(MOCK_EMPLOYEES.map(e => e.costCenter))];
 
-  const aboutTo = MOCK_EMPLOYEES.filter(e => e.status === "about_to");
-  const late    = MOCK_EMPLOYEES.filter(e => e.status === "late");
-  const premium = MOCK_EMPLOYEES.filter(e => e.status === "premium");
+  const hasFilter = search || filterEmployee || filterCrew || filterJob || filterCostCenter || filterSupervisor || filterPm;
 
-  const hasFilter = search || filterEmployee || filterCrew || filterJob || filterCostCenter || filterSupervisor;
-
-  const basePool =
-    activeSection === "about_to" ? aboutTo :
-    activeSection === "late"     ? late :
-    activeSection === "premium"  ? premium :
-    MOCK_EMPLOYEES;
-
-  const displayed = basePool.filter(e => {
+  // Filters apply first so every count on the page reflects the same slice.
+  const inScope = MOCK_EMPLOYEES.filter(e => {
     if (search && !e.name.toLowerCase().includes(search.toLowerCase()) && !e.role.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEmployee   && e.name       !== filterEmployee)   return false;
     if (filterCrew       && e.crew       !== filterCrew)       return false;
     if (filterSupervisor && e.supervisor !== filterSupervisor) return false;
+    if (filterPm         && e.pm         !== filterPm)         return false;
     if (filterJob        && e.job        !== filterJob)        return false;
     if (filterCostCenter && e.costCenter !== filterCostCenter) return false;
     return true;
   });
 
-  const crewLateMap = CREWS.reduce<Record<string, number>>((acc, crew) => {
-    acc[crew] = late.filter(e => e.crew === crew).length;
-    return acc;
-  }, {});
+  const upcoming = inScope.filter(e => e.state === "upcoming");
+  const missed   = inScope.filter(e => e.state === "missed");
+  const lateTake = inScope.filter(e => e.state === "late");
+  const premium  = inScope.filter(e => e.penaltyCount > 0);
 
-  const totalPenalty = premium.reduce((s, e) => s + (e.penaltyAmount ?? 0), 0);
+  const displayed =
+    activeSection === "upcoming" ? upcoming :
+    activeSection === "missed"   ? missed :
+    activeSection === "late"     ? lateTake :
+    activeSection === "premium"  ? premium :
+    inScope;
 
-  // Summary card styled like Traqspera quick-action cards
-  const SECTION_TINT: Record<string, string> = {
-    about_to: "#e8f2fa",
-    late:     "#faeaea",
-    premium:  "#fef3e2",
+  const crewStats: CrewStat[] = [...new Set(inScope.map(e => e.crew))].sort().map(crew => {
+    const members = inScope.filter(e => e.crew === crew);
+    return {
+      crew,
+      foreman: CREW_FOREMAN[crew] ?? "Unassigned",
+      size: members.length,
+      upcoming: members.filter(e => e.state === "upcoming").length,
+      missed:   members.filter(e => e.state === "missed").length,
+      late:     members.filter(e => e.state === "late").length,
+      notStarted: members.filter(hasNotStartedBreak).length,
+      penaltyAmount: members.reduce((s, e) => s + e.penaltyAmount, 0),
+    };
+  });
+
+  const totalPenalty = premium.reduce((s, e) => s + e.penaltyAmount, 0);
+  const totalViolations = premium.reduce((s, e) => s + e.penaltyCount, 0);
+
+  const notifyCrew = (stat: CrewStat) => {
+    setAlertedCrews(prev => new Set([...prev, stat.crew]));
+    toast.success(`Alert sent to ${stat.foreman} — ${stat.crew}`, { description: crewAlertMessage(stat) });
   };
 
-  const SummaryCard = ({ label, count, sub, dotColor, section }: {
-    label: string; count: number; sub: string; dotColor: string; section: "about_to" | "late" | "premium";
+  const SummaryCard = ({ label, count, sub, tone, section }: {
+    label: string; count: number; sub: string;
+    tone: { color: string; bg: string }; section: ExceptionView;
   }) => {
     const active = activeSection === section;
     return (
       <button onClick={() => setActiveSection(active ? "all" : section)}
         className="text-left transition-all w-full"
         style={{
-          background: active ? SECTION_TINT[section] : "#ffffff",
+          background: active ? tone.bg : "#ffffff",
           borderRadius: 8,
           boxShadow: active
-            ? `0 0 0 2px ${dotColor}, 0px 1px 1px rgba(0,0,0,0.05)`
+            ? `0 0 0 2px ${tone.color}, 0px 1px 1px rgba(0,0,0,0.05)`
             : "0px 1px 1px rgba(0,0,0,0.05)",
-          padding: 24,
+          padding: 20,
           border: "none",
           cursor: "pointer",
         }}>
-        <div className="flex items-center justify-between mb-[12px]">
-          <p className="font-semibold text-[14px] leading-[20px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{label}</p>
-
-        </div>
-        <h2 className="font-bold leading-[1]" style={{ color: dotColor, fontFamily: OS, ...OS_FVS, fontSize: 36, fontWeight: 700 }}>{count}</h2>
-        <p className="mt-[6px] font-semibold text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{sub}</p>
+        <p className="font-semibold text-[14px] leading-[20px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>{label}</p>
+        <h2 className="font-bold leading-[1]" style={{ color: tone.color, fontFamily: OS, ...OS_FVS, fontSize: 34, fontWeight: 700 }}>{count}</h2>
+        <p className="font-semibold text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginTop: 6 }}>{sub}</p>
       </button>
     );
   };
@@ -2978,45 +3108,59 @@ function ComplianceDashboard() {
           Exception Summary
         </p>
       </div>
-      <div className="grid grid-cols-3 gap-[16px] mb-[24px]">
-        <SummaryCard label="About to Take Break" count={aboutTo.length} sub="Break due within 30 minutes" dotColor="#0063a3" section="about_to" />
-        <SummaryCard label="Late for Break" count={late.length} sub="Break window already passed" dotColor="#ab1f26" section="late" />
-        <SummaryCard label="Meal Premiums Incurred" count={premium.length} sub={`$${totalPenalty.toFixed(2)} total accrued today`} dotColor="#d97706" section="premium" />
+      <div className="grid grid-cols-4 gap-[16px] mb-[8px]">
+        <SummaryCard label="Upcoming Break" count={upcoming.length} sub="No break taken yet, still in window"
+          tone={{ color: STATE_STYLE.upcoming.color, bg: STATE_STYLE.upcoming.bg }} section="upcoming" />
+        <SummaryCard label="Missed Break" count={missed.length} sub="Past the window, no break taken"
+          tone={{ color: STATE_STYLE.missed.color, bg: STATE_STYLE.missed.bg }} section="missed" />
+        <SummaryCard label="Late Break" count={lateTake.length} sub="Break taken outside the window"
+          tone={{ color: STATE_STYLE.late.color, bg: STATE_STYLE.late.bg }} section="late" />
+        <SummaryCard label="Meal Premiums Incurred" count={totalViolations} sub={`$${totalPenalty.toFixed(2)} across ${premium.length} employees`}
+          tone={{ color: "#a35b06", bg: "#fef3e2" }} section="premium" />
+      </div>
+      <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS, marginBottom: 24 }}>
+        A missed or late break earns a premium, so an employee can appear in more than one category.
+      </p>
+
+      {/* Crew status — direct intervention */}
+      <div className="mb-[10px] flex items-baseline justify-between">
+        <p className="font-semibold text-[18px] tracking-[0.027px] leading-[27px]" style={{ color: "#000000", fontFamily: OS, ...OS_FVS }}>
+          Crew Status
+        </p>
+        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>
+          Alert the foreman when a crew is running behind
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-[16px] mb-[24px]">
+        {crewStats.length === 0 ? (
+          <p className="text-[14px]" style={{ color: "#6a6e79", fontFamily: OS }}>No crews match these filters.</p>
+        ) : crewStats.map(stat => (
+          <CrewCard key={stat.crew} stat={stat}
+            alerted={alertedCrews.has(stat.crew)}
+            onAlert={() => notifyCrew(stat)} />
+        ))}
       </div>
 
-
-
-      {/* Filter row — search + dropdowns */}
-      <div className="mb-[16px] flex items-center gap-[8px]">
-        <FilterInput placeholder="Search" value={search} onChange={setSearch} />
-        <FilterInput placeholder="Employee" value={filterEmployee} onChange={setFilterEmployee} options={uniqueEmployees} />
-        <FilterInput placeholder="Crew" value={filterCrew} onChange={setFilterCrew} options={uniqueCrews} />
-        <FilterInput placeholder="Supervisor" value={filterSupervisor} onChange={setFilterSupervisor} options={uniqueSupervisors} />
-        <FilterInput placeholder="Job" value={filterJob} onChange={setFilterJob} options={uniqueJobs} />
-        <FilterInput placeholder="Cost Center" value={filterCostCenter} onChange={setFilterCostCenter} options={uniqueCostCenters} />
-        <ModusWcButton
-          color="primary"
-          variant="filled"
-          size="sm"
-          disabled={selectedIds.size === 0}
-          onButtonClick={() => {
-            if (selectedIds.size === 0) return;
-            setAlertedIds(prev => new Set([...prev, ...selectedIds]));
-            setSelectedIds(new Set());
-          }}
-        >
-          Send Alert{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
-        </ModusWcButton>
-        {hasFilter && (
-          <ModusWcButton
-            color="primary"
-            variant="borderless"
-            size="sm"
-            onButtonClick={() => { setSearch(""); setFilterEmployee(""); setFilterCrew(""); setFilterSupervisor(""); setFilterJob(""); setFilterCostCenter(""); }}
-          >
-            Clear ×
-          </ModusWcButton>
-        )}
+      {/* Filter matrix */}
+      <div className="mb-[16px]" style={{ background: "#ffffff", borderRadius: 8, boxShadow: "0px 1px 1px rgba(0,0,0,0.05)", padding: 16 }}>
+        <div className="mb-[10px] flex items-center justify-between">
+          <p className="font-semibold text-[14px] leading-[20px]" style={{ color: "#464b52", fontFamily: OS, ...OS_FVS }}>Filters</p>
+          {hasFilter && (
+            <ModusWcButton color="primary" variant="borderless" size="sm"
+              onButtonClick={() => { setSearch(""); setFilterEmployee(""); setFilterCrew(""); setFilterSupervisor(""); setFilterPm(""); setFilterJob(""); setFilterCostCenter(""); }}>
+              Clear filters
+            </ModusWcButton>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-[8px]">
+          <FilterInput placeholder="Search" value={search} onChange={setSearch} />
+          <FilterInput placeholder="Employee" value={filterEmployee} onChange={setFilterEmployee} options={uniqueEmployees} />
+          <FilterInput placeholder="Crew" value={filterCrew} onChange={setFilterCrew} options={uniqueCrews} />
+          <FilterInput placeholder="Supervisor" value={filterSupervisor} onChange={setFilterSupervisor} options={uniqueSupervisors} />
+          <FilterInput placeholder="PM" value={filterPm} onChange={setFilterPm} options={uniquePms} />
+          <FilterInput placeholder="Job" value={filterJob} onChange={setFilterJob} options={uniqueJobs} />
+          <FilterInput placeholder="Cost Center" value={filterCostCenter} onChange={setFilterCostCenter} options={uniqueCostCenters} />
+        </div>
       </div>
 
       {/* Main table — Traqspera table style */}
@@ -3025,26 +3169,47 @@ function ComplianceDashboard() {
         <div className="flex items-center gap-[12px] px-[16px] py-[10px] border-b" style={{ borderColor: "#0d3560", background: "#252a2e", minHeight: 48 }}>
           {activeSection !== "all" && (
             <AlertBadge
-              label={activeSection === "about_to" ? "About to Take Break" : activeSection === "late" ? "Late for Break" : "Meal Premiums Incurred"}
-              color={activeSection === "about_to" ? "#7ec8f7" : activeSection === "late" ? "#f7a0a5" : "#fcd99a"}
+              label={
+                activeSection === "upcoming" ? "Upcoming Break" :
+                activeSection === "missed"   ? "Missed Break" :
+                activeSection === "late"     ? "Late Break" :
+                activeSection === "premium"  ? "Meal Premiums Incurred" : "On time"
+              }
+              color={
+                activeSection === "upcoming" ? "#7ec8f7" :
+                activeSection === "missed"   ? "#f7a0a5" :
+                activeSection === "late"     ? "#fcd99a" : "#fcd99a"
+              }
             />
           )}
           <p className="font-semibold text-[12px]" style={{ color: "#b0b7c3", fontFamily: OS, ...OS_FVS }}>
             {displayed.length} employee{displayed.length !== 1 ? "s" : ""}
           </p>
-          {selectedIds.size > 0 && (
-            <>
-              <span className="font-semibold text-[12px]" style={{ color: "#7ec8f7", fontFamily: OS, ...OS_FVS }}>
-                {selectedIds.size} selected
-              </span>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="text-[13px] font-semibold"
-                style={{ background: "transparent", border: "none", color: "#b0b7c3", cursor: "pointer", fontFamily: OS, ...OS_FVS }}>
-                Deselect all
-              </button>
-            </>
-          )}
+          <div className="ml-auto flex items-center gap-[12px]">
+            {selectedIds.size > 0 && (
+              <>
+                <span className="font-semibold text-[12px]" style={{ color: "#7ec8f7", fontFamily: OS, ...OS_FVS }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-[13px] font-semibold"
+                  style={{ background: "transparent", border: "none", color: "#b0b7c3", cursor: "pointer", fontFamily: OS, ...OS_FVS }}>
+                  Deselect all
+                </button>
+              </>
+            )}
+            <ModusWcButton color="primary" variant="filled" size="sm"
+              disabled={selectedIds.size === 0}
+              onButtonClick={() => {
+                if (selectedIds.size === 0) return;
+                setAlertedIds(prev => new Set([...prev, ...selectedIds]));
+                toast.success(`Alert sent to ${selectedIds.size} employee${selectedIds.size > 1 ? "s" : ""}`);
+                setSelectedIds(new Set());
+              }}>
+              Send Alert{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+            </ModusWcButton>
+          </div>
         </div>
         <table className="w-full border-collapse">
           <thead>
@@ -3063,7 +3228,7 @@ function ComplianceDashboard() {
                     }
                   }} />
               </th>
-              {["Employee", "Crew", "Supervisor", "Job", "Cost Center", "Shift Start", "Status", "Action"].map(h => (
+              {["Employee", "Crew", "Supervisor", "PM", "Job", "Cost Center", "Break Status", "Premiums", "Action"].map(h => (
                 <th key={h} className="px-[16px] py-[10px] text-left"
                   style={{ borderBottom: "2px solid #e0e1e9", background: "#e0e1e9" }}>
                   <p className="font-semibold whitespace-nowrap" style={{ fontSize: 14, color: "#464b52", fontFamily: OS, ...OS_FVS }}>{h}</p>
@@ -3074,7 +3239,7 @@ function ComplianceDashboard() {
           <tbody>
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-[16px] py-[32px] text-center">
+                <td colSpan={10} className="px-[16px] py-[32px] text-center">
                   <p className="font-semibold text-[14px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>No exceptions to display.</p>
                 </td>
               </tr>
