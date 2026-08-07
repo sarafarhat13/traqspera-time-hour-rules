@@ -2093,21 +2093,6 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
           </button>
         </div>
 
-        {/* Coverage */}
-        <div className="px-[24px] pt-[16px]">
-          <div className="flex items-center justify-between mb-[6px]">
-            <span className="text-[12px] text-[#464b52]">
-              <strong className="text-[#252a2e]">{signedCount} of {inScope.length}</strong> covered employees have a signed agreement
-            </span>
-            {outstanding > 0 && (
-              <span className="text-[12px] font-semibold text-[#b45309]">{outstanding} outstanding</span>
-            )}
-          </div>
-          <div className="h-[6px] w-full rounded-full overflow-hidden" style={{ background: "#e5e5e5" }}>
-            <div className="h-full rounded-full" style={{ background: "#16a34a", width: `${inScope.length ? (signedCount / inScope.length) * 100 : 0}%` }} />
-          </div>
-        </div>
-
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-[12px] px-[24px] py-[16px]">
           <div className="flex shrink-0 items-center gap-[8px]">
