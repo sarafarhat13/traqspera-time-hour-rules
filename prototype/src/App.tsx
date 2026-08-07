@@ -7,6 +7,7 @@ import {
   ModusWcCheckbox,
   ModusWcIcon,
   ModusWcPagination,
+  ModusWcSelect,
   ModusWcSwitch,
   ModusWcTabs,
   ModusWcTextInput,
@@ -2080,37 +2081,28 @@ function FilterInput({ placeholder, value, onChange, options }: {
   options?: string[];
 }) {
   return (
-    <div className="flex-1 min-w-[120px] relative" style={{ borderRadius: 8 }}>
-      <div className="bg-white h-[32px] relative w-full" style={{ borderRadius: 8 }}>
-        <div aria-hidden className="absolute opacity-60 pointer-events-none" style={{ inset: "0 0.14% 0 0", borderRadius: 8 }}>
-          <div aria-hidden className="absolute border border-solid border-[#6a6e79] pointer-events-none" style={{ inset: -1, borderRadius: 9 }} />
-        </div>
-        {options ? (
-          <div className="flex items-center gap-[8px] px-[12px] size-full relative">
-            <SearchIcon />
-            <select
-              value={value ?? ""}
-              onChange={e => onChange(e.target.value)}
-              className="flex-1 min-w-0 appearance-none bg-transparent outline-none text-[14px] leading-[20px] cursor-pointer"
-              style={{ color: value ? "#171c1e" : "#6a6e79", fontFamily: OS, ...OS_FVS, border: "none" }}>
-              <option value="">{placeholder}</option>
-              {options.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-            <ChevronIcon />
-          </div>
-        ) : (
-          <div className="flex items-center gap-[8px] px-[12px] size-full relative">
-            <SearchIcon />
-            <input
-              type="text"
-              placeholder={placeholder}
-              value={value ?? ""}
-              onChange={e => onChange(e.target.value)}
-              className="flex-1 min-w-0 bg-transparent outline-none text-[14px] leading-[20px] placeholder-[#6a6e79]"
-              style={{ color: "#171c1e", fontFamily: OS, ...OS_FVS, border: "none" }} />
-          </div>
-        )}
-      </div>
+    <div style={{ flex: "1 1 160px", minWidth: 150 }}>
+      {options ? (
+        <ModusWcSelect
+          label={placeholder}
+          size="sm"
+          value={value ?? ""}
+          // Modus dropped the placeholder prop; a blank first option is the clear action.
+          options={[{ label: "All", value: "" }, ...options.map(o => ({ label: o, value: o }))]}
+          onInputChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <ModusWcTextInput
+          label={placeholder}
+          type="search"
+          size="sm"
+          includeSearch
+          includeClear
+          placeholder="Name or role"
+          value={value ?? ""}
+          onInputChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </div>
   );
 }
