@@ -3412,6 +3412,8 @@ function ComplianceDashboard() {
 
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
 function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
+  const [tenant, setTenant] = useState("enterprise");
+  const [viewingAs, setViewingAs] = useState("admin");
   return (
     <div className="fixed top-0 left-0 right-0 flex items-center bg-white border-b border-[#e0e1e9] px-[12px]"
       style={{ height: TOP_BAR_H, zIndex: 60 }}>
@@ -3427,16 +3429,33 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         <span className="text-[14px] font-bold text-[#0d3560] font-['Open_Sans',sans-serif] whitespace-nowrap">Traqspera</span>
       </div>
       {/* Center: tenant selector */}
-      <button className="flex items-center gap-[6px] rounded-[4px] border border-[#e0e1e9] bg-[#f5f5f8] px-[10px] py-[5px] text-[12px] text-[#464b52] font-['Open_Sans',sans-serif] hover:bg-[#eaeaef] transition-colors">
-        Enterprise
-        <ChevronDown size={12} />
-      </button>
+      <ModusWcSelect
+        aria-label="Tenant"
+        size="sm"
+        value={tenant}
+        options={[
+          { label: "Enterprise", value: "enterprise" },
+          { label: "Northwest Division", value: "northwest" },
+          { label: "Gulf Coast Division", value: "gulf" },
+        ]}
+        onInputChange={(e) => setTenant(e.target.value)}
+        style={{ width: 180 }}
+      />
       {/* Right: viewing + icons */}
       <div className="ml-auto flex items-center gap-[6px]">
-        <button className="flex items-center gap-[6px] rounded-[4px] border border-[#e0e1e9] bg-[#f5f5f8] px-[10px] py-[5px] text-[12px] text-[#464b52] font-['Open_Sans',sans-serif] hover:bg-[#eaeaef] transition-colors">
-          Viewing as Admin
-          <ChevronDown size={12} />
-        </button>
+        <ModusWcSelect
+          aria-label="Viewing as"
+          size="sm"
+          value={viewingAs}
+          options={[
+            { label: "Viewing as Admin", value: "admin" },
+            { label: "Viewing as Supervisor", value: "supervisor" },
+            { label: "Viewing as Foreman", value: "foreman" },
+            { label: "Viewing as Payroll Officer", value: "payroll" },
+          ]}
+          onInputChange={(e) => setViewingAs(e.target.value)}
+          style={{ width: 200 }}
+        />
         <button className="flex h-[32px] w-[32px] items-center justify-center rounded-full text-[#6a6e79] hover:text-[#252a2e] hover:bg-[#f1f1f6] transition-colors">
           <Bell size={15} />
         </button>
