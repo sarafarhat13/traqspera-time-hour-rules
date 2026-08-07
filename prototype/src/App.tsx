@@ -2131,7 +2131,7 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
                     color: active ? s.text : "#252a2e",
                     fontWeight: active ? 700 : 400,
                     border: `1px solid ${active ? s.border : "#e0e1e9"}`,
-                    borderRadius: 9999,
+                    borderRadius: 4,
                     cursor: "pointer",
                     padding: "4px 5px 4px 12px",
                     gap: 7,
