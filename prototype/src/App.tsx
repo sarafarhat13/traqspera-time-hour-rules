@@ -2220,17 +2220,16 @@ function OnDutyEmployeeModal({ scope, selected, initialFilter, onApply, onClose 
           </span>
           <div className="flex items-center gap-[10px]">
             {outstanding > 0 && (
-              <button type="button" onClick={() => toast.success(`Reminder sent to ${outstanding} employees`)}
-                className="rounded-[4px] text-[13px] font-semibold text-[#0063a3] transition-colors hover:bg-[#eef5fa]"
-                style={{ background: "transparent", border: "1px solid #0063a3", cursor: "pointer", padding: "8px 16px" }}>
+              <ModusWcButton color="primary" variant="outlined" size="sm"
+                onButtonClick={() => toast.success(`Reminder sent to ${outstanding} employees`)}>
+                <ModusWcIcon decorative name="email" size="xs" />
                 Remind all outstanding
-              </button>
+              </ModusWcButton>
             )}
-            <button type="button" onClick={() => { onApply(draft); onClose(); }}
-              className="rounded-[4px] text-[13px] font-semibold text-white transition-colors hover:bg-[#005a91]"
-              style={{ background: "#0063a3", border: "none", cursor: "pointer", padding: "8px 20px" }}>
+            <ModusWcButton color="primary" variant="filled" size="sm"
+              onButtonClick={() => { onApply(draft); onClose(); }}>
               {pickingEmployees ? "Save" : "Close"}
-            </button>
+            </ModusWcButton>
           </div>
         </div>
       </div>
