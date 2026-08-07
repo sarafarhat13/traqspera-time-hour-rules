@@ -1422,10 +1422,12 @@ function ExclusionSection({ title, description, items, onDelete, onAdd }: {
         <div className="px-[20px] py-[14px]">
           <div className="flex items-center justify-between mb-[10px]">
             <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px]">{description}</p>
-            <button onClick={onAdd}
-              className="ml-[16px] flex shrink-0 items-center gap-[5px] rounded-[4px] border border-[#006fb0] px-[10px] py-[5px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#006fb0] hover:bg-[#dcedf9] transition-colors">
-              <Plus size={12} /> Add / Edit
-            </button>
+            <div className="ml-[16px] shrink-0">
+              <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={onAdd}>
+                <ModusWcIcon decorative name="add" size="xs" />
+                Add / Edit
+              </ModusWcButton>
+            </div>
           </div>
           {items.length === 0 ? (
             <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79] italic">No excluded items configured.</p>
