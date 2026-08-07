@@ -2819,11 +2819,11 @@ function ClockInOutPage() {
                   You've been clocked in for {Math.floor(elapsed / 60)} min. Time to take a break!
                 </p>
               </div>
-              <button type="button" onClick={handleBreak}
-                className="rounded-[6px] px-[10px] py-[6px] shrink-0"
-                style={{ background: "#d97706", border: "none", cursor: "pointer", color: "#ffffff", fontSize: 12, fontWeight: 600, fontFamily: OS }}>
-                Take Break
-              </button>
+              <div className="shrink-0">
+                <ModusWcButton color="warning" variant="filled" size="sm" onButtonClick={handleBreak}>
+                  Take Break
+                </ModusWcButton>
+              </div>
             </div>
           )}
 
