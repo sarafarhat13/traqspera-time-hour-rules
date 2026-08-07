@@ -1917,7 +1917,7 @@ function CrewCard({ stat, alerted, selected, onSelect, onAlert }: {
           <ModusWcButton color="primary" variant="outlined" size="sm"
             disabled={alerted} onButtonClick={onAlert}>
             <ModusWcIcon decorative name="notifications" size="xs" />
-            {alerted ? `${stat.foreman} notified` : "Notify foreman"}
+            {alerted ? "Notified" : "Notify foreman"}
           </ModusWcButton>
         </div>
       ) : (
