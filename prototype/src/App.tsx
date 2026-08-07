@@ -1284,7 +1284,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
 }
 
 // ─── Exclusions Tab ───────────────────────────────────────────────────────────
-type ExclusionItem = { id: number; label: string; subLabel?: string; enabled: boolean };
+type ExclusionItem = { id: number; label: string; subLabel?: string };
 
 type PhaseOption = { code: string; name: string };
 type JobOption = { code: string; name: string; phases: PhaseOption[] };
@@ -1317,11 +1317,8 @@ const RATE_LEVEL_OPTIONS = ["Holiday", "Standby", "Shift Differential", "Apprent
 
 type ExclusionKind = "job" | "phase" | "rate";
 
-const EXCLUSION_COPY: Record<ExclusionKind, { title: string; hint: string }> = {
-  job:   { title: "Exclude a Job",        hint: "Every phase on the selected job is excluded too." },
-  phase: { title: "Exclude a Phase",      hint: "Pick the job first, then the phase to exclude on it." },
-  rate:  { title: "Exclude a Rate Level", hint: "Hours at the selected rate level are skipped by the rules." },
-};
+// Lets a job exclusion cover the whole job rather than one phase on it.
+const ALL_PHASES = "__all__";
 
 function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   kind: ExclusionKind;
@@ -1330,7 +1327,7 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   onAdd: (item: { label: string; subLabel?: string }) => void;
 }) {
   const [jobCode, setJobCode] = useState(JOB_CATALOG[0].code);
-  const [phaseCode, setPhaseCode] = useState(JOB_CATALOG[0].phases[0].code);
+  const [phaseCode, setPhaseCode] = useState(kind === "job" ? ALL_PHASES : JOB_CATALOG[0].phases[0].code);
   const [rateLevel, setRateLevel] = useState(RATE_LEVEL_OPTIONS[0]);
 
   useEffect(() => {
@@ -1340,49 +1337,29 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   }, [onClose]);
 
   const job = JOB_CATALOG.find(j => j.code === jobCode) ?? JOB_CATALOG[0];
-  const phase = job.phases.find(p => p.code === phaseCode) ?? job.phases[0];
+  const phase = job.phases.find(p => p.code === phaseCode) ?? (kind === "phase" ? job.phases[0] : undefined);
 
   const draft =
-    kind === "job"   ? { label: job.code, subLabel: job.name } :
-    kind === "phase" ? { label: `${job.code} · ${phase.code}`, subLabel: `${job.name} — ${phase.name}` } :
-                       { label: rateLevel };
+    kind === "rate" ? { label: rateLevel } :
+    phase           ? { label: `${job.code} · ${phase.code}`, subLabel: `${job.name} — ${phase.name}` } :
+                      { label: job.code, subLabel: `${job.name} — all phases` };
 
   const duplicate = existing.some(item => item.label === draft.label);
-  const copy = EXCLUSION_COPY[kind];
+  const title = kind === "job" ? "Exclude a Job" : kind === "phase" ? "Exclude a Phase" : "Exclude a Rate Level";
+  const hint =
+    kind === "rate" ? "Hours at the selected rate level are skipped by the rules." :
+    phase           ? "Only the selected phase is excluded on this job." :
+                      "Every phase on the selected job is excluded.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={onClose}>
       <div className="relative w-[440px] rounded-[8px] bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[14px]">
-          <span className="text-[14px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">{copy.title}</span>
+          <span className="text-[14px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">{title}</span>
           <button onClick={onClose} className="text-[#6a6e79] hover:text-[#252a2e] transition-colors"><X size={18} /></button>
         </div>
         <div className="flex flex-col gap-[14px] px-[20px] py-[16px]">
-          {kind !== "rate" && (
-            <ModusWcSelect
-              label="Job"
-              size="sm"
-              value={jobCode}
-              options={JOB_CATALOG.map(j => ({ label: `${j.code} - ${j.name}`, value: j.code }))}
-              onInputChange={(e) => {
-                const next = e.target.value;
-                setJobCode(next);
-                // The phase list is scoped to the job, so the old pick may not exist here.
-                const nextJob = JOB_CATALOG.find(j => j.code === next);
-                if (nextJob) setPhaseCode(nextJob.phases[0].code);
-              }}
-            />
-          )}
-          {kind === "phase" && (
-            <ModusWcSelect
-              label="Phase"
-              size="sm"
-              value={phase.code}
-              options={job.phases.map(p => ({ label: `${p.code} - ${p.name}`, value: p.code }))}
-              onInputChange={(e) => setPhaseCode(e.target.value)}
-            />
-          )}
-          {kind === "rate" && (
+          {kind === "rate" ? (
             <ModusWcSelect
               label="Rate level"
               size="sm"
@@ -1390,10 +1367,36 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
               options={RATE_LEVEL_OPTIONS.map(r => ({ label: r, value: r }))}
               onInputChange={(e) => setRateLevel(e.target.value)}
             />
+          ) : (
+            <>
+              <ModusWcSelect
+                label="Job"
+                size="sm"
+                value={jobCode}
+                options={JOB_CATALOG.map(j => ({ label: `${j.code} - ${j.name}`, value: j.code }))}
+                onInputChange={(e) => {
+                  const next = e.target.value;
+                  setJobCode(next);
+                  // The phase list is scoped to the job, so the old pick may not exist here.
+                  const nextJob = JOB_CATALOG.find(j => j.code === next);
+                  if (nextJob) setPhaseCode(kind === "job" ? ALL_PHASES : nextJob.phases[0].code);
+                }}
+              />
+              <ModusWcSelect
+                label="Phase"
+                size="sm"
+                value={phase ? phase.code : ALL_PHASES}
+                options={[
+                  ...(kind === "job" ? [{ label: "All phases", value: ALL_PHASES }] : []),
+                  ...job.phases.map(p => ({ label: `${p.code} - ${p.name}`, value: p.code })),
+                ]}
+                onInputChange={(e) => setPhaseCode(e.target.value)}
+              />
+            </>
           )}
           <p className="text-[11px] font-['Open_Sans',sans-serif] leading-[16px]"
             style={{ color: duplicate ? "#b45309" : "#6a6e79" }}>
-            {duplicate ? "This is already on the exclusion list." : copy.hint}
+            {duplicate ? "This is already on the exclusion list." : hint}
           </p>
         </div>
         <div className="flex items-center justify-end gap-[8px] border-t border-[#e0e1e9] px-[20px] py-[12px]">
@@ -1408,9 +1411,9 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   );
 }
 
-function ExclusionSection({ title, description, items, onToggle, onAdd }: {
+function ExclusionSection({ title, description, items, onDelete, onAdd }: {
   title: string; description: string;
-  items: ExclusionItem[]; onToggle: (id: number) => void; onAdd: () => void;
+  items: ExclusionItem[]; onDelete: (id: number) => void; onAdd: () => void;
 }) {
   return (
     <div>
@@ -1434,12 +1437,10 @@ function ExclusionSection({ title, description, items, onToggle, onAdd }: {
                     <span className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e]">{item.label}</span>
                     {item.subLabel && <span className="ml-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">— {item.subLabel}</span>}
                   </div>
-                  <div className="flex items-center gap-[10px]">
-                    <Toggle enabled={item.enabled} onChange={() => onToggle(item.id)} />
-                    <button className="flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-[#6a6e79] hover:bg-[#f1f1f6] hover:text-[#252a2e] transition-colors">
-                      <Pencil size={13} />
-                    </button>
-                  </div>
+                  <button onClick={() => onDelete(item.id)} aria-label={`Remove ${item.label}`}
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-[#6a6e79] hover:bg-[#fbdde2] hover:text-[#ab1f26] transition-colors">
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -1452,24 +1453,24 @@ function ExclusionSection({ title, description, items, onToggle, onAdd }: {
 
 function ExclusionsTab({ onSave }: { onSave: () => void }) {
   const [jobs, setJobs] = useState<ExclusionItem[]>([
-    { id: 1, label: "003699", subLabel: "AEP Carrollton Sub", enabled: true },
+    { id: 1, label: "003699", subLabel: "AEP Carrollton Sub — all phases" },
   ]);
   const [phases, setPhases] = useState<ExclusionItem[]>([]);
   const [rateLevels, setRateLevels] = useState<ExclusionItem[]>([
-    { id: 1, label: "Holiday", enabled: true },
+    { id: 1, label: "Holiday" },
   ]);
   const [picker, setPicker] = useState<ExclusionKind | null>(null);
-
-  const toggle = (setter: React.Dispatch<React.SetStateAction<ExclusionItem[]>>) => (id: number) => {
-    setter((prev) => prev.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item));
-    onSave();
-  };
 
   const listFor = (kind: ExclusionKind) => kind === "job" ? jobs : kind === "phase" ? phases : rateLevels;
   const setterFor = (kind: ExclusionKind) => kind === "job" ? setJobs : kind === "phase" ? setPhases : setRateLevels;
 
   const addItem = (kind: ExclusionKind) => (item: { label: string; subLabel?: string }) => {
-    setterFor(kind)((prev) => [...prev, { id: Date.now(), enabled: true, ...item }]);
+    setterFor(kind)((prev) => [...prev, { id: Date.now(), ...item }]);
+    onSave();
+  };
+
+  const deleteItem = (kind: ExclusionKind) => (id: number) => {
+    setterFor(kind)((prev) => prev.filter((item) => item.id !== id));
     onSave();
   };
 
@@ -1477,13 +1478,13 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
     <div className="flex flex-col gap-[20px]">
       <ExclusionSection title="Jobs To Exclude From Rules"
         description="You may specify jobs not to be calculated in hour rules. All Phases for this job will be excluded as well."
-        items={jobs} onToggle={toggle(setJobs)} onAdd={() => setPicker("job")} />
+        items={jobs} onDelete={deleteItem("job")} onAdd={() => setPicker("job")} />
       <ExclusionSection title="Phases To Exclude From Rules"
         description="You may specify a Phase combination not to be calculated in hour rules."
-        items={phases} onToggle={toggle(setPhases)} onAdd={() => setPicker("phase")} />
+        items={phases} onDelete={deleteItem("phase")} onAdd={() => setPicker("phase")} />
       <ExclusionSection title="Rate Levels To Exclude From Rules"
         description="You may specify rate levels not to be calculated in hour rules."
-        items={rateLevels} onToggle={toggle(setRateLevels)} onAdd={() => setPicker("rate")} />
+        items={rateLevels} onDelete={deleteItem("rate")} onAdd={() => setPicker("rate")} />
 
       {picker && (
         <ExclusionPicker kind={picker} existing={listFor(picker)}
