@@ -1741,7 +1741,7 @@ const NAV_SECTIONS: NavSection[] = [
 const TOP_BAR_H       = 48;
 const NAV_COLLAPSED_W = 40;
 const NAV_EXPANDED_W  = 224;
-const SETTINGS_NAV_W  = 200;
+const SETTINGS_NAV_W  = 232;
 
 // ─── Compliance Dashboard ─────────────────────────────────────────────────────
 
@@ -3252,14 +3252,14 @@ function NavSidebar({ activePage, onNavigate, collapsed, onToggleCollapse }: {
 
 // ─── Settings Sub-Nav ─────────────────────────────────────────────────────────
 const SETTINGS_ITEMS: { key: NavPage; label: string; icon: ReactNode }[] = [
-  { key: "s_settings",       label: "Settings",               icon: <Settings size={15} /> },
-  { key: "s_permissions",    label: "Permissions",            icon: <Shield size={15} /> },
-  { key: "s_time_off_setup", label: "Time Off Setup",         icon: <Clock size={15} /> },
-  { key: "s_notifications",  label: "Notifications",          icon: <AlignJustify size={15} /> },
-  { key: "s_tenant_images",  label: "Tenant Images",          icon: <FileText size={15} /> },
-  { key: "s_hour_rules",     label: "Hour Rules",             icon: <Filter size={15} /> },
-  { key: "s_rate_level",     label: "Rate Level",             icon: <BarChart2 size={15} /> },
-  { key: "s_auto_job",       label: "Automatic Job Settings", icon: <Wrench size={15} /> },
+  { key: "s_settings",       label: "Settings",               icon: <Settings size={17} /> },
+  { key: "s_permissions",    label: "Permissions",            icon: <Shield size={17} /> },
+  { key: "s_time_off_setup", label: "Time Off Setup",         icon: <Clock size={17} /> },
+  { key: "s_notifications",  label: "Notifications",          icon: <AlignJustify size={17} /> },
+  { key: "s_tenant_images",  label: "Tenant Images",          icon: <FileText size={17} /> },
+  { key: "s_hour_rules",     label: "Hour Rules",             icon: <Filter size={17} /> },
+  { key: "s_rate_level",     label: "Rate Level",             icon: <BarChart2 size={17} /> },
+  { key: "s_auto_job",       label: "Automatic Job Settings", icon: <Wrench size={17} /> },
 ];
 
 function SettingsSubNav({ activePage, onNavigate, navW }: {
@@ -3273,29 +3273,33 @@ function SettingsSubNav({ activePage, onNavigate, navW }: {
     <div className="fixed flex flex-col" style={{ left: navW, top: TOP_BAR_H, width: SETTINGS_NAV_W + 16, height: `calc(100vh - ${TOP_BAR_H}px)`, zIndex: 39, padding: "12px 8px", pointerEvents: "none" }}>
       <div className="flex flex-col bg-white rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.12)] border border-[#e0e1e9] h-full overflow-hidden" style={{ pointerEvents: "auto" }}>
         {/* Search */}
-        <div className="px-[10px] py-[10px] border-b border-[#f0f0f4]">
+        <div className="px-[12px] py-[12px] border-b border-[#f0f0f4]">
           <div className="relative">
-            <Search size={12} className="pointer-events-none absolute left-[8px] top-1/2 -translate-y-1/2 text-[#6a6e79]" />
+            {/* Flex centring rather than a transform: the Modus preflight resets `transform`. */}
+            <span className="pointer-events-none absolute left-[10px] top-0 bottom-0 flex items-center text-[#6a6e79]">
+              <Search size={15} />
+            </span>
             <input type="text" placeholder="Search" value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-[4px] border border-[#e0e1e9] bg-[#f5f5f8] pl-[24px] pr-[8px] py-[5px] text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]" />
+              className="w-full rounded-[4px] border border-[#e0e1e9] bg-[#f5f5f8] font-['Open_Sans',sans-serif] text-[#252a2e] outline-none focus:border-[#006fb0]"
+              style={{ padding: "8px 10px 8px 32px", fontSize: 14, lineHeight: "20px" }} />
           </div>
         </div>
         {/* Items */}
-        <div className="flex-1 overflow-y-auto py-[4px]" style={{ scrollbarWidth: "none" }}>
+        <div className="flex-1 overflow-y-auto py-[6px]" style={{ scrollbarWidth: "none" }}>
           {filtered.map((item) => {
             const active = activePage === item.key;
             return (
               <button key={item.key} onClick={() => onNavigate(item.key)}
-                className="flex w-full items-center gap-[10px] py-[9px] transition-colors text-left"
+                className="flex w-full items-start gap-[12px] transition-colors text-left"
                 style={{
-                  paddingLeft: 14, paddingRight: 10,
+                  padding: "11px 12px 11px 16px",
                   background: active ? "#dcedf9" : "transparent",
-                  borderLeft: active ? "3px solid #006fb0" : "3px solid transparent",
+                  borderLeft: active ? "4px solid #0d3560" : "4px solid transparent",
                 }}>
-                <span style={{ color: active ? "#006fb0" : "#6a6e79" }} className="shrink-0">{item.icon}</span>
-                <span className="text-[12px] font-['Open_Sans',sans-serif]"
-                  style={{ color: active ? "#006fb0" : "#464b52", fontWeight: active ? 600 : 400 }}>
+                <span style={{ color: active ? "#0063a3" : "#464b52" }} className="shrink-0 mt-[1px]">{item.icon}</span>
+                <span className="text-[14px] leading-[19px] font-['Open_Sans',sans-serif]"
+                  style={{ color: active ? "#0063a3" : "#252a2e", fontWeight: active ? 600 : 400 }}>
                   {item.label}
                 </span>
               </button>
