@@ -1167,10 +1167,10 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
               </button>
             )}
             {hasStateRules && (
-              <button onClick={deleteStateRules}
-                className="flex items-center gap-[5px] rounded-[4px] border border-[#dc3545] bg-white px-[12px] py-[5px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#dc3545] hover:bg-[#fce8e8] transition-colors">
-                <Trash2 size={12} /> Delete
-              </button>
+              <ModusWcButton color="danger" variant="outlined" size="sm" onButtonClick={deleteStateRules}>
+                <ModusWcIcon decorative name="delete" size="xs" />
+                Delete
+              </ModusWcButton>
             )}
           </div>
 
@@ -1237,10 +1237,10 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
               </button>
             )}
             {hasUnionRules && (
-              <button onClick={deleteUnionRules}
-                className="flex items-center gap-[5px] rounded-[4px] border border-[#dc3545] bg-white px-[12px] py-[5px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#dc3545] hover:bg-[#fce8e8] transition-colors">
-                <Trash2 size={12} /> Delete
-              </button>
+              <ModusWcButton color="danger" variant="outlined" size="sm" onButtonClick={deleteUnionRules}>
+                <ModusWcIcon decorative name="delete" size="xs" />
+                Delete
+              </ModusWcButton>
             )}
           </div>
 
