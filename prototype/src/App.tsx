@@ -315,8 +315,6 @@ function RuleSetForm({
   const [employeeModal, setEmployeeModal] = useState<WaiverFilter | null>(null);
   const openEmployeeModal = (filter: WaiverFilter) => setEmployeeModal(filter);
   const onDutyMembers = ON_DUTY_ROSTER.filter((e) => mp.onDutyEmployees.includes(e.id));
-  const onDutySigned = onDutyMembers.filter((e) => e.signedOn).length;
-  const onDutyOutstanding = onDutyMembers.length - onDutySigned;
 
   // The meal window is only meaningful when it ends at or after it starts.
   const setMealWindow = (meal: 1 | 2, edge: "start" | "end", val: number) => {
@@ -682,18 +680,18 @@ function RuleSetForm({
                 <div className="grid grid-cols-3 gap-[28px] px-[20px] py-[18px]">
                   {/* Agreement requirement */}
                   <div>
-                    <SectionLabel>Agreement Requirement</SectionLabel>
+                    <SectionLabel>Waiver Requirement</SectionLabel>
                     <div className="flex items-start gap-[10px]">
                       <Toggle enabled={mp.onDutyRequireAgreement} onChange={(v) => setMp("onDutyRequireAgreement", v)} />
                       <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] leading-[20px]">
-                        Allowed only with signed, revocable agreement
+                        Allowed only for employees assigned the waiver
                       </span>
                     </div>
                     {mp.onDutyRequireAgreement && (
                       <div className="mt-[10px] flex items-start gap-[8px] rounded-[6px] bg-[#eef5fa] px-[10px] py-[8px]">
                         <Info size={13} className="mt-[1px] shrink-0 text-[#006fb0]" />
                         <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          Employee must have a valid on-duty meal agreement on file before this meal type can be recorded.
+                          Employee must be assigned the on-duty meal waiver before this meal type can be recorded.
                         </p>
                       </div>
                     )}
@@ -701,7 +699,7 @@ function RuleSetForm({
 
                   {/* When no agreement */}
                   <div>
-                    <SectionLabel>When Taken Without Agreement</SectionLabel>
+                    <SectionLabel>When Taken Without Waiver</SectionLabel>
                     <div className="flex flex-col gap-[4px]">
                       {([
                         { value: "flag",          label: "Flag entry only" },
@@ -725,13 +723,13 @@ function RuleSetForm({
                       <div className="flex items-start gap-[6px]">
                         <Check size={12} className="mt-[2px] shrink-0 text-[#28a745]" />
                         <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          {mp.onDutyRequireAgreement ? "Agreement required to record on-duty meal" : "No agreement required"}
+                          {mp.onDutyRequireAgreement ? "Waiver required to record on-duty meal" : "No waiver required"}
                         </span>
                       </div>
                       <div className="flex items-start gap-[6px]">
                         <AlertTriangle size={12} className="mt-[2px] shrink-0 text-[#856404]" />
                         <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          Without agreement:{" "}
+                          Without waiver:{" "}
                           {mp.onDutyNoAgreementAction === "flag" && "entry flagged for review"}
                           {mp.onDutyNoAgreementAction === "pay_time_worked" && "meal paid as time worked"}
                           {mp.onDutyNoAgreementAction === "flag_and_pay" && "flagged and paid as time worked"}
@@ -750,16 +748,9 @@ function RuleSetForm({
                       <Users size={14} style={{ color: "#6a6e79" }} />
                       <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e]">
                         {onDutyMembers.length === 0
-                          ? "No employees assigned yet"
-                          : `${onDutyMembers.length} employees assigned`}
+                          ? "No employees assigned the waiver yet"
+                          : `${onDutyMembers.length} of ${ON_DUTY_ROSTER.length} employees assigned the waiver`}
                       </span>
-                      {onDutyMembers.length > 0 && (
-                        <span className="text-[11px] font-['Open_Sans',sans-serif]"
-                          style={{ color: onDutyOutstanding > 0 ? "#b45309" : "#15803d" }}>
-                          · {onDutySigned} signed
-                          {onDutyOutstanding > 0 ? `, ${onDutyOutstanding} outstanding` : ", all up to date"}
-                        </span>
-                      )}
                     </div>
                     <ModusWcButton color="primary" variant="outlined" size="sm"
                       onButtonClick={() => openEmployeeModal("all")}>
@@ -1499,35 +1490,29 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
 // ─── Meal & Penalties embedded section ───────────────────────────────────────
 type OnDutyMealAction = "flag" | "pay_time_worked" | "flag_and_pay";
 
-type OnDutyEmployee = { id: string; name: string; role: string; signedOn: string | null };
+type OnDutyEmployee = { id: string; name: string; role: string };
 
 // Stands in for a paged employee lookup; a real tenant roster is far larger.
 const ON_DUTY_ROSTER: OnDutyEmployee[] = [
-  { id: "e01", name: "Adam Reyes",        role: "Gate Guard",         signedOn: "2026-01-14" },
-  { id: "e02", name: "Priya Natarajan",   role: "Patrol Officer",     signedOn: "2026-01-14" },
-  { id: "e03", name: "Marcus Webb",       role: "Night Guard",        signedOn: null },
-  { id: "e04", name: "Dana Whitfield",    role: "Gate Guard",         signedOn: "2026-03-02" },
-  { id: "e05", name: "Luis Ferreira",     role: "Crane Operator",     signedOn: "2026-02-09" },
-  { id: "e06", name: "Grace Okonkwo",     role: "Loader Operator",    signedOn: null },
-  { id: "e07", name: "Tom Halvorsen",     role: "Excavator Operator", signedOn: "2026-02-09" },
-  { id: "e08", name: "Sofia Marchetti",   role: "Grader Operator",    signedOn: null },
-  { id: "e09", name: "Ray Kimura",        role: "Dispatcher",         signedOn: "2025-11-20" },
-  { id: "e10", name: "Elena Vasquez",     role: "Control Room Lead",  signedOn: "2025-11-20" },
-  { id: "e11", name: "Jordan Pace",       role: "Dispatcher",         signedOn: null },
-  { id: "e12", name: "Nadia Farouk",      role: "Site Medic",         signedOn: "2026-04-01" },
-  { id: "e13", name: "Colin Barrett",     role: "Site Medic",         signedOn: "2026-04-01" },
-  { id: "e14", name: "Hannah Lindqvist",  role: "Utility Tech",       signedOn: null },
-  { id: "e15", name: "Devon Achebe",      role: "Utility Tech",       signedOn: "2026-05-18" },
-  { id: "e16", name: "Mei Ling Chen",     role: "Site Supervisor",    signedOn: "2026-05-18" },
-  { id: "e17", name: "Owen Brady",        role: "Fuel Truck Driver",  signedOn: null },
-  { id: "e18", name: "Aisha Rahman",      role: "Weighbridge Clerk",  signedOn: "2026-06-02" },
+  { id: "e01", name: "Adam Reyes",        role: "Gate Guard" },
+  { id: "e02", name: "Priya Natarajan",   role: "Patrol Officer" },
+  { id: "e03", name: "Marcus Webb",       role: "Night Guard" },
+  { id: "e04", name: "Dana Whitfield",    role: "Gate Guard" },
+  { id: "e05", name: "Luis Ferreira",     role: "Crane Operator" },
+  { id: "e06", name: "Grace Okonkwo",     role: "Loader Operator" },
+  { id: "e07", name: "Tom Halvorsen",     role: "Excavator Operator" },
+  { id: "e08", name: "Sofia Marchetti",   role: "Grader Operator" },
+  { id: "e09", name: "Ray Kimura",        role: "Dispatcher" },
+  { id: "e10", name: "Elena Vasquez",     role: "Control Room Lead" },
+  { id: "e11", name: "Jordan Pace",       role: "Dispatcher" },
+  { id: "e12", name: "Nadia Farouk",      role: "Site Medic" },
+  { id: "e13", name: "Colin Barrett",     role: "Site Medic" },
+  { id: "e14", name: "Hannah Lindqvist",  role: "Utility Tech" },
+  { id: "e15", name: "Devon Achebe",      role: "Utility Tech" },
+  { id: "e16", name: "Mei Ling Chen",     role: "Site Supervisor" },
+  { id: "e17", name: "Owen Brady",        role: "Fuel Truck Driver" },
+  { id: "e18", name: "Aisha Rahman",      role: "Weighbridge Clerk" },
 ];
-
-const formatSignedDate = (iso: string) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[m - 1]} ${d}, ${y}`;
-};
 
 type MealPenaltyState = {
   meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
@@ -2101,7 +2086,7 @@ function FilterInput({ placeholder, value, onChange, options }: {
 }
 
 // ─── On-Duty Meal Employees Modal ────────────────────────────────────────────
-type WaiverFilter = "all" | "assigned" | "signed" | "unsigned";
+type WaiverFilter = "all" | "assigned" | "unassigned";
 
 const PAGE_SIZE = 8;
 
@@ -2110,10 +2095,9 @@ const FILTER_STYLES: Record<WaiverFilter, {
   tint: string; border: string; text: string;
   badgeOn: string; badgeOnText: string; badgeOff: string; badgeOffText: string;
 }> = {
-  all:      { tint: "#e8f2fa", border: "#0063a3", text: "#0e416c", badgeOn: "#0063a3", badgeOnText: "#ffffff", badgeOff: "#cfe4f4", badgeOffText: "#0e416c" },
-  assigned: { tint: "#fdf4e3", border: "#d99a2b", text: "#7c4a03", badgeOn: "#e0a338", badgeOnText: "#3d2600", badgeOff: "#fae7c4", badgeOffText: "#7c4a03" },
-  signed:   { tint: "#e8f7ed", border: "#16a34a", text: "#15803d", badgeOn: "#16a34a", badgeOnText: "#ffffff", badgeOff: "#cbeed8", badgeOffText: "#15803d" },
-  unsigned: { tint: "#fdecec", border: "#d64545", text: "#a72020", badgeOn: "#d64545", badgeOnText: "#ffffff", badgeOff: "#f9d5d5", badgeOffText: "#a72020" },
+  all:        { tint: "#e8f2fa", border: "#0063a3", text: "#0e416c", badgeOn: "#0063a3", badgeOnText: "#ffffff", badgeOff: "#cfe4f4", badgeOffText: "#0e416c" },
+  assigned:   { tint: "#e8f7ed", border: "#16a34a", text: "#15803d", badgeOn: "#16a34a", badgeOnText: "#ffffff", badgeOff: "#cbeed8", badgeOffText: "#15803d" },
+  unassigned: { tint: "#f1f1f6", border: "#6a6e79", text: "#464b52", badgeOn: "#6a6e79", badgeOnText: "#ffffff", badgeOff: "#e0e1e9", badgeOffText: "#464b52" },
 };
 
 function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
@@ -2133,12 +2117,9 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const outstanding = ON_DUTY_ROSTER.filter((e) => draft.includes(e.id) && !e.signedOn).length;
-
   const matches = ON_DUTY_ROSTER.filter((e) => {
     if (filter === "assigned" && !draft.includes(e.id)) return false;
-    if (filter === "signed" && !e.signedOn) return false;
-    if (filter === "unsigned" && e.signedOn) return false;
+    if (filter === "unassigned" && draft.includes(e.id)) return false;
     const q = query.trim().toLowerCase();
     return !q || e.name.toLowerCase().includes(q) || e.role.toLowerCase().includes(q);
   });
@@ -2152,10 +2133,9 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
     setDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
 
   const tabs: { value: WaiverFilter; label: string; count: number }[] = [
-    { value: "all",      label: "All",        count: ON_DUTY_ROSTER.length },
-    { value: "assigned", label: "Assigned",   count: draft.length },
-    { value: "signed",   label: "Signed",     count: ON_DUTY_ROSTER.filter((e) => e.signedOn).length },
-    { value: "unsigned", label: "Not signed", count: ON_DUTY_ROSTER.filter((e) => !e.signedOn).length },
+    { value: "all",        label: "All",          count: ON_DUTY_ROSTER.length },
+    { value: "assigned",   label: "Assigned",     count: draft.length },
+    { value: "unassigned", label: "Not assigned", count: ON_DUTY_ROSTER.length - draft.length },
   ];
 
   const th = "px-[16px] py-[10px] text-left text-[11px] font-semibold uppercase tracking-[0.4px] text-[#6a6e79]";
@@ -2172,7 +2152,7 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
           <div>
             <p className="text-[18px] font-semibold text-[#252a2e]">On-Duty Meal Employees</p>
             <p className="text-[12px] text-[#6a6e79] mt-[2px]">
-              Choose who can record an on-duty meal and review their signed agreements.
+              Assign the on-duty meal waiver to the employees allowed to record one.
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
@@ -2241,8 +2221,7 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                 <tr style={{ background: "#f7f7fb" }}>
                   <th className={th} style={{ width: 44 }} aria-label="Assigned" />
                   <th className={th}>Employee</th>
-                  <th className={th}>Agreement</th>
-                  <th className={th} style={{ textAlign: "right" }}>Action</th>
+                  <th className={th} style={{ textAlign: "right" }}>Waiver</th>
                 </tr>
               </thead>
               <tbody>
@@ -2262,31 +2241,21 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                         <span className="font-semibold">{e.name}</span>
                         <span className="block text-[11px] text-[#6a6e79]">{e.role}</span>
                       </td>
-                      <td className={td}>
-                        {e.signedOn ? (
+                      <td className={td} style={{ textAlign: "right" }}>
+                        {assigned ? (
                           <span className="inline-flex items-center gap-[6px] text-[12px] text-[#15803d]">
-                            <Check size={13} /> Signed {formatSignedDate(e.signedOn)}
+                            <Check size={13} /> Assigned
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-[6px] text-[12px] text-[#b45309]">
-                            <AlertTriangle size={13} /> Not signed
-                          </span>
+                          <span className="text-[12px] text-[#6a6e79]">Not assigned</span>
                         )}
-                      </td>
-                      <td className={td} style={{ textAlign: "right" }}>
-                        <button type="button"
-                          onClick={() => toast.success(e.signedOn ? `Opened agreement for ${e.name}` : `Reminder sent to ${e.name}`)}
-                          className="text-[12px] text-[#0063a3] hover:underline"
-                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          {e.signedOn ? "View" : "Send reminder"}
-                        </button>
                       </td>
                     </tr>
                   );
                 })}
                 {rows.length === 0 && (
                   <tr style={{ borderTop: "1px solid #e0e1e9" }}>
-                    <td colSpan={4} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
+                    <td colSpan={3} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
                       No employees match this search.
                     </td>
                   </tr>
@@ -2313,21 +2282,12 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
         {/* Footer */}
         <div className="flex items-center justify-between px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
           <span className="text-[12px] text-[#6a6e79]">
-            {draft.length} employees assigned
+            {draft.length} of {ON_DUTY_ROSTER.length} employees assigned
           </span>
-          <div className="flex items-center gap-[10px]">
-            {outstanding > 0 && (
-              <ModusWcButton color="primary" variant="outlined" size="sm"
-                onButtonClick={() => toast.success(`Reminder sent to ${outstanding} employees`)}>
-                <ModusWcIcon decorative name="email" size="xs" />
-                Remind all outstanding
-              </ModusWcButton>
-            )}
-            <ModusWcButton color="primary" variant="filled" size="sm"
-              onButtonClick={() => { onApply(draft); onClose(); }}>
-              Save
-            </ModusWcButton>
-          </div>
+          <ModusWcButton color="primary" variant="filled" size="sm"
+            onButtonClick={() => { onApply(draft); onClose(); }}>
+            Save
+          </ModusWcButton>
         </div>
       </div>
     </div>
