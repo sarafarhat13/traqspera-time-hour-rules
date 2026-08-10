@@ -1604,7 +1604,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2WindowStart: "17:00", meal2WindowEnd: "18:00",
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
-  onDutyMealEnabled: false, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
+  onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
   penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(),
 });
