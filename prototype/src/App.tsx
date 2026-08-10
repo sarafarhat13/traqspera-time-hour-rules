@@ -21,6 +21,7 @@ import {
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
   AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils,
+  MapPin, LoaderCircle,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -2574,6 +2575,48 @@ type ClockState = "out" | "in" | "break" | "meal";
 
 const ON_DUTY_AGREEMENT_SIGNED = "Feb 9, 2026";
 
+/*
+  Each job carries the geofence its crew is expected to clock in from. A fix
+  outside the radius does not block the punch; it is recorded on the entry so a
+  supervisor can review why the crew was somewhere else.
+*/
+type JobSite = { name: string; address: string; lat: number; lng: number; radiusMeters: number };
+
+const JOB_SITES: Record<string, JobSite> = {
+  "003699 - AEP Carrollton Sub": { name: "AEP Carrollton Substation", address: "1720 Kelly Blvd, Carrollton, TX", lat: 32.9857, lng: -96.8903, radiusMeters: 150 },
+  "003700 - Job B":              { name: "Richardson Yard",           address: "500 Lookout Dr, Richardson, TX", lat: 32.9718, lng: -96.7299, radiusMeters: 200 },
+  "003701 - Job C":              { name: "Plano Transfer Station",    address: "4200 W Plano Pkwy, Plano, TX",   lat: 33.0198, lng: -96.7469, radiusMeters: 120 },
+};
+
+type GeoFix = { lat: number; lng: number; accuracyMeters: number };
+
+// Straight-line ground distance; accurate enough at geofence scale.
+const distanceMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+const formatDistance = (meters: number) =>
+  meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1609.34).toFixed(1)} mi`;
+
+const formatCoords = (fix: GeoFix) =>
+  `${fix.lat.toFixed(5)}, ${fix.lng.toFixed(5)}`;
+
+/*
+  Real geolocation would place a demo device thousands of miles from these mock
+  sites, so the fix is derived from the selected job. The off-site offset is
+  roughly 2 km, far enough to fail every radius above.
+*/
+const simulateFix = (site: JobSite, offSite: boolean): GeoFix =>
+  offSite
+    ? { lat: site.lat + 0.0180, lng: site.lng - 0.0075, accuracyMeters: 22 }
+    : { lat: site.lat + 0.0004, lng: site.lng + 0.0003, accuracyMeters: 8 };
+
 function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockState }) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -2623,7 +2666,14 @@ function ClockInOutPage() {
   const [perDiem, setPerDiem] = useState(false);
   const [comment, setComment] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [timeline, setTimeline] = useState<{ time: string; label: string; sub: string; color: string }[]>([]);
+  const [timeline, setTimeline] = useState<{
+    time: string; label: string; sub: string; color: string;
+    location?: string; flagged?: boolean;
+  }[]>([]);
+  const [locating, setLocating] = useState(true);
+  const [offSiteSim, setOffSiteSim] = useState(false);
+  const [showOffSiteModal, setShowOffSiteModal] = useState(false);
+  const [clockedInOffSite, setClockedInOffSite] = useState(false);
   const [breakRows, setBreakRows] = useState<{ start: string; end: string | null }[]>([]);
   const [showEarlyBreakModal, setShowEarlyBreakModal] = useState(false);
   const MANDATORY_BREAK = 30; // seconds for testing (change to 30 * 60 for production)
@@ -2640,6 +2690,19 @@ function ClockInOutPage() {
   }, [clocked, startTime, breakStart, mealStart]);
 
 
+
+  const site = JOB_SITES[job];
+  const fix = simulateFix(site, offSiteSim);
+  const siteDistance = distanceMeters(fix, site);
+  const onSite = siteDistance <= site.radiusMeters;
+
+  // Re-acquire whenever the target site changes, mirroring a device refreshing
+  // its fix before the punch is recorded.
+  useEffect(() => {
+    setLocating(true);
+    const id = setTimeout(() => setLocating(false), 900);
+    return () => clearTimeout(id);
+  }, [job, offSiteSim]);
 
   const fmt = (s: number) => {
     const h = Math.floor(s / 3600).toString().padStart(2, "0");
@@ -2667,13 +2730,30 @@ function ClockInOutPage() {
     setBreakRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null ? { ...r, end: t } : r));
   };
 
+  const doClockIn = () => {
+    const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    setClocked("in"); setStartTime(new Date()); setElapsed(0);
+    setShowOffSiteModal(false); setClockedInOffSite(!onSite);
+    setTimeline(prev => [{
+      time: t,
+      label: "Clocked In",
+      sub: job,
+      color: onSite ? "#0063a3" : "#d97706",
+      location: onSite
+        ? `${site.name} · ${formatDistance(siteDistance)} from site center`
+        : `${formatDistance(siteDistance)} from ${site.name}`,
+      flagged: !onSite,
+    }, ...prev]);
+  };
+
   const handleMainBtn = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (clocked === "out") {
-      setClocked("in"); setStartTime(new Date()); setElapsed(0);
-      setTimeline(prev => [{ time: t, label: "Clocked In", sub: job, color: "#0063a3" }, ...prev]);
+      if (locating) return;
+      if (!onSite) { setShowOffSiteModal(true); return; }
+      doClockIn();
     } else if (clocked === "in") {
-      setClocked("out"); setStartTime(null); setElapsed(0);
+      setClocked("out"); setStartTime(null); setElapsed(0); setClockedInOffSite(false);
       setTimeline(prev => [{ time: t, label: "Clocked Out", sub: `After ${fmt(elapsed)}`, color: "#ab1f26" }, ...prev]);
     } else if (clocked === "meal") {
       endOnDutyMeal();
@@ -2769,6 +2849,50 @@ function ClockInOutPage() {
         </div>
       )}
 
+      {/* Off-site clock-in confirmation */}
+      {showOffSiteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setShowOffSiteModal(false)}>
+          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
+            style={{ width: 480, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-[12px] mb-[16px]">
+              <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full shrink-0" style={{ background: "#fef3e2" }}>
+                <MapPin size={20} style={{ color: "#d97706" }} />
+              </div>
+              <p style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>You're Away From the Job Site</p>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.6, marginBottom: 16 }}>
+              You're {formatDistance(siteDistance)} from {site.name}, outside its {site.radiusMeters} m radius.
+              You can still clock in, but your supervisor will see this entry flagged for review.
+            </p>
+
+            <div className="rounded-[8px] px-[12px] py-[10px] mb-[24px]" style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
+              <div className="flex justify-between gap-[12px] mb-[6px]">
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Job site</p>
+                <p style={{ fontSize: 12, color: "#252a2e", fontFamily: OS, ...OS_FVS, textAlign: "right" }}>{site.address}</p>
+              </div>
+              <div className="flex justify-between gap-[12px]">
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Your location</p>
+                <p style={{ fontSize: 12, color: "#252a2e", fontFamily: OS, ...OS_FVS, textAlign: "right" }}>
+                  {formatCoords(fix)} · ±{fix.accuracyMeters} m
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-[12px]">
+              <ModusWcButton color="primary" variant="outlined" size="md"
+                onButtonClick={() => setShowOffSiteModal(false)}>
+                Cancel
+              </ModusWcButton>
+              <ModusWcButton color="warning" variant="filled" size="md" onButtonClick={doClockIn}>
+                Clock In Anyway
+              </ModusWcButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* On-duty meal confirmation */}
       {showMealModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
@@ -2834,6 +2958,74 @@ function ClockInOutPage() {
           <div className="w-full mb-[24px]" style={{ maxWidth: 420 }}>
             <ClockDisplay elapsed={elapsed} clocked={clocked} />
           </div>
+
+          {/* Location tag */}
+          {clocked === "out" && (
+            <div className="w-full mb-[24px] px-[16px] py-[12px] rounded-[8px]" style={{
+              maxWidth: 420,
+              background: locating ? "#ffffff" : onSite ? "#e8f7ed" : "#fffbeb",
+              border: `1px solid ${locating ? "#e0e1e9" : onSite ? "#bbe6ca" : "#fbbf24"}`,
+            }}>
+              <div className="flex items-center gap-[12px]">
+                {locating
+                  ? <LoaderCircle size={18} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
+                  : <MapPin size={18} className="shrink-0" style={{ color: onSite ? "#15803d" : "#d97706" }} />}
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  {locating ? (
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
+                      Getting your location…
+                    </p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: onSite ? "#15803d" : "#92400e", fontFamily: OS, ...OS_FVS }}>
+                        {onSite ? `On site · ${site.name}` : `${formatDistance(siteDistance)} from ${site.name}`}
+                      </p>
+                      <p style={{ fontSize: 12, color: onSite ? "#3f7d55" : "#b45309", fontFamily: OS, ...OS_FVS }}>
+                        {onSite
+                          ? `${formatDistance(siteDistance)} from site center · accurate to ${fix.accuracyMeters} m`
+                          : `Outside the ${site.radiusMeters} m job site radius`}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              {!locating && (
+                <p className="mt-[8px]" style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                  {formatCoords(fix)} · {site.address}
+                </p>
+              )}
+              {/* Prototype control: real device coordinates never land on a mock site. */}
+              <div className="mt-[10px] pt-[10px] flex items-center gap-[8px]" style={{ borderTop: "1px dashed #d4d6dd" }}>
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Simulate:</p>
+                {([{ label: "On site", value: false }, { label: "Off site", value: true }] as const).map(opt => (
+                  <button key={opt.label} type="button" onClick={() => setOffSiteSim(opt.value)}
+                    aria-pressed={offSiteSim === opt.value}
+                    style={{
+                      fontSize: 11, fontFamily: OS, borderRadius: 4, padding: "2px 8px", cursor: "pointer",
+                      background: offSiteSim === opt.value ? "#0063a3" : "#ffffff",
+                      color: offSiteSim === opt.value ? "#ffffff" : "#464b52",
+                      border: `1px solid ${offSiteSim === opt.value ? "#0063a3" : "#cbced4"}`,
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Off-site clock-in flag */}
+          {clocked !== "out" && clockedInOffSite && (
+            <div className="w-full flex items-center gap-[12px] mb-[24px] px-[16px] py-[12px] rounded-[8px]"
+              style={{ background: "#fffbeb", border: "1px solid #fbbf24", maxWidth: 420 }}>
+              <MapPin size={18} style={{ color: "#d97706", flexShrink: 0 }} />
+              <div className="flex-1">
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#92400e", fontFamily: OS, ...OS_FVS }}>Clocked in off site</p>
+                <p style={{ fontSize: 12, color: "#b45309", fontFamily: OS, ...OS_FVS }}>
+                  This entry is flagged for supervisor review.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Break alert banner */}
           {showBreakAlert && (
@@ -3138,8 +3330,21 @@ function ClockInOutPage() {
                     </div>
                     <div className="pb-[16px]">
                       <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.time}</p>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.label}</p>
+                      <div className="flex items-center gap-[8px]">
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.label}</p>
+                        {e.flagged && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "1px 6px", fontFamily: OS, whiteSpace: "nowrap" }}>
+                            Flagged
+                          </span>
+                        )}
+                      </div>
                       <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.sub}</p>
+                      {e.location && (
+                        <div className="flex items-center gap-[4px] mt-[2px]">
+                          <MapPin size={11} style={{ color: e.flagged ? "#b45309" : "#6a6e79", flexShrink: 0 }} />
+                          <p style={{ fontSize: 11, color: e.flagged ? "#b45309" : "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.location}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
