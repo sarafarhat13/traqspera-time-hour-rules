@@ -2887,7 +2887,7 @@ function ClockInOutPage() {
                 <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
                   <Briefcase size={20} style={{ color: "#464b52" }} />
                 </div>
-                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Edit Job</p>
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Switch Job</p>
               </button>
               <button type="button" onClick={handleBreak}
                 className="flex flex-col items-center gap-[6px]"
