@@ -1,0 +1,62 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - cursor/modus-form-controls
+    paths:
+      - 'prototype/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Pages serves a single site, so let one deploy finish before the next starts.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: prototype/package-lock.json
+
+      - name: Install dependencies
+        working-directory: prototype
+        run: npm ci
+
+      - name: Build
+        working-directory: prototype
+        run: npm run build
+
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages --depth=1
+          git worktree add /tmp/ghp origin/gh-pages
+          cd /tmp/ghp
+          git switch -c gh-pages --track origin/gh-pages 2>/dev/null || git switch gh-pages
+          cd "$GITHUB_WORKSPACE"
+          # --checksum because index.html often keeps its size and mtime while the
+          # asset hashes inside it change, which plain rsync would skip.
+          rsync -a --checksum --delete --exclude '.git' --exclude '.nojekyll' prototype/dist/ /tmp/ghp/
+          touch /tmp/ghp/.nojekyll
+          cd /tmp/ghp
+          git add -A
+          if git diff --staged --quiet; then
+            echo "Build output is unchanged; nothing to deploy."
+            exit 0
+          fi
+          git commit -m "Deploy ${GITHUB_SHA:0:7}: $(git -C "$GITHUB_WORKSPACE" log -1 --pretty=%s)"
+          git push origin gh-pages
