@@ -1910,14 +1910,6 @@ const MOCK_EMPLOYEES: BreakEmployee[] = [
   { id: "17", name: "Mia Chen",       role: "Laborer",     crew: "Crew D", supervisor: "Sara Chen", pm: "Renee Cole",  job: "Job B", costCenter: "CC-300", shiftStart: "06:00", state: "compliant", breakTakenAt: "11:52", penaltyCount: 0, penaltyAmount: 0 },
 ];
 
-// Crew-level alerts go to the foreman, not to each worker individually.
-const CREW_FOREMAN: Record<string, string> = {
-  "Crew A": "Dani Okonkwo",
-  "Crew B": "Luis Ferreira",
-  "Crew C": "Jake Morales",
-  "Crew D": "Devon King",
-};
-
 const STATE_STYLE: Record<BreakState, { label: string; color: string; bg: string; border: string }> = {
   upcoming:  { label: "Upcoming",  color: "#0063a3", bg: "#e8f2fa", border: "#a3cced" },
   missed:    { label: "Missed",    color: "#ab1f26", bg: "#faeaea", border: "#eeb4b7" },
@@ -1950,118 +1942,6 @@ function AlertBadge({ label, color }: { label: string; color: string }) {
       style={{ background: color + "1a", color, fontFamily: OS }}>
       {label}
     </span>
-  );
-}
-
-type CrewStat = {
-  crew: string;
-  foreman: string;
-  size: number;
-  upcoming: number;
-  missed: number;
-  late: number;
-  notStarted: number;
-  penaltyAmount: number;
-};
-
-// The wording a foreman receives, taken from the story's example message.
-const crewAlertMessage = (c: CrewStat) =>
-  c.notStarted === c.size
-    ? "Your whole crew hasn't started their break yet, please make sure you take your break."
-    : `${c.notStarted} of ${c.size} on ${c.crew} haven't started their break yet, please make sure they take their break.`;
-
-function CrewCard({ stat, alerted, selected, onSelect, onAlert }: {
-  stat: CrewStat; alerted: boolean;
-  selected: boolean; onSelect: () => void; onAlert: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  const wholeCrew = stat.notStarted > 0 && stat.notStarted === stat.size;
-  const needsAction = stat.notStarted > 0;
-
-  const chip = (label: string, count: number, s: { color: string; bg: string; border: string }) =>
-    count === 0 ? null : (
-      <span key={label} className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
-        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
-        {label} {count}
-      </span>
-    );
-
-  const borderColor = selected ? "#0063a3" : wholeCrew ? "#eeb4b7" : "#e0e1e9";
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`Filter the dashboard to ${stat.crew}`}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); }
-      }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        background: selected ? "#f5fafd" : "#ffffff",
-        borderRadius: 8,
-        border: `1px solid ${borderColor}`,
-        boxShadow: selected
-          ? `0 0 0 1px #0063a3, 0px 1px 1px rgba(0,0,0,0.05)`
-          : hover
-            ? "0px 3px 6px rgba(0,0,0,0.12)"
-            : "0px 1px 1px rgba(0,0,0,0.05)",
-        padding: 16,
-        cursor: "pointer",
-        transition: "box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease",
-      }}>
-      <div className="flex items-start justify-between gap-[12px] mb-[10px]">
-        <div>
-          <p className="font-bold text-[15px] leading-[20px]" style={{ color: selected ? "#0e416c" : "#171c1e", fontFamily: OS, ...OS_FVS }}>{stat.crew}</p>
-          <p className="text-[12px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, marginTop: 2 }}>
-            Foreman {stat.foreman} · {stat.size} on shift
-          </p>
-        </div>
-        {stat.penaltyAmount > 0 && (
-          <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#a35b06", fontFamily: OS }}>
-            ${stat.penaltyAmount.toFixed(2)}
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-[6px] mb-[12px]">
-        {chip("Upcoming", stat.upcoming, STATE_STYLE.upcoming)}
-        {chip("Missed", stat.missed, STATE_STYLE.missed)}
-        {chip("Late", stat.late, STATE_STYLE.late)}
-        {stat.upcoming + stat.missed + stat.late === 0 && (
-          <span className="inline-flex items-center gap-[6px] text-[12px] font-semibold"
-            style={{ background: STATE_STYLE.compliant.bg, color: STATE_STYLE.compliant.color, border: `1px solid ${STATE_STYLE.compliant.border}`, borderRadius: 4, padding: "3px 8px", fontFamily: OS }}>
-            All breaks taken
-          </span>
-        )}
-      </div>
-
-      {wholeCrew && (
-        <p className="text-[12px] font-semibold leading-[16px]" style={{ color: "#ab1f26", fontFamily: OS, marginBottom: 10 }}>
-          Whole crew still hasn't started their break.
-        </p>
-      )}
-
-      {needsAction ? (
-        // Keep the alert action from also toggling the card's crew filter.
-        <div className="inline-flex" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-          <ModusWcButton color="primary" variant="outlined" size="sm"
-            disabled={alerted} onButtonClick={onAlert}>
-            <ModusWcIcon decorative name="notifications" size="xs" />
-            {alerted ? "Notified" : "Notify foreman"}
-          </ModusWcButton>
-        </div>
-      ) : (
-        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>No action needed.</p>
-      )}
-
-      <p className="text-[11px] leading-[15px]" style={{ color: selected ? "#0063a3" : "#a3a3a3", fontFamily: OS, marginTop: 10 }}>
-        {selected ? "Filtering the dashboard by this crew — click to clear" : "Click to filter the dashboard by this crew"}
-      </p>
-    </div>
   );
 }
 
@@ -3263,7 +3143,6 @@ function ClockInOutPage() {
 
 function ComplianceDashboard() {
   const [activeSection, setActiveSection] = useState<ExceptionView>("all");
-  const [alertedCrews, setAlertedCrews] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -3284,10 +3163,10 @@ function ComplianceDashboard() {
   const hasFilter = search || filterEmployee || filterCrew || filterJob || filterCostCenter || filterSupervisor || filterPm;
 
   // Filters apply first so every count on the page reflects the same slice.
-  const matchesFilters = (e: BreakEmployee, ignoreCrew = false) => {
+  const matchesFilters = (e: BreakEmployee) => {
     if (search && !e.name.toLowerCase().includes(search.toLowerCase()) && !e.role.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEmployee   && e.name       !== filterEmployee)   return false;
-    if (!ignoreCrew && filterCrew && e.crew !== filterCrew)    return false;
+    if (filterCrew       && e.crew       !== filterCrew)       return false;
     if (filterSupervisor && e.supervisor !== filterSupervisor) return false;
     if (filterPm         && e.pm         !== filterPm)         return false;
     if (filterJob        && e.job        !== filterJob)        return false;
@@ -3296,8 +3175,6 @@ function ComplianceDashboard() {
   };
 
   const inScope = MOCK_EMPLOYEES.filter(e => matchesFilters(e));
-  // Cards ignore the crew filter itself, so picking a crew never hides the others.
-  const crewScope = MOCK_EMPLOYEES.filter(e => matchesFilters(e, true));
 
   const upcoming = inScope.filter(e => e.state === "upcoming");
   const missed   = inScope.filter(e => e.state === "missed");
@@ -3311,27 +3188,8 @@ function ComplianceDashboard() {
     activeSection === "premium"  ? premium :
     inScope;
 
-  const crewStats: CrewStat[] = [...new Set(crewScope.map(e => e.crew))].sort().map(crew => {
-    const members = crewScope.filter(e => e.crew === crew);
-    return {
-      crew,
-      foreman: CREW_FOREMAN[crew] ?? "Unassigned",
-      size: members.length,
-      upcoming: members.filter(e => e.state === "upcoming").length,
-      missed:   members.filter(e => e.state === "missed").length,
-      late:     members.filter(e => e.state === "late").length,
-      notStarted: members.filter(hasNotStartedBreak).length,
-      penaltyAmount: members.reduce((s, e) => s + e.penaltyAmount, 0),
-    };
-  });
-
   const totalPenalty = premium.reduce((s, e) => s + e.penaltyAmount, 0);
   const totalViolations = premium.reduce((s, e) => s + e.penaltyCount, 0);
-
-  const notifyCrew = (stat: CrewStat) => {
-    setAlertedCrews(prev => new Set([...prev, stat.crew]));
-    toast.success(`Alert sent to ${stat.foreman} — ${stat.crew}`, { description: crewAlertMessage(stat) });
-  };
 
   const SummaryCard = ({ label, count, sub, tone, section }: {
     label: string; count: number; sub: string;
@@ -3396,27 +3254,6 @@ function ComplianceDashboard() {
       <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS, marginBottom: 24 }}>
         A missed or late break earns a premium, so an employee can appear in more than one category.
       </p>
-
-      {/* Crew status — direct intervention */}
-      <div className="mb-[10px] flex items-baseline justify-between">
-        <p className="font-semibold text-[18px] tracking-[0.027px] leading-[27px]" style={{ color: "#000000", fontFamily: OS, ...OS_FVS }}>
-          Crew Status
-        </p>
-        <p className="text-[12px]" style={{ color: "#6a6e79", fontFamily: OS }}>
-          Alert the foreman when a crew is running behind
-        </p>
-      </div>
-      <div className="grid grid-cols-4 gap-[16px] mb-[24px]">
-        {crewStats.length === 0 ? (
-          <p className="text-[14px]" style={{ color: "#6a6e79", fontFamily: OS }}>No crews match these filters.</p>
-        ) : crewStats.map(stat => (
-          <CrewCard key={stat.crew} stat={stat}
-            alerted={alertedCrews.has(stat.crew)}
-            selected={filterCrew === stat.crew}
-            onSelect={() => setFilterCrew(filterCrew === stat.crew ? "" : stat.crew)}
-            onAlert={() => notifyCrew(stat)} />
-        ))}
-      </div>
 
       {/* Filter matrix */}
       <div className="mb-[16px]" style={{ background: "#ffffff", borderRadius: 8, boxShadow: "0px 1px 1px rgba(0,0,0,0.05)", padding: 16 }}>
