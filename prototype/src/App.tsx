@@ -2487,8 +2487,11 @@ function AttestationModal({ day, onClose, onSubmit }: {
 }
 
 // ─── Attestation Panel ────────────────────────────────────────────────────────
-function AttestationPanel({ days }: { days: { label: string; date: number }[] }) {
-  const [attested, setAttested] = useState<Set<number>>(new Set());
+function AttestationPanel({ days, attested, onAttest }: {
+  days: { label: string; date: number }[];
+  attested: Set<number>;
+  onAttest: (date: number) => void;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeDay, setActiveDay] = useState<{ label: string; date: number } | null>(null);
 
@@ -2548,7 +2551,7 @@ function AttestationPanel({ days }: { days: { label: string; date: number }[] })
           day={activeDay}
           onClose={() => setActiveDay(null)}
           onSubmit={() => {
-            setAttested(prev => new Set([...prev, activeDay.date]));
+            onAttest(activeDay.date);
             setActiveDay(null);
           }}
         />
@@ -2564,6 +2567,14 @@ const CLOCK_MOCK_ENTRIES = [
   { date: "Wed, Jul 23", jobNum: "740-EC2", start: "6:58 AM", end: "3:32 PM", dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt", payRule: "5b", reg: 8, ot: 0.57, ot2: 0, qty: 0, travel: 1.00, perDiem: 0 },
   { date: "Thu, Jul 24", jobNum: "740-EC2", start: "7:01 AM", end: "4:18 PM", dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt", payRule: "5b", reg: 8, ot: 1.28, ot2: 0, qty: 0, travel: 1.00, perDiem: 0 },
   { date: "Mon, Jul 28", jobNum: "740-EC2", start: "6:55 AM", end: "3:40 PM", dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt", payRule: "5b", reg: 8, ot: 0.75, ot2: 0, qty: 0, travel: 1.00, perDiem: 0 },
+];
+
+// Days awaiting attestation, shared by the desktop panel and the mobile card.
+const ATTESTATION_DAYS = [
+  { label: "Tue", date: 22 },
+  { label: "Wed", date: 23 },
+  { label: "Thu", date: 24 },
+  { label: "Mon", date: 28 },
 ];
 
 /*
@@ -2587,6 +2598,12 @@ const JOB_SITES: Record<string, JobSite> = {
   "003700 - Job B":              { name: "Richardson Yard",           address: "500 Lookout Dr, Richardson, TX", lat: 32.9718, lng: -96.7299, radiusMeters: 200 },
   "003701 - Job C":              { name: "Plano Transfer Station",    address: "4200 W Plano Pkwy, Plano, TX",   lat: 33.0198, lng: -96.7469, radiusMeters: 120 },
 };
+
+// Shared by the desktop form and the mobile sheet so the two cannot drift.
+const CLOCK_CREW_OPTIONS  = ["740 - Adam Hazey's Crew", "Crew B", "Crew C"];
+const CLOCK_DEPT_OPTIONS  = ["3300 - Job Cost", "3400 - Operations", "3500 - Admin"];
+const CLOCK_JOB_OPTIONS   = Object.keys(JOB_SITES);
+const CLOCK_PHASE_OPTIONS = ["5554 - Renewal - Asphalt", "5555 - Phase B", "5556 - Phase C"];
 
 type GeoFix = { lat: number; lng: number; accuracyMeters: number };
 
@@ -2646,7 +2663,12 @@ function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockSta
   );
 }
 
-function ClockInOutPage() {
+/*
+  Desktop and mobile are two renderings of one shift, so the state lives here
+  and the page hands the same session to whichever view is on screen. Switching
+  views mid-shift keeps the running clock and today's timeline intact.
+*/
+function useClockSession() {
   const [clocked, setClocked] = useState<ClockState>("out");
   const [elapsed, setElapsed] = useState(0);
   const [breakElapsed, setBreakElapsed] = useState(0);
@@ -2657,12 +2679,14 @@ function ClockInOutPage() {
   const [mealRows, setMealRows] = useState<{ start: string; end: string | null }[]>([]);
   const [showMealModal, setShowMealModal] = useState(false);
   const [mealAck, setMealAck] = useState(false);
-  const [crew, setCrew] = useState("740 - Adam Hazey's Crew");
-  const [dept, setDept] = useState("3300 - Job Cost");
-  const [job, setJob] = useState("003699 - AEP Carrollton Sub");
-  const [phase, setPhase] = useState("5554 - Renewal - Asphalt");
-  const [travel, setTravel] = useState("1.00");
-  const [qty, setQty] = useState("0");
+  // The shift starts blank: the punch is only as good as the details on it,
+  // so nothing is pre-filled for the employee.
+  const [crew, setCrew] = useState("");
+  const [dept, setDept] = useState("");
+  const [job, setJob] = useState("");
+  const [phase, setPhase] = useState("");
+  const [travel, setTravel] = useState("");
+  const [qty, setQty] = useState("");
   const [perDiem, setPerDiem] = useState(false);
   const [comment, setComment] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -2691,18 +2715,36 @@ function ClockInOutPage() {
 
 
 
-  const site = JOB_SITES[job];
-  const fix = simulateFix(site, offSiteSim);
-  const siteDistance = distanceMeters(fix, site);
-  const onSite = siteDistance <= site.radiusMeters;
+  // No job picked yet means there is no geofence to measure against.
+  const site: JobSite | null = JOB_SITES[job] as JobSite | undefined ?? null;
+  const fix = site ? simulateFix(site, offSiteSim) : null;
+  const siteDistance = site && fix ? distanceMeters(fix, site) : 0;
+  const onSite = !!site && siteDistance <= site.radiusMeters;
+
+  // Job details the punch cannot be recorded without.
+  const missingDetails = ([
+    ["Job", job], ["Phase", phase], ["Crew", crew], ["Department", dept],
+  ] as const).filter(([, value]) => !value).map(([label]) => label);
+  const detailsComplete = missingDetails.length === 0;
+  const [detailsPrompt, setDetailsPrompt] = useState(false);
+
+  useEffect(() => {
+    if (detailsComplete) setDetailsPrompt(false);
+  }, [detailsComplete]);
+
+  // Attestations live with the session so a day signed on the phone shows as
+  // signed on the desktop, and the other way round.
+  const [attested, setAttested] = useState<Set<number>>(new Set());
+  const attestDay = (date: number) => setAttested(prev => new Set([...prev, date]));
 
   // Re-acquire whenever the target site changes, mirroring a device refreshing
   // its fix before the punch is recorded.
   useEffect(() => {
+    if (!site) { setLocating(false); return; }
     setLocating(true);
     const id = setTimeout(() => setLocating(false), 900);
     return () => clearTimeout(id);
-  }, [job, offSiteSim]);
+  }, [job, offSiteSim, site]);
 
   const fmt = (s: number) => {
     const h = Math.floor(s / 3600).toString().padStart(2, "0");
@@ -2710,11 +2752,6 @@ function ClockInOutPage() {
     const sec = (s % 60).toString().padStart(2, "0");
     return `${h}:${m}:${sec}`;
   };
-
-  const now = new Date();
-  const totalReg = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.reg, 0);
-  const totalOT  = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.ot, 0);
-  const totalTravel = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.travel, 0);
 
   // Colors per state
   const stateColor = clocked === "out" ? "#0063a3" : clocked === "break" ? "#d97706" : clocked === "meal" ? "#15803d" : "#ab1f26";
@@ -2731,6 +2768,7 @@ function ClockInOutPage() {
   };
 
   const doClockIn = () => {
+    if (!site) return;
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     setClocked("in"); setStartTime(new Date()); setElapsed(0);
     setShowOffSiteModal(false); setClockedInOffSite(!onSite);
@@ -2749,6 +2787,7 @@ function ClockInOutPage() {
   const handleMainBtn = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (clocked === "out") {
+      if (!detailsComplete) { setDetailsPrompt(true); setShowForm(true); return; }
       if (locating) return;
       if (!onSite) { setShowOffSiteModal(true); return; }
       doClockIn();
@@ -2797,12 +2836,787 @@ function ClockInOutPage() {
     if (elapsed >= BREAK_INTERVAL) setShowBreakAlert(true);
   }, [elapsed, clocked]);
 
-  const SelectField = ({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) => (
+  const breakRemaining = Math.max(0, MANDATORY_BREAK - breakElapsed);
+  const breakRemainingFmt = `${Math.floor(breakRemaining / 60)}:${(breakRemaining % 60).toString().padStart(2, "0")}`;
+
+  return {
+    clocked, setClocked, elapsed, setElapsed, breakElapsed, setBreakElapsed, mealElapsed,
+    startTime, setStartTime, setBreakStart,
+    mealRows, breakRows, timeline,
+    showMealModal, setShowMealModal, mealAck, setMealAck,
+    showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
+    showOffSiteModal, setShowOffSiteModal,
+    crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
+    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    showForm, setShowForm,
+    locating, offSiteSim, setOffSiteSim, clockedInOffSite,
+    site, fix, siteDistance, onSite,
+    missingDetails, detailsComplete, detailsPrompt, setDetailsPrompt,
+    attested, attestDay,
+    fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
+    breakRemainingFmt,
+    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+  };
+}
+
+type ClockSession = ReturnType<typeof useClockSession>;
+
+// Both the desktop and mobile clocks pulse these rings, so the keyframes ship
+// with whichever view is mounted rather than living inside one of them.
+function ClockRingStyles() {
+  return (
+    <style>{`
+      @keyframes clock-pulse {
+        0%   { transform: scale(1);    opacity: 1; }
+        50%  { transform: scale(1.07); opacity: 0.7; }
+        100% { transform: scale(1);    opacity: 1; }
+      }
+      .ring-outer { animation: clock-pulse 2.4s ease-in-out infinite; }
+      .ring-mid   { animation: clock-pulse 2.4s ease-in-out infinite 0.3s; }
+      .ring-inner { animation: clock-pulse 2.4s ease-in-out infinite 0.6s; }
+    `}</style>
+  );
+}
+
+// ─── Mobile Clock In / Out ────────────────────────────────────────────────────
+/*
+  Native controls rather than the Modus web components: inside a 390 px frame
+  these keep a 44 px touch target and let the OS raise its own picker, which is
+  what the field app would actually do.
+*/
+const mobileInputStyle: React.CSSProperties = {
+  width: "100%", height: 44, borderRadius: 8, border: "1px solid #cbced4",
+  padding: "0 12px", fontSize: 14, color: "#252a2e", fontFamily: OS,
+  background: "#ffffff", boxSizing: "border-box",
+};
+
+function MobileField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
+        {label}{required && <span style={{ color: "#ab1f26" }}> *</span>}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function MobileSelect({ value, onChange, options, placeholder, invalid }: {
+  value: string; onChange: (v: string) => void; options: string[];
+  placeholder: string; invalid?: boolean;
+}) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        style={{
+          ...mobileInputStyle,
+          appearance: "none", paddingRight: 34, cursor: "pointer",
+          color: value ? "#252a2e" : "#8b8f96",
+          borderColor: invalid ? "#ab1f26" : "#cbced4",
+        }}>
+        <option value="" disabled>{placeholder}</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ChevronDown size={16} style={{ position: "absolute", right: 12, top: 14, color: "#6a6e79", pointerEvents: "none" }} />
+    </div>
+  );
+}
+
+/*
+  The desktop attestation dialog is position:fixed and would escape the phone
+  frame, so the same questions are asked here in a bottom sheet.
+*/
+function MobileAttestationSheet({ day, onClose, onSubmit }: {
+  day: { label: string; date: number };
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const [tookBreaks, setTookBreaks] = useState<"yes" | "no" | null>(null);
+  const [breakComment, setBreakComment] = useState("");
+  const [hurt, setHurt] = useState<"yes" | "no" | null>(null);
+  const [hurtComment, setHurtComment] = useState("");
+  const canSubmit = !!tookBreaks && !!breakComment && !!hurt;
+
+  const YesNo = ({ value, onSelect }: { value: "yes" | "no" | null; onSelect: (v: "yes" | "no") => void }) => (
+    <div className="flex gap-[8px]">
+      {(["yes", "no"] as const).map(opt => (
+        <button key={opt} type="button" onClick={() => onSelect(opt)} className="flex-1"
+          style={{
+            background: value === opt ? "#e8f2fa" : "#ffffff",
+            border: `1px solid ${value === opt ? "#0063a3" : "#cbced4"}`,
+            color: value === opt ? "#0063a3" : "#464b52",
+            borderRadius: 8, padding: "11px 0", fontSize: 14,
+            fontWeight: value === opt ? 700 : 400, fontFamily: OS, cursor: "pointer",
+          }}>
+          {opt === "yes" ? "Yes" : "No"}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <>
+      <p style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Hello Adam!</p>
+      <p style={{ fontSize: 13, color: "#464b52", fontFamily: OS, ...OS_FVS, marginBottom: 14 }}>
+        Attesting for {day.label} 2026/07/{day.date}
+      </p>
+
+      <div className="rounded-[8px] px-[12px] py-[10px] mb-[16px]" style={{ background: "#dcedf9" }}>
+        <p style={{ fontSize: 10, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>TOTAL</p>
+        <div className="flex items-center">
+          {[["REG", "0.04"], ["OT", "0.00"], ["DT", "0.00"], ["TVL", "11.00"], ["QUA", "2.00"], ["PD", "0.00"]].map(([k, v], i) => (
+            <div key={k} className="flex-1 flex flex-col items-center" style={{ borderLeft: i > 0 ? "1px solid #a8c8e8" : undefined }}>
+              <p style={{ fontSize: 9, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{k}</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
+        Did you take your breaks today? <span style={{ color: "#ab1f26" }}>*</span>
+      </p>
+      <YesNo value={tookBreaks} onSelect={setTookBreaks} />
+      <div style={{ marginTop: 10, marginBottom: 18 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
+          Additional comments <span style={{ color: "#ab1f26" }}>*</span>
+        </p>
+        <input type="text" value={breakComment} placeholder="Required"
+          onChange={(e) => setBreakComment(e.target.value)} style={mobileInputStyle} />
+      </div>
+
+      <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
+        Were you hurt on the job today? <span style={{ color: "#ab1f26" }}>*</span>
+      </p>
+      <YesNo value={hurt} onSelect={setHurt} />
+      <div style={{ marginTop: 10, marginBottom: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
+          Additional comments
+        </p>
+        <input type="text" value={hurtComment} placeholder="Optional note…"
+          onChange={(e) => setHurtComment(e.target.value)} style={mobileInputStyle} />
+      </div>
+
+      <button type="button" disabled={!canSubmit} onClick={onSubmit} className="w-full"
+        style={{
+          background: canSubmit ? "#0063a3" : "#d4d6dd", color: "#ffffff", border: "none", borderRadius: 8,
+          padding: "13px 0", marginBottom: 10, fontSize: 14, fontWeight: 700, fontFamily: OS,
+          cursor: canSubmit ? "pointer" : "not-allowed",
+        }}>
+        Submit
+      </button>
+      <button type="button" onClick={onClose} className="w-full"
+        style={{ background: "#ffffff", color: "#0063a3", border: "1px solid #0063a3", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+        Cancel
+      </button>
+    </>
+  );
+}
+
+function MobileSheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+  if (!open) return null;
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 20 }} />
+      <div style={{
+        position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 21,
+        background: "#ffffff", borderRadius: "20px 20px 0 0",
+        padding: "12px 20px 28px", maxHeight: "82%", overflowY: "auto",
+        boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+      }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: "#d4d6dd", margin: "0 auto 16px" }} />
+        {children}
+      </div>
+    </>
+  );
+}
+
+function MobileClockView({ session }: { session: ClockSession }) {
+  const {
+    clocked, elapsed, breakElapsed, mealElapsed,
+    timeline, job, setJob, phase, setPhase, crew, setCrew, dept, setDept,
+    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    showMealModal, setShowMealModal, mealAck, setMealAck,
+    showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
+    showOffSiteModal, setShowOffSiteModal,
+    locating, offSiteSim, setOffSiteSim, clockedInOffSite,
+    site, fix, siteDistance, onSite,
+    missingDetails, detailsComplete, detailsPrompt,
+    attested, attestDay,
+    fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
+    breakRemainingFmt,
+    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+  } = session;
+
+  const [showDetailsSheet, setShowDetailsSheet] = useState(false);
+  const [attestDayOpen, setAttestDayOpen] = useState<{ label: string; date: number } | null>(null);
+  // A rejected punch should land the employee straight on the fields to fill.
+  const onMainPress = () => {
+    if (clocked === "out" && !detailsComplete) setShowDetailsSheet(true);
+    handleMainBtn();
+  };
+  const now = new Date();
+  const statusLabel = clocked === "out" ? "Not Clocked In" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock";
+  const activeTimer = clocked === "break" ? breakElapsed : clocked === "meal" ? mealElapsed : elapsed;
+
+  const card: React.CSSProperties = {
+    background: "#ffffff", borderRadius: 12, border: "1px solid #e0e1e9",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+  };
+  // Filled in before the punch, mirroring the desktop Job Details form.
+  const jobDetailsCard = (
+          <div className="mt-[12px]" style={{ ...card, overflow: "hidden" }}>
+            <div className="flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: "1px solid #eef0f3" }}>
+              <div className="flex items-center gap-[10px]">
+                <div className="flex items-center justify-center shrink-0" style={{ width: 30, height: 30, borderRadius: 8, background: "#e8f2fa" }}>
+                  <Briefcase size={16} style={{ color: "#0063a3" }} />
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Job Details</p>
+                {clocked === "out" && !detailsComplete && (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#ab1f26", background: "#fdeaea", borderRadius: 999, padding: "2px 7px", fontFamily: OS }}>
+                    {missingDetails.length} missing
+                  </span>
+                )}
+              </div>
+              <button type="button" onClick={() => setShowDetailsSheet(true)}
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, fontSize: 12, fontWeight: 700, color: "#0063a3", fontFamily: OS }}>
+                {clocked === "out" ? (detailsComplete ? "Edit" : "Add") : "Switch"}
+              </button>
+            </div>
+            <button type="button" onClick={() => setShowDetailsSheet(true)}
+              className="w-full text-left" style={{ background: "transparent", border: "none", cursor: "pointer", padding: "10px 14px 12px" }}>
+              {([
+                ["Job", job],
+                ["Phase", phase],
+                ["Crew", crew],
+                ["Department", dept],
+              ] as const).map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-[12px]" style={{ marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>{label}</p>
+                  <p style={{ fontSize: 12, fontWeight: value ? 600 : 400, color: value ? "#252a2e" : detailsPrompt ? "#ab1f26" : "#a3a3a3", fontFamily: OS, ...OS_FVS, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {value || "Required"}
+                  </p>
+                </div>
+              ))}
+              {(travel || qty || perDiem || comment) && (
+                <div className="flex items-center gap-[6px] mt-[8px] pt-[8px]" style={{ borderTop: "1px dashed #e0e1e9", flexWrap: "wrap" }}>
+                  {[
+                    travel ? `Travel ${travel}` : null,
+                    qty ? `Qty ${qty}` : null,
+                    perDiem ? "Per Diem" : null,
+                    comment ? "Comment added" : null,
+                  ].filter(Boolean).map(chip => (
+                    <span key={chip as string} style={{ fontSize: 10, color: "#464b52", background: "#f1f1f6", borderRadius: 999, padding: "3px 8px", fontFamily: OS }}>
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+
+            {/* Site — the geofence belongs to the selected job, so it lives here */}
+            {clocked === "out" && (
+              <div style={{
+                padding: "10px 14px 12px",
+                borderTop: "1px solid #eef0f3",
+                background: !site || locating ? "#f7f7f8" : onSite ? "#e8f7ed" : "#fffbeb",
+              }}>
+                <div className="flex items-center gap-[10px]">
+                  {locating && site
+                    ? <LoaderCircle size={17} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
+                    : <MapPin size={17} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
+                  <div style={{ minWidth: 0 }}>
+                    {!site ? (
+                      <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Select a job to check its site.</p>
+                    ) : locating ? (
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#464b52", fontFamily: OS, ...OS_FVS }}>Getting your location…</p>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: onSite ? "#15803d" : "#92400e", fontFamily: OS, ...OS_FVS }}>
+                          {onSite ? "On site" : `${formatDistance(siteDistance)} away`}
+                        </p>
+                        <p style={{ fontSize: 11, color: onSite ? "#3f7d55" : "#b45309", fontFamily: OS, ...OS_FVS, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {onSite
+                            ? `${site.name} · ±${fix?.accuracyMeters} m`
+                            : `${site.name} · outside the ${site.radiusMeters} m radius`}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {site && (
+                  <div className="mt-[10px] pt-[10px] flex items-center gap-[8px]" style={{ borderTop: "1px dashed #d4d6dd" }}>
+                    <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Simulate:</p>
+                    {([{ label: "On site", value: false }, { label: "Off site", value: true }] as const).map(opt => (
+                      <button key={opt.label} type="button" onClick={() => setOffSiteSim(opt.value)}
+                        aria-pressed={offSiteSim === opt.value}
+                        style={{
+                          fontSize: 11, fontFamily: OS, borderRadius: 999, padding: "3px 10px", cursor: "pointer",
+                          background: offSiteSim === opt.value ? "#0063a3" : "#ffffff",
+                          color: offSiteSim === opt.value ? "#ffffff" : "#464b52",
+                          border: `1px solid ${offSiteSim === opt.value ? "#0063a3" : "#cbced4"}`,
+                        }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+  );
+  const sheetTitle: React.CSSProperties = { fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS };
+  const sheetBody: React.CSSProperties = { fontSize: 13, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.6 };
+
+  return (
+    <div className="flex justify-center py-[32px]" style={{ background: "#f1f1f6" }}>
+      <ClockRingStyles />
+      {/* Device frame */}
+      <div style={{ background: "#1b1d21", borderRadius: 48, padding: 10, boxShadow: "0 24px 60px rgba(0,0,0,0.28)" }}>
+        <div style={{
+          position: "relative", width: 390, height: 844, borderRadius: 38,
+          overflow: "hidden", background: "#f1f1f6", display: "flex", flexDirection: "column",
+        }}>
+          {/* Status bar */}
+          <div className="flex items-center justify-between shrink-0 px-[28px]" style={{ height: 44, background: "#ffffff" }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+              {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </p>
+            <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: 8, width: 112, height: 28, borderRadius: 14, background: "#1b1d21" }} />
+            <div className="flex items-center gap-[5px]">
+              {[4, 7, 10, 13].map(h => (
+                <div key={h} style={{ width: 3, height: h, borderRadius: 1, background: "#252a2e" }} />
+              ))}
+              <div style={{ width: 22, height: 11, borderRadius: 3, border: "1px solid #252a2e", padding: 1, marginLeft: 3 }}>
+                <div style={{ width: "72%", height: "100%", borderRadius: 1, background: "#252a2e" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* App bar */}
+          <div className="flex items-center justify-between shrink-0 px-[16px]"
+            style={{ height: 56, background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+            <AlignJustify size={20} style={{ color: "#464b52" }} />
+            <div className="flex items-center gap-[8px]">
+              <div className="flex items-center justify-center" style={{ width: 22, height: 22, borderRadius: 4, background: "#0e416c" }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", fontFamily: OS }}>T</p>
+              </div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock In &amp; Out</p>
+            </div>
+            <div className="flex items-center justify-center" style={{ width: 28, height: 28, borderRadius: 999, background: "#0e416c" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff", fontFamily: OS }}>JD</p>
+            </div>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="flex-1 px-[16px] pt-[16px]" style={{ overflowY: "auto" }}>
+            {/* Timer */}
+            <div className="px-[16px] py-[18px] text-center" style={{ ...card }}>
+              <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </p>
+              <p style={{ fontSize: 40, fontWeight: 800, color: "#252a2e", fontFamily: OS, ...OS_FVS, letterSpacing: "-1px", lineHeight: 1.2 }}>
+                {fmt(activeTimer)}
+              </p>
+              <div className="flex items-center justify-center gap-[6px]">
+                <div style={{ width: 8, height: 8, borderRadius: 999, background: stateColor }} />
+                <p style={{ fontSize: 12, fontWeight: 700, color: stateColor, fontFamily: OS, ...OS_FVS }}>{statusLabel}</p>
+              </div>
+            </div>
+
+            {/* Off-site flag */}
+            {clocked !== "out" && clockedInOffSite && (
+              <div className="mt-[12px] flex items-center gap-[10px] px-[14px] py-[12px]"
+                style={{ ...card, background: "#fffbeb", border: "1px solid #fbbf24" }}>
+                <MapPin size={17} style={{ color: "#d97706", flexShrink: 0 }} />
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#92400e", fontFamily: OS, ...OS_FVS }}>Clocked in off site</p>
+                  <p style={{ fontSize: 11, color: "#b45309", fontFamily: OS, ...OS_FVS }}>Flagged for supervisor review.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Break reminder */}
+            {showBreakAlert && (
+              <div className="mt-[12px] px-[14px] py-[12px]" style={{ ...card, background: "#fffbeb", border: "1px solid #fbbf24" }}>
+                <div className="flex items-center gap-[10px]">
+                  <AlertTriangle size={17} style={{ color: "#d97706", flexShrink: 0 }} />
+                  <div className="flex-1">
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#92400e", fontFamily: OS, ...OS_FVS }}>Break Reminder</p>
+                    <p style={{ fontSize: 11, color: "#b45309", fontFamily: OS, ...OS_FVS }}>
+                      Clocked in {Math.floor(elapsed / 60)} min. Time for a break.
+                    </p>
+                  </div>
+                </div>
+                <button type="button" onClick={handleBreak} className="w-full"
+                  style={{ background: "#d97706", color: "#ffffff", border: "none", borderRadius: 8, padding: "9px 0", marginTop: 10, fontSize: 13, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+                  Take Break
+                </button>
+              </div>
+            )}
+
+            {/* Meal banner */}
+            {clocked === "meal" && (
+              <div className="mt-[12px] flex items-center gap-[10px] px-[14px] py-[12px]"
+                style={{ ...card, background: "#e8f7ed", border: "1px solid #bbe6ca" }}>
+                <Utensils size={17} style={{ color: "#15803d", flexShrink: 0 }} />
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#15803d", fontFamily: OS, ...OS_FVS }}>On-Duty Meal · {fmt(mealElapsed)}</p>
+                  <p style={{ fontSize: 11, color: "#3f7d55", fontFamily: OS, ...OS_FVS }}>Still on the clock and paid.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Primary action */}
+            <div className="relative flex items-center justify-center mx-auto my-[20px]" style={{ width: 216, height: 216 }}>
+              <div className="ring-outer absolute rounded-full" style={{ width: 216, height: 216, background: stateColorLight }} />
+              <div className="ring-mid absolute rounded-full" style={{ width: 168, height: 168, background: stateColorMid }} />
+              <div className="ring-inner absolute rounded-full" style={{ width: 126, height: 126, background: stateColorStrong }} />
+              <button type="button" onClick={onMainPress}
+                className="relative flex items-center justify-center rounded-full transition-transform active:scale-95"
+                style={{
+                  width: 92, height: 92, background: stateColor, border: "none", cursor: "pointer",
+                  color: "#ffffff", fontSize: 12, letterSpacing: "0.08em", fontFamily: OS, fontWeight: 900,
+                  boxShadow: `0 4px 24px ${stateColorStrong}`, textAlign: "center", lineHeight: 1.2,
+                }}>
+                {btnLabel}
+              </button>
+            </div>
+
+            {/* Sub actions */}
+            {clocked === "in" && (
+              <div className="grid grid-cols-3 gap-[10px]">
+                {([
+                  { label: "Switch Job", icon: <Briefcase size={19} style={{ color: "#464b52" }} />, onPress: () => setShowDetailsSheet(true) },
+                  { label: "Take Break", icon: <Clock size={19} style={{ color: "#464b52" }} />, onPress: handleBreak },
+                  { label: "On-Duty Meal", icon: <Utensils size={19} style={{ color: "#464b52" }} />, onPress: () => { setMealAck(false); setShowMealModal(true); } },
+                ]).map(a => (
+                  <button key={a.label} type="button" onClick={a.onPress}
+                    className="flex flex-col items-center gap-[6px]"
+                    style={{ ...card, cursor: "pointer", padding: "12px 4px" }}>
+                    {a.icon}
+                    <p style={{ fontSize: 11, color: "#464b52", fontFamily: OS, ...OS_FVS, textAlign: "center" }}>{a.label}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {jobDetailsCard}
+
+            {/* Daily attestation */}
+            <div className="mt-[12px]" style={{ ...card, overflow: "hidden", borderColor: "#fbad26", background: "#fffbf0" }}>
+              <div className="flex items-center gap-[10px]" style={{ padding: "12px 14px" }}>
+                <div className="flex items-center justify-center shrink-0" style={{ width: 22, height: 22, borderRadius: 999, background: "#fbad26" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", fontFamily: OS }}>i</span>
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1 }}>Daily Attestation</p>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                  {attested.size}/{ATTESTATION_DAYS.length}
+                </span>
+              </div>
+              <div style={{ padding: "0 14px 14px" }}>
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
+                  Tap a date to complete or view.
+                </p>
+                <div className="flex gap-[8px]">
+                  {ATTESTATION_DAYS.map(({ label, date }) => {
+                    const done = attested.has(date);
+                    return (
+                      <button key={date} type="button" onClick={() => setAttestDayOpen({ label, date })}
+                        className="flex flex-col items-center justify-center flex-1"
+                        style={{
+                          height: 66, cursor: "pointer", borderRadius: 8,
+                          background: done ? "#e8f5e9" : "#ffffff",
+                          border: `1px solid ${done ? "#2e7d32" : "#fbad26"}`,
+                        }}>
+                        <div className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 999, marginBottom: 4, background: done ? "#2e7d32" : "#fbad26" }}>
+                          {done
+                            ? <Check size={10} style={{ color: "#ffffff" }} strokeWidth={3} />
+                            : <X size={10} style={{ color: "#ffffff" }} strokeWidth={3} />}
+                        </div>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: done ? "#2e7d32" : "#c47f00", fontFamily: OS, ...OS_FVS, lineHeight: 1.2 }}>{label}</p>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: done ? "#2e7d32" : "#c47f00", fontFamily: OS, ...OS_FVS, lineHeight: 1.2 }}>{date}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Activity */}
+            {timeline.length > 0 && (
+              <div className="mt-[16px] mb-[16px]">
+                <p className="mb-[10px]" style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Today's Activity</p>
+                <div style={{ ...card, padding: "14px" }}>
+                  {timeline.map((e, i) => (
+                    <div key={i} className="flex gap-[10px]">
+                      <div className="flex flex-col items-center">
+                        <div style={{ width: 9, height: 9, borderRadius: 999, background: e.color, marginTop: 4, flexShrink: 0 }} />
+                        {i < timeline.length - 1 && <div style={{ width: 1, flex: 1, background: "#e0e1e9", marginTop: 2, minHeight: 22 }} />}
+                      </div>
+                      <div style={{ paddingBottom: i < timeline.length - 1 ? 14 : 0, minWidth: 0 }}>
+                        <div className="flex items-center gap-[6px]">
+                          <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.label}</p>
+                          {e.flagged && (
+                            <span style={{ fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "1px 5px", fontFamily: OS }}>Flagged</span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.time} · {e.sub}</p>
+                        {e.location && (
+                          <div className="flex items-center gap-[4px] mt-[2px]">
+                            <MapPin size={10} style={{ color: e.flagged ? "#b45309" : "#6a6e79", flexShrink: 0 }} />
+                            <p style={{ fontSize: 10, color: e.flagged ? "#b45309" : "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.location}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom tab bar */}
+          <div className="shrink-0" style={{ background: "#ffffff", borderTop: "1px solid #e0e1e9" }}>
+            <div className="flex items-start justify-around pt-[8px]">
+              {([
+                { label: "Time",      icon: Clock,    active: true },
+                { label: "Timesheet", icon: FileText, active: false },
+                { label: "Jobs",      icon: Briefcase, active: false },
+                { label: "More",      icon: AlignJustify, active: false },
+              ]).map(t => (
+                <div key={t.label} className="flex flex-col items-center gap-[3px]" style={{ width: 72 }}>
+                  <t.icon size={19} style={{ color: t.active ? "#0063a3" : "#8a8e97" }} />
+                  <p style={{ fontSize: 10, fontWeight: t.active ? 700 : 400, color: t.active ? "#0063a3" : "#8a8e97", fontFamily: OS, ...OS_FVS }}>{t.label}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ width: 134, height: 5, borderRadius: 3, background: "#1b1d21", margin: "8px auto 8px" }} />
+          </div>
+
+          {/* Daily attestation sheet */}
+          {attestDayOpen && (
+            <MobileSheet open onClose={() => setAttestDayOpen(null)}>
+              <MobileAttestationSheet
+                day={attestDayOpen}
+                onClose={() => setAttestDayOpen(null)}
+                onSubmit={() => { attestDay(attestDayOpen.date); setAttestDayOpen(null); }}
+              />
+            </MobileSheet>
+          )}
+
+          {/* Off-site sheet */}
+          {site && fix && (
+            <MobileSheet open={showOffSiteModal} onClose={() => setShowOffSiteModal(false)}>
+              <div className="flex items-center gap-[10px] mb-[12px]">
+                <div className="flex items-center justify-center shrink-0" style={{ width: 36, height: 36, borderRadius: 999, background: "#fef3e2" }}>
+                  <MapPin size={18} style={{ color: "#d97706" }} />
+                </div>
+                <p style={sheetTitle}>You're Away From the Job Site</p>
+              </div>
+              <p style={{ ...sheetBody, marginBottom: 14 }}>
+                You're {formatDistance(siteDistance)} from {site.name}, outside its {site.radiusMeters} m radius.
+                You can still clock in, but this entry will be flagged for review.
+              </p>
+              <div className="px-[12px] py-[10px] mb-[18px]" style={{ background: "#f7f7fb", borderRadius: 8, border: "1px solid #e0e1e9" }}>
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Your location</p>
+                <p style={{ fontSize: 12, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{formatCoords(fix)} · ±{fix.accuracyMeters} m</p>
+              </div>
+              <button type="button" onClick={doClockIn} className="w-full"
+                style={{ background: "#d97706", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", marginBottom: 10, fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+                Clock In Anyway
+              </button>
+              <button type="button" onClick={() => setShowOffSiteModal(false)} className="w-full"
+                style={{ background: "#ffffff", color: "#0063a3", border: "1px solid #0063a3", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+                Cancel
+              </button>
+            </MobileSheet>
+          )}
+
+          {/* On-duty meal sheet */}
+          <MobileSheet open={showMealModal} onClose={() => setShowMealModal(false)}>
+            <div className="flex items-center gap-[10px] mb-[12px]">
+              <div className="flex items-center justify-center shrink-0" style={{ width: 36, height: 36, borderRadius: 999, background: "#e8f7ed" }}>
+                <Utensils size={18} style={{ color: "#15803d" }} />
+              </div>
+              <p style={sheetTitle}>Start On-Duty Meal</p>
+            </div>
+            <p style={{ ...sheetBody, marginBottom: 14 }}>
+              You stay clocked in and paid for this meal. Take it at your post when the job
+              can't be left unattended.
+            </p>
+            <div className="flex items-center gap-[8px] px-[12px] py-[10px] mb-[16px]"
+              style={{ background: "#e8f7ed", border: "1px solid #bbe6ca", borderRadius: 8 }}>
+              <Check size={15} strokeWidth={3} style={{ color: "#15803d", flexShrink: 0 }} />
+              <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>
+                On-duty meal waiver assigned to you
+              </p>
+            </div>
+            <label className="flex items-center gap-[10px] mb-[18px]" style={{ cursor: "pointer" }}>
+              <input type="checkbox" checked={mealAck} onChange={() => setMealAck(v => !v)} style={{ width: 18, height: 18, accentColor: "#0063a3" }} />
+              <span style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>I agree to take my meal on duty today.</span>
+            </label>
+            <button type="button" onClick={startOnDutyMeal} disabled={!mealAck} className="w-full"
+              style={{
+                background: mealAck ? "#1e8a44" : "#d4d6dd", color: "#ffffff", border: "none", borderRadius: 8,
+                padding: "13px 0", marginBottom: 10, fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: mealAck ? "pointer" : "not-allowed",
+              }}>
+              Start On-Duty Meal
+            </button>
+            <button type="button" onClick={() => setShowMealModal(false)} className="w-full"
+              style={{ background: "#ffffff", color: "#0063a3", border: "1px solid #0063a3", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Cancel
+            </button>
+          </MobileSheet>
+
+          {/* Early break sheet */}
+          <MobileSheet open={showEarlyBreakModal} onClose={() => setShowEarlyBreakModal(false)}>
+            <div className="flex items-center gap-[10px] mb-[12px]">
+              <div className="flex items-center justify-center shrink-0" style={{ width: 36, height: 36, borderRadius: 999, background: "#fef3e2" }}>
+                <AlertTriangle size={18} style={{ color: "#d97706" }} />
+              </div>
+              <p style={sheetTitle}>Clocking Back In Early</p>
+            </div>
+            <p style={{ ...sheetBody, marginBottom: 8 }}>
+              You're clocking back in early. Confirm this is intentional, or wait until your break is finished.
+            </p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#d97706", fontFamily: OS, ...OS_FVS, marginBottom: 18 }}>
+              Time remaining on break: {breakRemainingFmt}
+            </p>
+            <button type="button" onClick={confirmEndBreak} className="w-full"
+              style={{ background: "#0063a3", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", marginBottom: 10, fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Confirm Early Clock In
+            </button>
+            <button type="button" onClick={() => setShowEarlyBreakModal(false)} className="w-full"
+              style={{ background: "#ffffff", color: "#0063a3", border: "1px solid #0063a3", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Wait — Stay on Break
+            </button>
+          </MobileSheet>
+
+          {/* Job details sheet */}
+          <MobileSheet open={showDetailsSheet} onClose={() => setShowDetailsSheet(false)}>
+            <p style={{ ...sheetTitle, marginBottom: 4 }}>Job Details</p>
+            <p style={{ ...sheetBody, marginBottom: 14 }}>
+              Tell us where this time is charged before you clock in.
+            </p>
+
+            {detailsPrompt && (
+              <div className="flex items-start gap-[8px] mb-[14px]" style={{ background: "#fdeaea", border: "1px solid #f3b8b8", borderRadius: 8, padding: "10px 12px" }}>
+                <AlertTriangle size={15} style={{ color: "#ab1f26", flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12, color: "#8b1a1f", fontFamily: OS, ...OS_FVS }}>
+                  Add {missingDetails.join(", ")} to clock in.
+                </p>
+              </div>
+            )}
+
+            <MobileField label="Job" required>
+              <MobileSelect value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
+                placeholder="Select job" invalid={detailsPrompt && !job} />
+              {site && (
+                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginTop: 5 }}>
+                  {site.name} · {site.radiusMeters} m geofence
+                </p>
+              )}
+            </MobileField>
+
+            <MobileField label="Phase" required>
+              <MobileSelect value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
+                placeholder="Select phase" invalid={detailsPrompt && !phase} />
+            </MobileField>
+
+            <MobileField label="Crew" required>
+              <MobileSelect value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
+                placeholder="Select crew" invalid={detailsPrompt && !crew} />
+            </MobileField>
+
+            <MobileField label="Department" required>
+              <MobileSelect value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
+                placeholder="Select department" invalid={detailsPrompt && !dept} />
+            </MobileField>
+
+            <div className="grid grid-cols-2 gap-[12px]">
+              <MobileField label="Travel">
+                <input type="number" min={0} step={0.25} value={travel}
+                  onChange={(e) => setTravel(e.target.value)} style={mobileInputStyle} />
+              </MobileField>
+              <MobileField label="Quantity">
+                <input type="number" min={0} value={qty}
+                  onChange={(e) => setQty(e.target.value)} style={mobileInputStyle} />
+              </MobileField>
+            </div>
+
+            <label className="flex items-center gap-[10px] mb-[14px]" style={{ cursor: "pointer" }}>
+              <input type="checkbox" checked={perDiem} onChange={() => setPerDiem(v => !v)}
+                style={{ width: 18, height: 18, accentColor: "#0063a3" }} />
+              <span style={{ fontSize: 13, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Per Diem</span>
+            </label>
+
+            <MobileField label="Comment">
+              <input type="text" value={comment} placeholder="Optional note…"
+                onChange={(e) => setComment(e.target.value)} style={mobileInputStyle} />
+            </MobileField>
+
+            <button type="button" onClick={() => setShowDetailsSheet(false)} className="w-full"
+              style={{ background: "#0063a3", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", marginTop: 4, fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Done
+            </button>
+          </MobileSheet>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClockInOutPage() {
+  const session = useClockSession();
+  const {
+    clocked, setClocked, elapsed, setElapsed, breakElapsed, setBreakElapsed, mealElapsed,
+    setStartTime, setBreakStart,
+    mealRows, breakRows, timeline,
+    showMealModal, setShowMealModal, mealAck, setMealAck,
+    showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
+    showOffSiteModal, setShowOffSiteModal,
+    crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
+    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    showForm, setShowForm,
+    locating, offSiteSim, setOffSiteSim, clockedInOffSite,
+    site, fix, siteDistance, onSite,
+    missingDetails, detailsPrompt,
+    attested, attestDay,
+    fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
+    breakRemainingFmt,
+    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+  } = session;
+
+  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+
+  // The form sits below the punch button, so pull it into view when we reject.
+  const formRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (detailsPrompt && viewMode === "desktop") {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [detailsPrompt, viewMode]);
+
+  const now = new Date();
+  const totalReg = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.reg, 0);
+  const totalOT  = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.ot, 0);
+  const totalTravel = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.travel, 0);
+
+  const SelectField = ({ label, value, onChange, options, required, invalid }: {
+    label: string; value: string; onChange: (v: string) => void; options: string[];
+    required?: boolean; invalid?: boolean;
+  }) => (
     <ModusWcSelect
       label={label}
       size="sm"
+      required={required}
       value={value}
-      options={options.map(o => ({ label: o, value: o }))}
+      feedback={invalid ? { level: "error", message: "Required" } : undefined}
+      options={[
+        { label: `Select ${label.toLowerCase()}`, value: "", disabled: true },
+        ...options.map(o => ({ label: o, value: o })),
+      ]}
       onInputChange={(e) => onChange(e.target.value)}
     />
   );
@@ -2814,13 +3628,10 @@ function ClockInOutPage() {
     return `${h}h ${m}m ${sec}s`;
   };
 
-  const breakRemaining = Math.max(0, MANDATORY_BREAK - breakElapsed);
-  const breakRemainingFmt = `${Math.floor(breakRemaining / 60)}:${(breakRemaining % 60).toString().padStart(2, "0")}`;
-
   return (
     <div style={{ background: "#f1f1f6", fontFamily: OS }}>
       {/* Early break modal */}
-      {showEarlyBreakModal && (
+      {viewMode === "desktop" && showEarlyBreakModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]" style={{ width: 480, maxWidth: "90vw" }}>
             <div className="flex items-center gap-[12px] mb-[16px]">
@@ -2850,7 +3661,7 @@ function ClockInOutPage() {
       )}
 
       {/* Off-site clock-in confirmation */}
-      {showOffSiteModal && (
+      {viewMode === "desktop" && showOffSiteModal && site && fix && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
           onClick={() => setShowOffSiteModal(false)}>
           <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
@@ -2894,7 +3705,7 @@ function ClockInOutPage() {
       )}
 
       {/* On-duty meal confirmation */}
-      {showMealModal && (
+      {viewMode === "desktop" && showMealModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
           onClick={() => setShowMealModal(false)}>
           <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
@@ -2944,13 +3755,38 @@ function ClockInOutPage() {
       )}
 
       {/* Top header */}
-      <div className="px-[32px] pt-[24px] pb-[20px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#ffffff" }}>
-        <p style={{ fontSize: 22, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock In &amp; Out</p>
-        <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-          {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-        </p>
+      <div className="flex items-center justify-between gap-[16px] px-[32px] pt-[24px] pb-[20px]"
+        style={{ borderBottom: "1px solid #e0e1e9", background: "#ffffff" }}>
+        <div>
+          <p style={{ fontSize: 22, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock In &amp; Out</p>
+          <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+            {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </p>
+        </div>
+        {/* One shift, two renderings — the switcher keeps the running clock. */}
+        <div className="flex shrink-0 items-center gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}>
+          {([
+            { value: "desktop", label: "Desktop" },
+            { value: "mobile",  label: "Mobile" },
+          ] as const).map(opt => (
+            <button key={opt.value} type="button" onClick={() => setViewMode(opt.value)}
+              aria-pressed={viewMode === opt.value}
+              style={{
+                fontSize: 12, fontFamily: OS, fontWeight: viewMode === opt.value ? 700 : 400,
+                padding: "5px 14px", borderRadius: 4, cursor: "pointer", border: "none",
+                background: viewMode === opt.value ? "#ffffff" : "transparent",
+                color: viewMode === opt.value ? "#0e416c" : "#6a6e79",
+                boxShadow: viewMode === opt.value ? "0 1px 2px rgba(0,0,0,0.12)" : "none",
+              }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {viewMode === "mobile" && <MobileClockView session={session} />}
+
+      {viewMode === "desktop" && (
       <div className="flex" style={{ minHeight: 520, overflow: "hidden" }}>
         {/* ── Left panel: concentric circle clock ── */}
         <div className="flex flex-col items-center justify-start flex-1 pt-[56px] pb-[48px] px-[32px]" style={{ minWidth: 0, overflow: "hidden" }}>
@@ -2958,60 +3794,6 @@ function ClockInOutPage() {
           <div className="w-full mb-[24px]" style={{ maxWidth: 420 }}>
             <ClockDisplay elapsed={elapsed} clocked={clocked} />
           </div>
-
-          {/* Location tag */}
-          {clocked === "out" && (
-            <div className="w-full mb-[24px] px-[16px] py-[12px] rounded-[8px]" style={{
-              maxWidth: 420,
-              background: locating ? "#ffffff" : onSite ? "#e8f7ed" : "#fffbeb",
-              border: `1px solid ${locating ? "#e0e1e9" : onSite ? "#bbe6ca" : "#fbbf24"}`,
-            }}>
-              <div className="flex items-center gap-[12px]">
-                {locating
-                  ? <LoaderCircle size={18} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
-                  : <MapPin size={18} className="shrink-0" style={{ color: onSite ? "#15803d" : "#d97706" }} />}
-                <div className="flex-1" style={{ minWidth: 0 }}>
-                  {locating ? (
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
-                      Getting your location…
-                    </p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: onSite ? "#15803d" : "#92400e", fontFamily: OS, ...OS_FVS }}>
-                        {onSite ? `On site · ${site.name}` : `${formatDistance(siteDistance)} from ${site.name}`}
-                      </p>
-                      <p style={{ fontSize: 12, color: onSite ? "#3f7d55" : "#b45309", fontFamily: OS, ...OS_FVS }}>
-                        {onSite
-                          ? `${formatDistance(siteDistance)} from site center · accurate to ${fix.accuracyMeters} m`
-                          : `Outside the ${site.radiusMeters} m job site radius`}
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              {!locating && (
-                <p className="mt-[8px]" style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-                  {formatCoords(fix)} · {site.address}
-                </p>
-              )}
-              {/* Prototype control: real device coordinates never land on a mock site. */}
-              <div className="mt-[10px] pt-[10px] flex items-center gap-[8px]" style={{ borderTop: "1px dashed #d4d6dd" }}>
-                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Simulate:</p>
-                {([{ label: "On site", value: false }, { label: "Off site", value: true }] as const).map(opt => (
-                  <button key={opt.label} type="button" onClick={() => setOffSiteSim(opt.value)}
-                    aria-pressed={offSiteSim === opt.value}
-                    style={{
-                      fontSize: 11, fontFamily: OS, borderRadius: 4, padding: "2px 8px", cursor: "pointer",
-                      background: offSiteSim === opt.value ? "#0063a3" : "#ffffff",
-                      color: offSiteSim === opt.value ? "#ffffff" : "#464b52",
-                      border: `1px solid ${offSiteSim === opt.value ? "#0063a3" : "#cbced4"}`,
-                    }}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Off-site clock-in flag */}
           {clocked !== "out" && clockedInOffSite && (
@@ -3060,16 +3842,7 @@ function ClockInOutPage() {
           )}
 
           {/* Concentric rings */}
-          <style>{`
-            @keyframes clock-pulse {
-              0%   { transform: scale(1);    opacity: 1; }
-              50%  { transform: scale(1.07); opacity: 0.7; }
-              100% { transform: scale(1);    opacity: 1; }
-            }
-            .ring-outer { animation: clock-pulse 2.4s ease-in-out infinite; }
-            .ring-mid   { animation: clock-pulse 2.4s ease-in-out infinite 0.3s; }
-            .ring-inner { animation: clock-pulse 2.4s ease-in-out infinite 0.6s; }
-          `}</style>
+          <ClockRingStyles />
           <div className="relative flex items-center justify-center" style={{ width: 260, height: 260, flexShrink: 0 }}>
             <div className="ring-outer absolute rounded-full" style={{ width: 260, height: 260, background: stateColorLight }} />
             <div className="ring-mid absolute rounded-full" style={{ width: 200, height: 200, background: stateColorMid }} />
@@ -3121,15 +3894,29 @@ function ClockInOutPage() {
 
           {/* Collapsible job form */}
           {(showForm || clocked === "out") && (
-            <div className="mt-[28px] w-full bg-white rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] p-[20px]" style={{ maxWidth: 420 }}>
+            <div ref={formRef} className="mt-[28px] w-full bg-white rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden" style={{ maxWidth: 420 }}>
+              <div className="p-[20px]">
               <p style={{ fontSize: 13, fontWeight: 700, color: "#0e416c", fontFamily: OS, ...OS_FVS, marginBottom: 14 }}>Job Details</p>
-              <div className="grid grid-cols-2 gap-[12px]">
-                <SelectField label="Crew" value={crew} onChange={setCrew} options={["740 - Adam Hazey's Crew", "Crew B", "Crew C"]} />
-                <SelectField label="Department" value={dept} onChange={setDept} options={["3300 - Job Cost", "3400 - Operations", "3500 - Admin"]} />
-                <div className="col-span-2">
-                  <SelectField label="Job" value={job} onChange={setJob} options={["003699 - AEP Carrollton Sub", "003700 - Job B", "003701 - Job C"]} />
+              {detailsPrompt && (
+                <div className="mb-[14px]">
+                  <ModusWcAlert
+                    variant="error"
+                    alertTitle="Add job details before clocking in"
+                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
+                  />
                 </div>
-                <SelectField label="Phase" value={phase} onChange={setPhase} options={["5554 - Renewal - Asphalt", "5555 - Phase B", "5556 - Phase C"]} />
+              )}
+              <div className="grid grid-cols-2 gap-[12px]">
+                <SelectField label="Crew" value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
+                  required invalid={detailsPrompt && !crew} />
+                <SelectField label="Department" value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
+                  required invalid={detailsPrompt && !dept} />
+                <div className="col-span-2">
+                  <SelectField label="Job" value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
+                    required invalid={detailsPrompt && !job} />
+                </div>
+                <SelectField label="Phase" value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
+                  required invalid={detailsPrompt && !phase} />
                 <ModusWcNumberInput
                   label="Travel"
                   size="sm"
@@ -3164,6 +3951,66 @@ function ClockInOutPage() {
                   />
                 </div>
               </div>
+              </div>
+
+              {/* Site — the geofence belongs to the selected job, so it lives here */}
+              {clocked === "out" && (
+                <div className="px-[20px] py-[14px]" style={{
+                  borderTop: "1px solid #eef0f3",
+                  background: !site || locating ? "#f7f7f8" : onSite ? "#e8f7ed" : "#fffbeb",
+                }}>
+                  <div className="flex items-center gap-[12px]">
+                    {locating && site
+                      ? <LoaderCircle size={18} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
+                      : <MapPin size={18} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
+                    <div className="flex-1" style={{ minWidth: 0 }}>
+                      {!site ? (
+                        <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                          Select a job to check its site.
+                        </p>
+                      ) : locating ? (
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
+                          Getting your location…
+                        </p>
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: onSite ? "#15803d" : "#92400e", fontFamily: OS, ...OS_FVS }}>
+                            {onSite ? `On site · ${site.name}` : `${formatDistance(siteDistance)} from ${site.name}`}
+                          </p>
+                          <p style={{ fontSize: 12, color: onSite ? "#3f7d55" : "#b45309", fontFamily: OS, ...OS_FVS }}>
+                            {onSite
+                              ? `${formatDistance(siteDistance)} from site center · accurate to ${fix?.accuracyMeters} m`
+                              : `Outside the ${site.radiusMeters} m job site radius`}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {site && fix && !locating && (
+                    <p className="mt-[8px]" style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                      {formatCoords(fix)} · {site.address}
+                    </p>
+                  )}
+                  {/* Prototype control: real device coordinates never land on a mock site. */}
+                  {site && (
+                    <div className="mt-[10px] pt-[10px] flex items-center gap-[8px]" style={{ borderTop: "1px dashed #d4d6dd" }}>
+                      <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Simulate:</p>
+                      {([{ label: "On site", value: false }, { label: "Off site", value: true }] as const).map(opt => (
+                        <button key={opt.label} type="button" onClick={() => setOffSiteSim(opt.value)}
+                          aria-pressed={offSiteSim === opt.value}
+                          style={{
+                            fontSize: 11, fontFamily: OS, borderRadius: 4, padding: "2px 8px", cursor: "pointer",
+                            background: offSiteSim === opt.value ? "#0063a3" : "#ffffff",
+                            color: offSiteSim === opt.value ? "#ffffff" : "#464b52",
+                            border: `1px solid ${offSiteSim === opt.value ? "#0063a3" : "#cbced4"}`,
+                          }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -3174,12 +4021,7 @@ function ClockInOutPage() {
                 Timesheet for Pay Period August 1 – August 7, 2026
               </p>
             </div>
-            <AttestationPanel days={[
-              { label: "Tue", date: 22 },
-              { label: "Wed", date: 23 },
-              { label: "Thu", date: 24 },
-              { label: "Mon", date: 28 },
-            ]} />
+            <AttestationPanel days={ATTESTATION_DAYS} attested={attested} onAttest={attestDay} />
             <div>
               <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
                 <thead>
@@ -3353,8 +4195,7 @@ function ClockInOutPage() {
           )}
         </div>
       </div>
-
-
+      )}
     </div>
   );
 }
