@@ -1490,28 +1490,28 @@ function ExclusionsTab({ onSave }: { onSave: () => void }) {
 // ─── Meal & Penalties embedded section ───────────────────────────────────────
 type OnDutyMealAction = "flag" | "pay_time_worked" | "flag_and_pay";
 
-type OnDutyEmployee = { id: string; name: string; role: string };
+type OnDutyEmployee = { id: string; name: string; title: string; department: string; costCenter: string };
 
 // Stands in for a paged employee lookup; a real tenant roster is far larger.
 const ON_DUTY_ROSTER: OnDutyEmployee[] = [
-  { id: "e01", name: "Adam Reyes",        role: "Gate Guard" },
-  { id: "e02", name: "Priya Natarajan",   role: "Patrol Officer" },
-  { id: "e03", name: "Marcus Webb",       role: "Night Guard" },
-  { id: "e04", name: "Dana Whitfield",    role: "Gate Guard" },
-  { id: "e05", name: "Luis Ferreira",     role: "Crane Operator" },
-  { id: "e06", name: "Grace Okonkwo",     role: "Loader Operator" },
-  { id: "e07", name: "Tom Halvorsen",     role: "Excavator Operator" },
-  { id: "e08", name: "Sofia Marchetti",   role: "Grader Operator" },
-  { id: "e09", name: "Ray Kimura",        role: "Dispatcher" },
-  { id: "e10", name: "Elena Vasquez",     role: "Control Room Lead" },
-  { id: "e11", name: "Jordan Pace",       role: "Dispatcher" },
-  { id: "e12", name: "Nadia Farouk",      role: "Site Medic" },
-  { id: "e13", name: "Colin Barrett",     role: "Site Medic" },
-  { id: "e14", name: "Hannah Lindqvist",  role: "Utility Tech" },
-  { id: "e15", name: "Devon Achebe",      role: "Utility Tech" },
-  { id: "e16", name: "Mei Ling Chen",     role: "Site Supervisor" },
-  { id: "e17", name: "Owen Brady",        role: "Fuel Truck Driver" },
-  { id: "e18", name: "Aisha Rahman",      role: "Weighbridge Clerk" },
+  { id: "e01", name: "Adam Reyes",        title: "Gate Guard",         department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e02", name: "Priya Natarajan",   title: "Patrol Officer",     department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e03", name: "Marcus Webb",       title: "Night Guard",        department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e04", name: "Dana Whitfield",    title: "Gate Guard",         department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e05", name: "Luis Ferreira",     title: "Crane Operator",     department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e06", name: "Grace Okonkwo",     title: "Loader Operator",    department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e07", name: "Tom Halvorsen",     title: "Excavator Operator", department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e08", name: "Sofia Marchetti",   title: "Grader Operator",    department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e09", name: "Ray Kimura",        title: "Dispatcher",         department: "3500 - Admin",      costCenter: "CC-300" },
+  { id: "e10", name: "Elena Vasquez",     title: "Control Room Lead",  department: "3500 - Admin",      costCenter: "CC-300" },
+  { id: "e11", name: "Jordan Pace",       title: "Dispatcher",         department: "3500 - Admin",      costCenter: "CC-300" },
+  { id: "e12", name: "Nadia Farouk",      title: "Site Medic",         department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e13", name: "Colin Barrett",     title: "Site Medic",         department: "3400 - Operations", costCenter: "CC-100" },
+  { id: "e14", name: "Hannah Lindqvist",  title: "Utility Tech",       department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e15", name: "Devon Achebe",      title: "Utility Tech",       department: "3300 - Job Cost",   costCenter: "CC-200" },
+  { id: "e16", name: "Mei Ling Chen",     title: "Site Supervisor",    department: "3400 - Operations", costCenter: "CC-200" },
+  { id: "e17", name: "Owen Brady",        title: "Fuel Truck Driver",  department: "3300 - Job Cost",   costCenter: "CC-300" },
+  { id: "e18", name: "Aisha Rahman",      title: "Weighbridge Clerk",  department: "3500 - Admin",      costCenter: "CC-300" },
 ];
 
 type MealPenaltyState = {
@@ -2108,6 +2108,9 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
 }) {
   const [filter, setFilter] = useState<WaiverFilter>(initialFilter);
   const [query, setQuery] = useState("");
+  const [costCenter, setCostCenter] = useState("");
+  const [department, setDepartment] = useState("");
+  const [title, setTitle] = useState("");
   const [page, setPage] = useState(0);
   const [draft, setDraft] = useState<string[]>(selected);
 
@@ -2117,11 +2120,23 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const matches = ON_DUTY_ROSTER.filter((e) => {
+  const sortedUnique = (pick: (e: OnDutyEmployee) => string) =>
+    [...new Set(ON_DUTY_ROSTER.map(pick))].sort();
+
+  // Attribute filters narrow the population; the waiver tabs then split that
+  // population by assignment, so the tab counts stay true to what is listed.
+  const scoped = ON_DUTY_ROSTER.filter((e) => {
+    if (costCenter && e.costCenter !== costCenter) return false;
+    if (department && e.department !== department) return false;
+    if (title && e.title !== title) return false;
+    const q = query.trim().toLowerCase();
+    return !q || e.name.toLowerCase().includes(q) || e.title.toLowerCase().includes(q);
+  });
+
+  const matches = scoped.filter((e) => {
     if (filter === "assigned" && !draft.includes(e.id)) return false;
     if (filter === "unassigned" && draft.includes(e.id)) return false;
-    const q = query.trim().toLowerCase();
-    return !q || e.name.toLowerCase().includes(q) || e.role.toLowerCase().includes(q);
+    return true;
   });
 
   const pageCount = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
@@ -2132,10 +2147,16 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
   const toggle = (id: string) =>
     setDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
 
+  const scopedAssigned = scoped.filter((e) => draft.includes(e.id)).length;
+  const hasAttributeFilter = Boolean(costCenter || department || title);
+  const clearAttributeFilters = () => {
+    setCostCenter(""); setDepartment(""); setTitle(""); setPage(0);
+  };
+
   const tabs: { value: WaiverFilter; label: string; count: number }[] = [
-    { value: "all",        label: "All",          count: ON_DUTY_ROSTER.length },
-    { value: "assigned",   label: "Assigned",     count: draft.length },
-    { value: "unassigned", label: "Not assigned", count: ON_DUTY_ROSTER.length - draft.length },
+    { value: "all",        label: "All",          count: scoped.length },
+    { value: "assigned",   label: "Assigned",     count: scopedAssigned },
+    { value: "unassigned", label: "Not assigned", count: scoped.length - scopedAssigned },
   ];
 
   const th = "px-[16px] py-[10px] text-left text-[11px] font-semibold uppercase tracking-[0.4px] text-[#6a6e79]";
@@ -2146,7 +2167,7 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-label="On-duty meal employees"
         className="bg-white rounded-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.18)] flex flex-col font-['Open_Sans',sans-serif]"
-        style={{ width: 720, maxHeight: "88vh", overflow: "hidden" }}>
+        style={{ width: 820, maxHeight: "88vh", overflow: "hidden" }}>
         {/* Header */}
         <div className="flex items-start justify-between px-[24px] py-[18px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
           <div>
@@ -2205,11 +2226,38 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
               size="sm"
               includeSearch
               includeClear
-              placeholder="Search name or role"
+              placeholder="Search name or title"
               value={query}
               onInputChange={(e) => { setQuery(e.target.value); setPage(0); }}
               onClearClick={() => { setQuery(""); setPage(0); }}
             />
+          </div>
+        </div>
+
+        {/* Attribute filters */}
+        <div className="flex items-end gap-[12px] px-[24px] pb-[16px]">
+          <FilterInput
+            placeholder="Cost Center"
+            value={costCenter}
+            onChange={(v) => { setCostCenter(v); setPage(0); }}
+            options={sortedUnique((e) => e.costCenter)}
+          />
+          <FilterInput
+            placeholder="Department"
+            value={department}
+            onChange={(v) => { setDepartment(v); setPage(0); }}
+            options={sortedUnique((e) => e.department)}
+          />
+          <FilterInput
+            placeholder="Title"
+            value={title}
+            onChange={(v) => { setTitle(v); setPage(0); }}
+            options={sortedUnique((e) => e.title)}
+          />
+          <div className="shrink-0" style={{ visibility: hasAttributeFilter ? "visible" : "hidden" }}>
+            <ModusWcButton color="primary" variant="borderless" size="sm" onButtonClick={clearAttributeFilters}>
+              Clear filters
+            </ModusWcButton>
           </div>
         </div>
 
@@ -2221,6 +2269,7 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                 <tr style={{ background: "#f7f7fb" }}>
                   <th className={th} style={{ width: 44 }} aria-label="Assigned" />
                   <th className={th}>Employee</th>
+                  <th className={th}>Department</th>
                   <th className={th} style={{ textAlign: "right" }}>Waiver</th>
                 </tr>
               </thead>
@@ -2239,7 +2288,11 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                       </td>
                       <td className={td}>
                         <span className="font-semibold">{e.name}</span>
-                        <span className="block text-[11px] text-[#6a6e79]">{e.role}</span>
+                        <span className="block text-[11px] text-[#6a6e79]">{e.title}</span>
+                      </td>
+                      <td className={td}>
+                        <span className="text-[12px]">{e.department}</span>
+                        <span className="block text-[11px] text-[#6a6e79]">{e.costCenter}</span>
                       </td>
                       <td className={td} style={{ textAlign: "right" }}>
                         {assigned ? (
@@ -2255,8 +2308,8 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
                 })}
                 {rows.length === 0 && (
                   <tr style={{ borderTop: "1px solid #e0e1e9" }}>
-                    <td colSpan={3} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
-                      No employees match this search.
+                    <td colSpan={4} className="px-[16px] py-[28px] text-center text-[13px] text-[#6a6e79]">
+                      No employees match these filters.
                     </td>
                   </tr>
                 )}
