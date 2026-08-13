@@ -2634,6 +2634,144 @@ const simulateFix = (site: JobSite, offSite: boolean): GeoFix =>
     ? { lat: site.lat + 0.0180, lng: site.lng - 0.0075, accuracyMeters: 22 }
     : { lat: site.lat + 0.0004, lng: site.lng + 0.0003, accuracyMeters: 8 };
 
+/*
+  Web Mercator, enough of it to lay out OpenStreetMap tiles by hand. A map
+  library would pull in a dependency for one read-only view, and drawing the
+  tiles ourselves lets the geofence be a real circle at the map's own scale.
+*/
+const TILE_SIZE = 256;
+
+const lngToWorldX = (lng: number, zoom: number) =>
+  ((lng + 180) / 360) * Math.pow(2, zoom) * TILE_SIZE;
+
+const latToWorldY = (lat: number, zoom: number) => {
+  const rad = (lat * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * Math.pow(2, zoom) * TILE_SIZE;
+};
+
+const metersPerPixel = (lat: number, zoom: number) =>
+  (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+
+const SCALE_STEPS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+
+function SiteMap({ site, fix, width, height }: { site: JobSite; fix: GeoFix; width: number; height: number }) {
+  const distance = distanceMeters(fix, site);
+  const onSite = distance <= site.radiusMeters;
+  const accent = onSite ? "#15803d" : "#d97706";
+
+  // Frame the whole geofence and the punch together, with room to breathe.
+  const spanMeters = Math.max(site.radiusMeters * 2.6, distance * 2.4, 120);
+  let zoom = 19;
+  while (zoom > 2 && spanMeters / metersPerPixel(site.lat, zoom) > Math.min(width, height)) zoom--;
+
+  const left = lngToWorldX((site.lng + fix.lng) / 2, zoom) - width / 2;
+  const top = latToWorldY((site.lat + fix.lat) / 2, zoom) - height / 2;
+  const project = (p: { lat: number; lng: number }) => ({
+    x: lngToWorldX(p.lng, zoom) - left,
+    y: latToWorldY(p.lat, zoom) - top,
+  });
+
+  const sitePt = project(site);
+  const fixPt = project(fix);
+  const mpp = metersPerPixel(site.lat, zoom);
+  const radiusPx = site.radiusMeters / mpp;
+  const accuracyPx = Math.max(fix.accuracyMeters / mpp, 5);
+
+  const lastTile = Math.pow(2, zoom) - 1;
+  const tiles: { key: string; x: number; y: number; url: string }[] = [];
+  for (let tx = Math.floor(left / TILE_SIZE); tx <= Math.floor((left + width) / TILE_SIZE); tx++) {
+    for (let ty = Math.floor(top / TILE_SIZE); ty <= Math.floor((top + height) / TILE_SIZE); ty++) {
+      if (tx < 0 || ty < 0 || tx > lastTile || ty > lastTile) continue;
+      tiles.push({
+        key: `${tx}/${ty}`,
+        x: tx * TILE_SIZE - left,
+        y: ty * TILE_SIZE - top,
+        url: `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
+      });
+    }
+  }
+
+  const scaleMeters = [...SCALE_STEPS].reverse().find(m => m / mpp <= 96) ?? SCALE_STEPS[0];
+  const gapPx = Math.hypot(fixPt.x - sitePt.x, fixPt.y - sitePt.y);
+
+  return (
+    <div>
+      <div style={{
+        position: "relative", width, height, overflow: "hidden",
+        borderRadius: 8, border: "1px solid #e0e1e9", background: "#e8eae3",
+      }}>
+        {tiles.map(t => (
+          <img key={t.key} src={t.url} alt="" width={TILE_SIZE} height={TILE_SIZE}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+            style={{ position: "absolute", left: t.x, top: t.y, width: TILE_SIZE, height: TILE_SIZE }} />
+        ))}
+
+        {/* Geofence, drawn at the same scale as the tiles underneath it */}
+        <div style={{
+          position: "absolute", left: sitePt.x - radiusPx, top: sitePt.y - radiusPx,
+          width: radiusPx * 2, height: radiusPx * 2, borderRadius: "50%",
+          border: `2px solid ${accent}`, background: onSite ? "rgba(21,128,61,0.14)" : "rgba(217,119,6,0.12)",
+          pointerEvents: "none",
+        }} />
+
+        {/* The walk between the punch and the site is the point of the map */}
+        {gapPx > 26 && (
+          <svg width={width} height={height} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <line x1={sitePt.x} y1={sitePt.y} x2={fixPt.x} y2={fixPt.y}
+              stroke={accent} strokeWidth={2} strokeDasharray="5 4" />
+          </svg>
+        )}
+
+        {/* Job site centre */}
+        <div style={{
+          position: "absolute", left: sitePt.x - 6, top: sitePt.y - 6, width: 12, height: 12,
+          borderRadius: "50%", background: accent, border: "2px solid #ffffff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.35)", pointerEvents: "none",
+        }} />
+
+        {/* Where the punch was taken, with its accuracy halo */}
+        <div style={{
+          position: "absolute", left: fixPt.x - accuracyPx, top: fixPt.y - accuracyPx,
+          width: accuracyPx * 2, height: accuracyPx * 2, borderRadius: "50%",
+          background: "rgba(0,99,163,0.22)", border: "1px solid rgba(0,99,163,0.55)",
+          pointerEvents: "none",
+        }} />
+        <div style={{
+          position: "absolute", left: fixPt.x - 6, top: fixPt.y - 6, width: 12, height: 12,
+          borderRadius: "50%", background: "#0063a3", border: "2px solid #ffffff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.35)", pointerEvents: "none",
+        }} />
+
+        {/* Scale bar keeps the geofence circle honest */}
+        <div style={{ position: "absolute", left: 8, bottom: 8, pointerEvents: "none" }}>
+          <div style={{ width: scaleMeters / mpp, height: 4, background: "rgba(37,42,46,0.75)", borderRadius: 1 }} />
+          <p style={{ fontSize: 10, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginTop: 2, textShadow: "0 0 3px #ffffff" }}>
+            {formatDistance(scaleMeters)}
+          </p>
+        </div>
+
+        <p style={{
+          position: "absolute", right: 4, bottom: 2, fontSize: 9, color: "#464b52", fontFamily: OS, ...OS_FVS,
+          background: "rgba(255,255,255,0.72)", borderRadius: 3, padding: "0 4px", pointerEvents: "none",
+        }}>
+          © OpenStreetMap
+        </p>
+      </div>
+
+      <div className="flex items-center gap-[16px] mt-[10px]">
+        <div className="flex items-center gap-[6px]">
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: accent, border: "2px solid #ffffff", boxShadow: "0 0 0 1px #cbced4" }} />
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Job site · {site.radiusMeters} m radius</p>
+        </div>
+        <div className="flex items-center gap-[6px]">
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#0063a3", border: "2px solid #ffffff", boxShadow: "0 0 0 1px #cbced4" }} />
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>You · ±{fix.accuracyMeters} m</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockState }) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -2697,6 +2835,7 @@ function useClockSession() {
   const [locating, setLocating] = useState(true);
   const [offSiteSim, setOffSiteSim] = useState(false);
   const [showOffSiteModal, setShowOffSiteModal] = useState(false);
+  const [showSiteMap, setShowSiteMap] = useState(false);
   const [clockedInOffSite, setClockedInOffSite] = useState(false);
   const [breakRows, setBreakRows] = useState<{ start: string; end: string | null }[]>([]);
   const [showEarlyBreakModal, setShowEarlyBreakModal] = useState(false);
@@ -2846,6 +2985,7 @@ function useClockSession() {
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
+    showSiteMap, setShowSiteMap,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
     travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
@@ -3039,6 +3179,7 @@ function MobileClockView({ session }: { session: ClockSession }) {
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
+    showSiteMap, setShowSiteMap,
     locating, offSiteSim, setOffSiteSim, clockedInOffSite,
     site, fix, siteDistance, onSite,
     missingDetails, detailsComplete, detailsPrompt,
@@ -3124,7 +3265,17 @@ function MobileClockView({ session }: { session: ClockSession }) {
                 <div className="flex items-center gap-[10px]">
                   {locating && site
                     ? <LoaderCircle size={17} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
-                    : <MapPin size={17} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
+                    : site && fix ? (
+                      <button type="button" onClick={() => setShowSiteMap(true)}
+                        title="View on map" aria-label={`View ${site.name} on a map`}
+                        className="shrink-0 flex items-center justify-center"
+                        style={{
+                          width: 32, height: 32, padding: 0, borderRadius: 999, cursor: "pointer",
+                          background: "#ffffff", border: `1px solid ${onSite ? "#b7e0c4" : "#f4d6a4"}`,
+                        }}>
+                        <MapPin size={17} style={{ color: onSite ? "#15803d" : "#d97706" }} />
+                      </button>
+                    ) : <MapPin size={17} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
                   <div style={{ minWidth: 0 }}>
                     {!site ? (
                       <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Select a job to check its site.</p>
@@ -3405,6 +3556,29 @@ function MobileClockView({ session }: { session: ClockSession }) {
             </MobileSheet>
           )}
 
+          {/* Site map sheet */}
+          {site && fix && (
+            <MobileSheet open={showSiteMap} onClose={() => setShowSiteMap(false)}>
+              <div className="flex items-center gap-[10px] mb-[12px]">
+                <div className="flex items-center justify-center shrink-0" style={{ width: 36, height: 36, borderRadius: 999, background: onSite ? "#e8f7ed" : "#fef3e2" }}>
+                  <MapPin size={18} style={{ color: onSite ? "#15803d" : "#d97706" }} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={sheetTitle}>{onSite ? "On site" : `${formatDistance(siteDistance)} away`}</p>
+                  <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{site.name}</p>
+                </div>
+              </div>
+              <SiteMap site={site} fix={fix} width={350} height={220} />
+              <p className="mt-[12px] mb-[16px]" style={{ fontSize: 12, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
+                {formatCoords(fix)} · {site.address}
+              </p>
+              <button type="button" onClick={() => setShowSiteMap(false)} className="w-full"
+                style={{ background: "#0063a3", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+                Close
+              </button>
+            </MobileSheet>
+          )}
+
           {/* Off-site sheet */}
           {site && fix && (
             <MobileSheet open={showOffSiteModal} onClose={() => setShowOffSiteModal(false)}>
@@ -3576,6 +3750,7 @@ function ClockInOutPage() {
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
+    showSiteMap, setShowSiteMap,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
     travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
@@ -3654,6 +3829,38 @@ function ClockInOutPage() {
               <ModusWcButton color="primary" variant="filled" size="md"
                 onButtonClick={confirmEndBreak}>
                 Confirm Early Clock In
+              </ModusWcButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Site location map */}
+      {viewMode === "desktop" && showSiteMap && site && fix && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setShowSiteMap(false)}>
+          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
+            style={{ width: 560, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-[12px] mb-[16px]">
+              <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full shrink-0" style={{ background: onSite ? "#e8f7ed" : "#fef3e2" }}>
+                <MapPin size={20} style={{ color: onSite ? "#15803d" : "#d97706" }} />
+              </div>
+              <div>
+                <p style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+                  {onSite ? `On site · ${site.name}` : `${formatDistance(siteDistance)} from ${site.name}`}
+                </p>
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                  {formatCoords(fix)} · {site.address}
+                </p>
+              </div>
+            </div>
+
+            <SiteMap site={site} fix={fix} width={496} height={320} />
+
+            <div className="flex justify-end mt-[24px]">
+              <ModusWcButton color="primary" variant="filled" size="md"
+                onButtonClick={() => setShowSiteMap(false)}>
+                Close
               </ModusWcButton>
             </div>
           </div>
@@ -3962,7 +4169,17 @@ function ClockInOutPage() {
                   <div className="flex items-center gap-[12px]">
                     {locating && site
                       ? <LoaderCircle size={18} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
-                      : <MapPin size={18} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
+                      : site && fix ? (
+                        <button type="button" onClick={() => setShowSiteMap(true)}
+                          title="View on map" aria-label={`View ${site.name} on a map`}
+                          className="shrink-0 flex items-center justify-center"
+                          style={{
+                            width: 34, height: 34, padding: 0, borderRadius: 999, cursor: "pointer",
+                            background: "#ffffff", border: `1px solid ${onSite ? "#b7e0c4" : "#f4d6a4"}`,
+                          }}>
+                          <MapPin size={18} style={{ color: onSite ? "#15803d" : "#d97706" }} />
+                        </button>
+                      ) : <MapPin size={18} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
                     <div className="flex-1" style={{ minWidth: 0 }}>
                       {!site ? (
                         <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
