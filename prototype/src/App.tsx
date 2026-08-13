@@ -8,6 +8,7 @@ import {
   ModusWcIcon,
   ModusWcNumberInput,
   ModusWcPagination,
+  ModusWcRadio,
   ModusWcSelect,
   ModusWcSwitch,
   ModusWcTabs,
@@ -88,25 +89,27 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
   );
 }
 
-function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88 }: {
+function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88, disabled = false }: {
   value: number; onChange: (v: number) => void;
-  step?: number; min?: number; suffix?: string; width?: number;
+  step?: number; min?: number; suffix?: string; width?: number; disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-[6px]">
+    <div className={`flex items-center gap-[6px] ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
       <ModusWcNumberInput
         aria-label="Value"
         size="sm"
         min={min}
         step={step}
         value={String(value)}
+        disabled={disabled}
         onInputChange={(e) => {
+          if (disabled) return;
           const v = parseFloat(e.target.value);
           if (!isNaN(v)) onChange(v);
         }}
         style={{ width }}
       />
-      {suffix && <span className="text-[12px] text-[#6a6e79] font-['Open_Sans',sans-serif]">{suffix}</span>}
+      {suffix && <span className="text-[12px] text-[#6a6e79]">{suffix}</span>}
     </div>
   );
 }
@@ -142,18 +145,18 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
-  return <p className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e] mb-[4px]">{children}</p>;
+  return <p className="text-[12px] font-semibold text-[#252a2e] mb-[4px]">{children}</p>;
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#6a6e79] uppercase tracking-[0.08em] mb-[8px]">{children}</p>;
+  return <p className="text-[11px] font-semibold text-[#6a6e79] uppercase tracking-[0.08em] mb-[8px]">{children}</p>;
 }
 
 // Blue section divider header (matches screenshot navy bars)
 function SectionDivider({ children }: { children: ReactNode }) {
   return (
     <div className="bg-[#0e416c] px-[20px] py-[10px] rounded-t-[6px]">
-      <h2 className="text-[13px] font-bold font-['Open_Sans',sans-serif] text-white">{children}</h2>
+      <h2 className="text-[13px] font-bold text-white">{children}</h2>
     </div>
   );
 }
@@ -181,7 +184,7 @@ function SubCard({ title, action, children }: { title: string; action?: ReactNod
   return (
     <div className="border-t border-[#f0f0f4] first:border-t-0">
       <div className="flex items-center justify-between px-[20px] py-[10px] bg-[#fafafa]">
-        <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#464b52] uppercase tracking-[0.06em]">{title}</span>
+        <span className="text-[12px] font-bold text-[#464b52] uppercase tracking-[0.06em]">{title}</span>
         {action}
       </div>
       <div className="px-[20px] pb-[16px] pt-[4px]">{children}</div>
@@ -246,7 +249,7 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
               zIndex: isActive ? 10 : 0,
               padding: "7px 14px",
               marginBottom: -1,
-              fontFamily: "Open Sans, sans-serif",
+              fontFamily: "var(--modus-wc-font-family), sans-serif",
               fontSize: 12,
               fontWeight: 600,
               lineHeight: 1.4,
@@ -270,7 +273,8 @@ function InnerTabBar<T extends string>({ tabs, active, onChange }: {
 
 
 // ─── Reusable tabbed rule-set container ───────────────────────────────────────
-type RuleSetTab = "daily" | "weekly" | "break" | "kiosk" | "equipment" | "meal" | "penalties";
+type RuleSetTab = "daily" | "weekly" | "breaks" | "onDuty" | "kiosk" | "equipment";
+type BreakType = "automatic" | "flagged" | "premium";
 
 function RuleSetForm({
   data,
@@ -316,6 +320,12 @@ function RuleSetForm({
   const [employeeModal, setEmployeeModal] = useState<WaiverFilter | null>(null);
   const openEmployeeModal = (filter: WaiverFilter) => setEmployeeModal(filter);
   const onDutyMembers = ON_DUTY_ROSTER.filter((e) => mp.onDutyEmployees.includes(e.id));
+  const breakUsesEndWindow = mp.breakType === "premium";
+
+  const breakSummary = (start: number, end: number, duration: number) =>
+    breakUsesEndWindow
+      ? `Break required between ${start} and ${end} hrs worked · min ${duration} min`
+      : `Break required after ${start} hrs into shift · min ${duration} min`;
 
   // The meal window is only meaningful when it ends at or after it starts.
   const setMealWindow = (meal: 1 | 2, edge: "start" | "end", val: number) => {
@@ -337,11 +347,10 @@ function RuleSetForm({
 
   const allTabs: { key: RuleSetTab; label: string; show: boolean }[] = [
     { key: "daily",     label: "Daily & Weekly Rules", show: true },
-    { key: "break",     label: "Break Rules",    show: true },
+    { key: "breaks",    label: "Breaks",         show: true },
+    { key: "onDuty",    label: "On-Duty Meal",   show: true },
     { key: "kiosk",     label: "Kiosk Break",    show: !!showKiosk },
     { key: "equipment", label: "Equipment",      show: !!showEquipment },
-    { key: "meal",      label: "Meal Periods",   show: true },
-    { key: "penalties", label: "Premiums", show: true },
   ];
   const visibleTabs = allTabs.filter((t) => t.show);
 
@@ -349,7 +358,7 @@ function RuleSetForm({
     <>
       {descriptionText && (
         <div className="px-[20px] pt-[14px] pb-[10px]">
-          <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px]">{descriptionText}</p>
+          <p className="text-[12px] text-[#464b52] leading-[18px]">{descriptionText}</p>
         </div>
       )}
 
@@ -373,13 +382,13 @@ function RuleSetForm({
               <table className="w-full border-collapse">
                 <thead>
                   <tr style={{ background: TABLE_HEADER_BG }}>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: TABLE_HEADER_TEXT, width: 150, borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }} />
+                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, fontFamily: "var(--modus-wc-font-family), sans-serif", color: TABLE_HEADER_TEXT, width: 150, borderBottom: `1px solid ${TABLE_HEADER_BORDER}` }} />
                     {colHeaders.map((col) => (
                       <th key={col.key} style={{
                         padding: "10px 8px",
                         fontSize: 11,
                         fontWeight: 600,
-                        fontFamily: "Open Sans, sans-serif",
+                        fontFamily: "var(--modus-wc-font-family), sans-serif",
                         color: TABLE_HEADER_TEXT,
                         textAlign: "center",
                         whiteSpace: "pre-line",
@@ -397,7 +406,7 @@ function RuleSetForm({
                     const isLastRow = idx === data.days.length - 1;
                     return (
                       <tr key={day.label} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
-                        <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}`, borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#252a2e", whiteSpace: "nowrap", borderRight: `1px solid ${TABLE_HEADER_BORDER}`, borderBottom: isLastRow ? undefined : `1px solid ${TABLE_HEADER_BORDER}` }}>{day.label}</td>
                         {colHeaders.map((col, ci) => (
                           <td key={col.key} style={{
                             padding: "8px 8px",
@@ -424,12 +433,12 @@ function RuleSetForm({
                 }}>
                 {data.flag24thDay && <Check size={9} className="text-white" strokeWidth={3} />}
               </div>
-              <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52]">Flag 24th Consecutive Day</span>
+              <span className="text-[11px] text-[#464b52]">Flag 24th Consecutive Day</span>
             </button>
 
             {/* ── Weekly Rules ── */}
             <div className="mt-[24px]">
-              <p className="text-[13px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e] mb-[10px]">Weekly Rules</p>
+              <p className="text-[13px] font-semibold text-[#252a2e] mb-[10px]">Weekly Rules</p>
               <div
                 className="overflow-x-auto"
                 style={{ border: `1px solid ${TABLE_HEADER_BORDER}`, borderRadius: 6, overflow: "hidden" }}
@@ -442,7 +451,7 @@ function RuleSetForm({
                           padding: "10px 12px",
                           fontSize: 11,
                           fontWeight: 600,
-                          fontFamily: "Open Sans, sans-serif",
+                          fontFamily: "var(--modus-wc-font-family), sans-serif",
                           color: TABLE_HEADER_TEXT,
                           textAlign: "center",
                           borderBottom: `1px solid ${TABLE_HEADER_BORDER}`,
@@ -468,57 +477,335 @@ function RuleSetForm({
 
 
 
-        {/* ── Break Rules ── */}
-        {activeTab === "break" && (
-          <>
-            <div className="grid grid-cols-2 gap-[20px] mb-[20px]">
-              <div>
-                <FieldLabel>Minimum Hours Per Day</FieldLabel>
-                <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[6px]">Break is required once this threshold is reached</p>
-                <NumberInput value={data.breakMinHours} onChange={(v) => onChange({ ...data, breakMinHours: v })} step={0.5} min={0} suffix="hrs" />
-              </div>
-              <div>
-                <FieldLabel>Break Length Required</FieldLabel>
-                <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[6px]">Minimum duration of the required break</p>
-                <NumberInput value={data.breakLength} onChange={(v) => onChange({ ...data, breakLength: v })} step={0.25} min={0} suffix="hrs" />
-              </div>
-            </div>
+        {/* ── Breaks ── */}
+        {activeTab === "breaks" && (
+          <div className="flex flex-col gap-[24px]">
+            <ModusWcAlert variant="info"
+              alertTitle="Two breaks, one type"
+              alertDescription="Administrators can configure exactly two breaks. All breaks must use the same type — Automatic, Flagged, or Premium — for consistent calculation."
+            />
 
             <div>
-              <FieldLabel>When break requirement is not met</FieldLabel>
-              <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[10px]">Choose how the system responds when an employee works past the threshold without a qualifying break</p>
-              <div className="flex gap-[10px]">
-                {/* Flag option */}
-                <div onClick={() => onChange({ ...data, breakAction: "flag" })}
-                  className={`flex-1 cursor-pointer rounded-[6px] border-2 px-[16px] py-[12px] transition-all ${data.breakAction === "flag" ? "border-[#856404] bg-[#fffbf0]" : "border-[#e0e1e9] bg-white hover:border-[#f0d080]"}`}>
-                  <div className="flex items-center gap-[8px] mb-[6px]">
-                    <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${data.breakAction === "flag" ? "border-[#856404]" : "border-[#cbced4]"}`}>
-                      {data.breakAction === "flag" && <div className="h-[7px] w-[7px] rounded-full bg-[#856404]" />}
+              <FieldLabel>Break Type</FieldLabel>
+              <p className="text-[11px] text-[#6a6e79] mb-[10px]">Applies to both configured breaks. Fixed schedule windows are not supported in this release.</p>
+              <fieldset className="flex gap-[10px] border-0 p-0 m-0 min-w-0">
+                <legend className="sr-only">Break type</legend>
+                {([
+                  { value: "flagged" as BreakType, title: "Flagged", desc: "Violations are flagged for supervisor review." },
+                  { value: "automatic" as BreakType, title: "Automatic", desc: "The system inserts qualifying breaks automatically." },
+                  { value: "premium" as BreakType, title: "Premium", desc: "Late or missed breaks trigger premium pay per violation rules below." },
+                ]).map((opt) => {
+                  const selected = mp.breakType === opt.value;
+                  return (
+                    <div
+                      key={opt.value}
+                      role="presentation"
+                      onClick={() => setMp("breakType", opt.value)}
+                      className={`flex-1 min-w-0 cursor-pointer rounded-[6px] border-2 px-[16px] py-[12px] transition-all ${
+                        selected
+                          ? "border-[#006fb0] bg-[#f5faff]"
+                          : "border-[#e0e1e9] bg-white hover:border-[#cbced4]"
+                      }`}
+                    >
+                      <ModusWcRadio
+                        name="break-type"
+                        size="sm"
+                        inputId={`break-type-${opt.value}`}
+                        label={opt.title}
+                        customClass="font-bold"
+                        value={selected}
+                        onInputChange={() => setMp("breakType", opt.value)}
+                      />
+                      <p className="text-[11px] text-[var(--modus-wc-color-base-content-low-contrast)] leading-[16px] mt-[6px] ps-[22px]">
+                        {opt.desc}
+                      </p>
                     </div>
-                    <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Flag for review</span>
+                  );
+                })}
+              </fieldset>
+            </div>
+
+            {/* Break 1 */}
+            <CardShell title="First Break" badge="Break 1" badgeColor="blue">
+              <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
+                <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
+                  <SectionLabel>Break Trigger</SectionLabel>
+                  <p className="text-[11px] text-[#6a6e79] mb-[12px] leading-[15px]">
+                    {breakUsesEndWindow
+                      ? "Window measured from shift start."
+                      : "Start threshold measured from shift start."}
+                  </p>
+                  <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                    <div>
+                      <p className="text-[11px] text-[#464b52] mb-[4px]">Break must begin after</p>
+                      <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
+                    </div>
+                    {breakUsesEndWindow && (
+                      <div>
+                        <p className="text-[11px] text-[#464b52] mb-[4px]">Break must end after</p>
+                        <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] leading-[16px] ml-[22px]">The timesheet entry is flagged and a warning is shown. A supervisor must review and resolve the violation manually.</p>
                 </div>
-                {/* Auto option */}
-                <div onClick={() => onChange({ ...data, breakAction: "auto" })}
-                  className={`flex-1 cursor-pointer rounded-[6px] border-2 px-[16px] py-[12px] transition-all ${data.breakAction === "auto" ? "border-[#006fb0] bg-[#f5faff]" : "border-[#e0e1e9] bg-white hover:border-[#b8d9f0]"}`}>
-                  <div className="flex items-center gap-[8px] mb-[6px]">
-                    <div className={`flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${data.breakAction === "auto" ? "border-[#006fb0]" : "border-[#cbced4]"}`}>
-                      {data.breakAction === "auto" && <div className="h-[7px] w-[7px] rounded-full bg-[#006fb0]" />}
-                    </div>
-                    <span className="text-[12px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Automatically apply break</span>
+                <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
+                  <div>
+                    <SectionLabel>Break Duration</SectionLabel>
+                    <FieldLabel>Minimum required length</FieldLabel>
+                    <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" />
                   </div>
-                  <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] leading-[16px] ml-[22px]">The system inserts a break of the required length into the entry automatically. Requires Automatic Hour Rule Rollover to be enabled.</p>
+                  <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
+                    <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
+                    <p className="text-[11px] text-[#464b52] leading-[16px]">
+                      {breakSummary(mp.meal1Trigger, mp.meal1TriggerEnd, mp.meal1Duration)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </>
+            </CardShell>
+
+            {/* Break 2 */}
+            <CardShell title="Second Break" badge="Break 2" badgeColor="blue">
+              <div className="grid grid-cols-2 gap-0">
+                <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
+                  <SectionLabel>Break Trigger</SectionLabel>
+                  <p className="text-[11px] text-[#6a6e79] mb-[12px] leading-[15px]">
+                    {breakUsesEndWindow
+                      ? "Window measured from shift start."
+                      : "Start threshold measured from shift start."}
+                  </p>
+                  <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
+                    <div>
+                      <p className="text-[11px] text-[#464b52] mb-[4px]">Break must begin after</p>
+                      <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
+                    </div>
+                    {breakUsesEndWindow && (
+                      <div>
+                        <p className="text-[11px] text-[#464b52] mb-[4px]">Break must end after</p>
+                        <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
+                  <div>
+                    <SectionLabel>Break Duration</SectionLabel>
+                    <FieldLabel>Minimum required length</FieldLabel>
+                    <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" />
+                  </div>
+                  <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
+                    <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
+                    <p className="text-[11px] text-[#464b52] leading-[16px]">
+                      {breakSummary(mp.meal2Trigger, mp.meal2TriggerEnd, mp.meal2Duration)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardShell>
+
+            {mp.breakType === "premium" && (
+              <CardShell title="Break Premium Violations" badge="LC § 226.7" badgeColor="red"
+                action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">Auto-calculate premium pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
+                <div className={`transition-opacity duration-200 ${mp.penaltiesEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                  <div className="px-[20px] pt-[16px] pb-[4px]">
+                    <div className="overflow-x-auto rounded-[6px] border border-[#e0e1e9]">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-[#f5f5f8]">
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79] w-[32px]" />
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79]">Violation</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79] w-[180px]">Pay Type</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[11px] font-semibold text-[#6a6e79] w-[130px]">Hours Rate</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(mp.violations ?? defaultViolations()).map((v, idx) => {
+                            const updateViolation = (patch: Partial<ViolationRule>) => {
+                              const next = (mp.violations ?? defaultViolations()).map((r, i) => i === idx ? { ...r, ...patch } : r);
+                              setMp("violations", next);
+                            };
+                            return (
+                              <tr key={v.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
+                                  <Toggle enabled={v.enabled} onChange={(val) => updateViolation({ enabled: val })} />
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                                  <span className="text-[12px] font-semibold text-[#252a2e]">{v.label}</span>
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                  <div className="pointer-events-auto">
+                                    <SelectField value={v.payType} onChange={(val) => updateViolation({ payType: val as PayType })}
+                                      options={[
+                                        { value: "regular", label: "Regular Rate" },
+                                        { value: "overtime", label: "Overtime Rate (1.5×)" },
+                                        { value: "double_time", label: "Double Time (2×)" },
+                                        { value: "flat", label: "Flat Dollar Amount" },
+                                      ]} />
+                                  </div>
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center">
+                                  <div className="flex justify-center pointer-events-auto">
+                                    <NumberInput value={v.hoursRate} onChange={(val) => updateViolation({ hoursRate: val })}
+                                      step={0.25} min={0} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-[32px] px-[20px] pt-[14px] pb-[16px] border-t border-[#f0f0f4] mt-[12px]">
+                    <div>
+                      <FieldLabel>Daily Stacking Cap</FieldLabel>
+                      <NumberInput value={mp.stackingCap} onChange={(v) => setMp("stackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
+                      <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total premium pay per workday across all violations</p>
+                    </div>
+                  </div>
+                </div>
+              </CardShell>
+            )}
+
+            <CardShell title="Custom Reminders & Notifications" badge="Breaks" badgeColor="blue"
+              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">{mp.freeMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.freeMealEnabled} onChange={(v) => setMp("freeMealEnabled", v)} /></div>}>
+              <div className={`transition-opacity duration-200 ${mp.freeMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                <div className="px-[20px] pt-[14px] pb-[2px]">
+                  <p className="text-[12px] text-[#464b52] leading-[18px]">
+                    Configure when employees are prompted during breaks, and customize the message they see.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-[24px] px-[20px] py-[14px]">
+                  <div>
+                    <SectionLabel>When to Notify</SectionLabel>
+                    <SelectField value={mp.freeMealTrigger} onChange={(v) => setMp("freeMealTrigger", v as FreeMealTrigger)}
+                      options={[
+                        { value: "always", label: "Every break" },
+                        { value: "before_threshold", label: "Before threshold by..." },
+                        { value: "exceeding", label: "Only for breaks exceeding..." },
+                      ]} />
+                    {mp.freeMealTrigger === "before_threshold" && (
+                      <div className="mt-[8px] flex flex-col gap-[6px]">
+                        <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" />
+                        <p className="text-[11px] text-[#6a6e79] leading-[15px]">
+                          Employee is notified {mp.freeMealBeforeMinutes} min before the break threshold is reached.
+                        </p>
+                      </div>
+                    )}
+                    {mp.freeMealTrigger === "exceeding" && (
+                      <div className="mt-[8px] flex items-center gap-[6px]">
+                        <span className="text-[12px] text-[#464b52]">Longer than:</span>
+                        <NumberInput value={mp.freeMealMinutes} onChange={(v) => setMp("freeMealMinutes", v)} step={5} min={1} suffix="min" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <SectionLabel>Notification Message</SectionLabel>
+                    <ModusWcTextarea aria-label="Notification message" value={mp.freeMealPrompt}
+                      onInputChange={(e) => setMp("freeMealPrompt", e.target.value)} rows={3} maxLength={200}
+                      placeholder="Enter the message employees will see during their break..." />
+                    <p className="mt-[4px] text-[11px] text-[#6a6e79]">{mp.freeMealPrompt.length}/200 characters</p>
+                  </div>
+                </div>
+              </div>
+            </CardShell>
+          </div>
+        )}
+
+        {/* ── On-Duty Meal ── */}
+        {activeTab === "onDuty" && (
+          <div className="flex flex-col gap-[24px]">
+            <ModusWcAlert variant="info"
+              alertTitle="Separate from standard breaks"
+              alertDescription="On-duty meal is configured separately from standard breaks to meet California Labor Code requirements."
+            />
+            <CardShell title="On-Duty Meal" badge="CA Labor Code § 512(e)" badgeColor="blue"
+              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">{mp.onDutyMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyMealEnabled", v)} /></div>}>
+              <div className={`transition-opacity duration-200 ${mp.onDutyMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                <div className="grid grid-cols-3 gap-[28px] px-[20px] py-[18px]">
+                  <div>
+                    <SectionLabel>Waiver Requirement</SectionLabel>
+                    <div className="flex items-start gap-[10px]">
+                      <Toggle enabled={mp.onDutyRequireAgreement} onChange={(v) => setMp("onDutyRequireAgreement", v)} />
+                      <span className="text-[12px] text-[#252a2e] leading-[20px]">
+                        Allowed only for employees assigned the waiver
+                      </span>
+                    </div>
+                    {mp.onDutyRequireAgreement && (
+                      <div className="mt-[10px] flex items-start gap-[8px] rounded-[6px] bg-[#eef5fa] px-[10px] py-[8px]">
+                        <Info size={13} className="mt-[1px] shrink-0 text-[#006fb0]" />
+                        <p className="text-[11px] text-[#464b52] leading-[16px]">
+                          Employee must be assigned the on-duty meal waiver before this meal type can be recorded.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <SectionLabel>When Taken Without Waiver</SectionLabel>
+                    <div className="flex flex-col gap-[4px]">
+                      {([
+                        { value: "flag", label: "Flag entry only" },
+                        { value: "pay_time_worked", label: "Pay as time worked" },
+                        { value: "flag_and_pay", label: "Flag & pay as time worked" },
+                      ] as { value: OnDutyMealAction; label: string }[]).map((opt) => (
+                        <SoftOption key={opt.value} selected={mp.onDutyNoAgreementAction === opt.value}
+                          onSelect={() => setMp("onDutyNoAgreementAction", opt.value)} title={opt.label} />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <SectionLabel>Effective Behavior</SectionLabel>
+                    <div className="rounded-[6px] bg-[#f1f1f6] px-[12px] py-[12px] flex flex-col gap-[8px]">
+                      <div className="flex items-start gap-[6px]">
+                        <Check size={12} className="mt-[2px] shrink-0 text-[#28a745]" />
+                        <span className="text-[11px] text-[#464b52] leading-[16px]">
+                          {mp.onDutyRequireAgreement ? "Waiver required to record on-duty meal" : "No waiver required"}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-[6px]">
+                        <AlertTriangle size={12} className="mt-[2px] shrink-0 text-[#856404]" />
+                        <span className="text-[11px] text-[#464b52] leading-[16px]">
+                          Without waiver:{" "}
+                          {mp.onDutyNoAgreementAction === "flag" && "entry flagged for review"}
+                          {mp.onDutyNoAgreementAction === "pay_time_worked" && "on-duty meal paid as time worked"}
+                          {mp.onDutyNoAgreementAction === "flag_and_pay" && "flagged and paid as time worked"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-[20px] pt-[16px] pb-[18px]" style={{ borderTop: "1px solid #e0e1e9" }}>
+                  <SectionLabel>Assigned Employees</SectionLabel>
+                  <div className="flex flex-wrap items-center justify-between gap-[12px] rounded-[6px] px-[12px] py-[10px]"
+                    style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
+                    <div className="flex items-center gap-[8px]">
+                      <Users size={14} style={{ color: "#6a6e79" }} />
+                      <span className="text-[12px] text-[#252a2e]">
+                        {onDutyMembers.length === 0
+                          ? "No employees assigned the waiver yet"
+                          : `${onDutyMembers.length} of ${ON_DUTY_ROSTER.length} employees assigned the waiver`}
+                      </span>
+                    </div>
+                    <ModusWcButton color="primary" variant="outlined" size="sm"
+                      onButtonClick={() => openEmployeeModal("all")}>
+                      <ModusWcIcon decorative name="manage_people" size="xs" />
+                      Manage employees
+                    </ModusWcButton>
+                  </div>
+                </div>
+              </div>
+            </CardShell>
+            {employeeModal && (
+              <OnDutyEmployeeModal selected={mp.onDutyEmployees} initialFilter={employeeModal}
+                onApply={(ids) => setMp("onDutyEmployees", ids)} onClose={() => setEmployeeModal(null)} />
+            )}
+          </div>
         )}
 
         {/* ── Kiosk Break ── */}
         {activeTab === "kiosk" && showKiosk && (
           <>
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px] mb-[14px]">
+            <p className="text-[12px] text-[#464b52] leading-[18px] mb-[14px]">
               Shift entries will have a break automatically added based on the minimum number of hours worked in a day that a break must be taken for, and the length of the required break.
             </p>
             <div className="flex items-end gap-[24px]">
@@ -542,377 +829,6 @@ function RuleSetForm({
               <NumberInput value={equipMaxHours ?? 10} onChange={onEquipMaxHours ?? (() => {})} step={1} min={0} suffix="hrs" />
             </div>
           </div>
-        )}
-
-        {/* ── Meal Periods ── */}
-        {activeTab === "meal" && (
-          <div className="flex flex-col gap-[24px]">
-            {/* Meal 1 */}
-            <CardShell title="First Meal Period" badge="Meal 1" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.meal1Enabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.meal1Enabled} onChange={(v) => setMp("meal1Enabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.meal1Enabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
-                  {/* Trigger */}
-                  <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
-                    <SectionLabel>Meal Trigger</SectionLabel>
-                    <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[12px] leading-[15px]">Choose when this meal period is required during a shift.</p>
-                    <div className="flex flex-col gap-[4px]">
-                      <SoftOption
-                        selected={mp.meal1Schedule === "relative"}
-                        onSelect={() => setMp("meal1Schedule", "relative")}
-                        title="Relative to shift start"
-                        description="Set the window the meal must fall within, measured from shift start"
-                      >
-                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
-                          <div>
-                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
-                            <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
-                            <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
-                          </div>
-                        </div>
-                      </SoftOption>
-                      <SoftOption
-                        selected={mp.meal1Schedule === "fixed"}
-                        onSelect={() => setMp("meal1Schedule", "fixed")}
-                        title="Fixed schedule window"
-                        description="Meal can be taken any time within a set clock-time window each day"
-                      >
-                        <MealWindowFields
-                          start={mp.meal1WindowStart}
-                          end={mp.meal1WindowEnd}
-                          onStart={(v) => setMp("meal1WindowStart", v)}
-                          onEnd={(v) => setMp("meal1WindowEnd", v)}
-                          duration={mp.meal1Duration}
-                        />
-                      </SoftOption>
-                    </div>
-                  </div>
-                  {/* Settings */}
-                  <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
-                    <div>
-                      <SectionLabel>Meal Duration</SectionLabel>
-                      <FieldLabel>Minimum required length</FieldLabel>
-                      <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" />
-                    </div>
-                    {/* Summary pill */}
-                    <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
-                      <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
-                      <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                        {mp.meal1Schedule === "relative"
-                          ? `Meal required between ${mp.meal1Trigger} and ${mp.meal1TriggerEnd} hrs worked · min ${mp.meal1Duration} min`
-                          : `Meal window ${formatClock(mp.meal1WindowStart)} – ${formatClock(mp.meal1WindowEnd)} · min ${mp.meal1Duration} min`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardShell>
-
-            {/* Meal 2 */}
-            <CardShell title="Second Meal Period" badge="Meal 2" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.meal2Enabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.meal2Enabled} onChange={(v) => setMp("meal2Enabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.meal2Enabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-2 gap-0">
-                  {/* Trigger */}
-                  <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
-                    <SectionLabel>Meal Trigger</SectionLabel>
-                    <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mb-[12px] leading-[15px]">Choose when this meal period is required during a shift.</p>
-                    <div className="flex flex-col gap-[4px]">
-                      <SoftOption
-                        selected={mp.meal2Schedule === "relative"}
-                        onSelect={() => setMp("meal2Schedule", "relative")}
-                        title="Relative to shift start"
-                        description="Set the window the meal must fall within, measured from shift start"
-                      >
-                        <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
-                          <div>
-                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must begin after</p>
-                            <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] mb-[4px]">Meal must end after</p>
-                            <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
-                          </div>
-                        </div>
-                      </SoftOption>
-                      <SoftOption
-                        selected={mp.meal2Schedule === "fixed"}
-                        onSelect={() => setMp("meal2Schedule", "fixed")}
-                        title="Fixed schedule window"
-                        description="Meal can be taken any time within a set clock-time window each day"
-                      >
-                        <MealWindowFields
-                          start={mp.meal2WindowStart}
-                          end={mp.meal2WindowEnd}
-                          onStart={(v) => setMp("meal2WindowStart", v)}
-                          onEnd={(v) => setMp("meal2WindowEnd", v)}
-                          duration={mp.meal2Duration}
-                        />
-                      </SoftOption>
-                    </div>
-                  </div>
-                  {/* Settings */}
-                  <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
-                    <div>
-                      <SectionLabel>Meal Duration</SectionLabel>
-                      <FieldLabel>Minimum required length</FieldLabel>
-                      <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" />
-                    </div>
-                    <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
-                      <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
-                      <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                        {mp.meal2Schedule === "relative"
-                          ? `Meal required between ${mp.meal2Trigger} and ${mp.meal2TriggerEnd} hrs worked · min ${mp.meal2Duration} min`
-                          : `Meal window ${formatClock(mp.meal2WindowStart)} – ${formatClock(mp.meal2WindowEnd)} · min ${mp.meal2Duration} min`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardShell>
-
-            {/* On-Duty Meal */}
-            <CardShell title="On-Duty Meal" badge="CA Labor Code § 512(e)" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.onDutyMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyMealEnabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.onDutyMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                <div className="grid grid-cols-3 gap-[28px] px-[20px] py-[18px]">
-                  {/* Agreement requirement */}
-                  <div>
-                    <SectionLabel>Waiver Requirement</SectionLabel>
-                    <div className="flex items-start gap-[10px]">
-                      <Toggle enabled={mp.onDutyRequireAgreement} onChange={(v) => setMp("onDutyRequireAgreement", v)} />
-                      <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e] leading-[20px]">
-                        Allowed only for employees assigned the waiver
-                      </span>
-                    </div>
-                    {mp.onDutyRequireAgreement && (
-                      <div className="mt-[10px] flex items-start gap-[8px] rounded-[6px] bg-[#eef5fa] px-[10px] py-[8px]">
-                        <Info size={13} className="mt-[1px] shrink-0 text-[#006fb0]" />
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          Employee must be assigned the on-duty meal waiver before this meal type can be recorded.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* When no agreement */}
-                  <div>
-                    <SectionLabel>When Taken Without Waiver</SectionLabel>
-                    <div className="flex flex-col gap-[4px]">
-                      {([
-                        { value: "flag",          label: "Flag entry only" },
-                        { value: "pay_time_worked", label: "Pay as time worked" },
-                        { value: "flag_and_pay",  label: "Flag & pay as time worked" },
-                      ] as { value: OnDutyMealAction; label: string }[]).map((opt) => (
-                        <SoftOption
-                          key={opt.value}
-                          selected={mp.onDutyNoAgreementAction === opt.value}
-                          onSelect={() => setMp("onDutyNoAgreementAction", opt.value)}
-                          title={opt.label}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div>
-                    <SectionLabel>Effective Behavior</SectionLabel>
-                    <div className="rounded-[6px] bg-[#f1f1f6] px-[12px] py-[12px] flex flex-col gap-[8px]">
-                      <div className="flex items-start gap-[6px]">
-                        <Check size={12} className="mt-[2px] shrink-0 text-[#28a745]" />
-                        <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          {mp.onDutyRequireAgreement ? "Waiver required to record on-duty meal" : "No waiver required"}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-[6px]">
-                        <AlertTriangle size={12} className="mt-[2px] shrink-0 text-[#856404]" />
-                        <span className="text-[11px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[16px]">
-                          Without waiver:{" "}
-                          {mp.onDutyNoAgreementAction === "flag" && "entry flagged for review"}
-                          {mp.onDutyNoAgreementAction === "pay_time_worked" && "meal paid as time worked"}
-                          {mp.onDutyNoAgreementAction === "flag_and_pay" && "flagged and paid as time worked"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Applies to */}
-                <div className="px-[20px] pt-[16px] pb-[18px]" style={{ borderTop: "1px solid #e0e1e9" }}>
-                  <SectionLabel>Assigned Employees</SectionLabel>
-                  <div className="flex flex-wrap items-center justify-between gap-[12px] rounded-[6px] px-[12px] py-[10px]"
-                    style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
-                    <div className="flex items-center gap-[8px]">
-                      <Users size={14} style={{ color: "#6a6e79" }} />
-                      <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#252a2e]">
-                        {onDutyMembers.length === 0
-                          ? "No employees assigned the waiver yet"
-                          : `${onDutyMembers.length} of ${ON_DUTY_ROSTER.length} employees assigned the waiver`}
-                      </span>
-                    </div>
-                    <ModusWcButton color="primary" variant="outlined" size="sm"
-                      onButtonClick={() => openEmployeeModal("all")}>
-                      <ModusWcIcon decorative name="manage_people" size="xs" />
-                      Manage employees
-                    </ModusWcButton>
-                  </div>
-                </div>
-              </div>
-            </CardShell>
-
-            {employeeModal && (
-              <OnDutyEmployeeModal
-                selected={mp.onDutyEmployees}
-                initialFilter={employeeModal}
-                onApply={(ids) => setMp("onDutyEmployees", ids)}
-                onClose={() => setEmployeeModal(null)}
-              />
-            )}
-
-            {/* Free Meal */}
-            <CardShell title="Custom Reminders & Notifications" badge="Meal Breaks" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">{mp.freeMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.freeMealEnabled} onChange={(v) => setMp("freeMealEnabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.freeMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                {/* Description */}
-                <div className="px-[20px] pt-[14px] pb-[2px]">
-                  <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px]">
-                    Configure when employees are prompted with a notification during meal breaks, and customize the message they see.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-[24px] px-[20px] py-[14px]">
-                  {/* When to notify */}
-                  <div>
-                    <SectionLabel>When to Notify</SectionLabel>
-                    <SelectField value={mp.freeMealTrigger} onChange={(v) => setMp("freeMealTrigger", v as FreeMealTrigger)}
-                      options={[
-                        { value: "always",           label: "Every meal break" },
-                        { value: "before_threshold", label: "Before threshold by..." },
-                        { value: "exceeding",        label: "Only for breaks exceeding..." },
-                      ]} />
-                    {mp.freeMealTrigger === "before_threshold" && (
-                      <div className="mt-[8px] flex flex-col gap-[6px]">
-                        <div className="flex items-center gap-[6px]">
-                          <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" />
-                        </div>
-                        <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] leading-[15px]">
-                          Employee is notified {mp.freeMealBeforeMinutes} min before the meal threshold is reached.
-                        </p>
-                      </div>
-                    )}
-                    {mp.freeMealTrigger === "exceeding" && (
-                      <div className="mt-[8px] flex items-center gap-[6px]">
-                        <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">Longer than:</span>
-                        <NumberInput value={mp.freeMealMinutes} onChange={(v) => setMp("freeMealMinutes", v)} step={5} min={1} suffix="min" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Message */}
-                  <div className="col-span-2">
-                    <SectionLabel>Notification Message</SectionLabel>
-                    <ModusWcTextarea
-                      aria-label="Notification message"
-                      value={mp.freeMealPrompt}
-                      onInputChange={(e) => setMp("freeMealPrompt", e.target.value)}
-                      rows={3}
-                      maxLength={200}
-                      placeholder="Enter the message employees will see during their meal break..."
-                    />
-                    <p className="mt-[4px] text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
-                      {mp.freeMealPrompt.length}/200 characters
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            </CardShell>
-          </div>
-        )}
-
-        {/* ── Premiums ── */}
-        {activeTab === "penalties" && (
-          <CardShell title="Premium Engine" badge="LC § 226.7" badgeColor="red"
-            action={<div className="flex items-center gap-[8px]"><span className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">Auto-calculate Meal Penalty Premium Pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
-            <div className={`transition-opacity duration-200 ${mp.penaltiesEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-
-              {/* Per-violation table */}
-              <div className="px-[20px] pt-[16px] pb-[4px]">
-                <div className="overflow-x-auto rounded-[6px] border border-[#e0e1e9]">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-[#f5f5f8]">
-                        <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#6a6e79] w-[32px]" />
-                        <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#6a6e79]">Violation</th>
-                        <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#6a6e79] w-[180px]">Pay Type</th>
-                        <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[11px] font-semibold font-['Open_Sans',sans-serif] text-[#6a6e79] w-[130px]">Hours Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(mp.violations ?? defaultViolations()).map((v, idx) => {
-                        const updateViolation = (patch: Partial<ViolationRule>) => {
-                          const next = (mp.violations ?? defaultViolations()).map((r, i) => i === idx ? { ...r, ...patch } : r);
-                          setMp("violations", next);
-                        };
-                        return (
-                          <tr key={v.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}>
-                            {/* Enable toggle */}
-                            <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
-                              <Toggle enabled={v.enabled} onChange={(val) => updateViolation({ enabled: val })} />
-                            </td>
-                            {/* Label */}
-                            <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
-                              <span className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e]">{v.label}</span>
-                            </td>
-                            {/* Pay Type */}
-                            <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
-                              <div className="pointer-events-auto">
-                                <SelectField
-                                  value={v.payType}
-                                  onChange={(val) => updateViolation({ payType: val as PayType })}
-                                  options={[
-                                    { value: "regular",     label: "Regular Rate" },
-                                    { value: "overtime",    label: "Overtime Rate (1.5×)" },
-                                    { value: "double_time", label: "Double Time (2×)" },
-                                    { value: "flat",        label: "Flat Dollar Amount" },
-                                  ]}
-                                />
-                              </div>
-                            </td>
-                            {/* Hours Rate */}
-                            <td className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center">
-                              <div className="flex justify-center pointer-events-auto">
-                                <NumberInput
-                                  value={v.hoursRate}
-                                  onChange={(val) => updateViolation({ hoursRate: val })}
-                                  step={0.25}
-                                  min={0}
-                                  suffix={v.payType === "flat" ? "$" : "hr(s)"}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Global stacking cap */}
-              <div className="flex items-end gap-[32px] px-[20px] pt-[14px] pb-[16px] border-t border-[#f0f0f4] mt-[12px]">
-                <div>
-                  <FieldLabel>Daily Stacking Cap</FieldLabel>
-                  <NumberInput value={mp.stackingCap} onChange={(v) => setMp("stackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
-                  <p className="mt-[4px] text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79]">Max total penalty pay per workday across all violations</p>
-                </div>
-              </div>
-
-            </div>
-          </CardShell>
         )}
 
       </div>
@@ -939,7 +855,7 @@ function PrecedenceSection() {
   return (
     <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e0e1e9", background: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
       <div style={{ background: "#0e416c", padding: "10px 20px" }}>
-        <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#ffffff" }}>
+        <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#ffffff" }}>
           Hour Rule Precedence
         </h2>
       </div>
@@ -955,7 +871,7 @@ function PrecedenceSection() {
           padding: "10px 12px",
         }}>
           <Info size={14} style={{ marginTop: 1, flexShrink: 0, color: "#006fb0" }} />
-          <p style={{ margin: 0, fontSize: 12, fontFamily: "Open Sans, sans-serif", color: "#0e416c", lineHeight: "18px" }}>
+          <p style={{ margin: 0, fontSize: 12, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#0e416c", lineHeight: "18px" }}>
             Drag to arrange the order the rules are looked at, from top to bottom. The most generous rule will be taken when compared with State and Union rules.
           </p>
         </div>
@@ -998,11 +914,11 @@ function PrecedenceSection() {
                   color: "#ffffff",
                   fontSize: 10,
                   fontWeight: 700,
-                  fontFamily: "Open Sans, sans-serif",
+                  fontFamily: "var(--modus-wc-font-family), sans-serif",
                 }}>
                   {idx + 1}
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "Open Sans, sans-serif", color: "#252a2e" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#252a2e" }}>
                   {label}
                 </span>
               </div>
@@ -1138,7 +1054,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
         <SectionBody>
           {/* Selector bar */}
           <div className="flex items-center gap-[10px] px-[20px] py-[14px] border-b border-[#f0f0f4]">
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] shrink-0">
+            <p className="text-[12px] text-[#464b52] shrink-0">
               You may specify different rules for each individual State.
             </p>
             <div className="flex-1 max-w-[220px]">
@@ -1154,7 +1070,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
             </div>
             {selectedState && !hasStateRules && (
               <button onClick={addStateRules}
-                className="flex items-center gap-[5px] rounded-[4px] bg-[#006fb0] px-[12px] py-[5px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-white hover:bg-[#005a8e] transition-colors">
+                className="flex items-center gap-[5px] rounded-[4px] bg-[#006fb0] px-[12px] py-[5px] text-[11px] font-semibold text-white hover:bg-[#005a8e] transition-colors">
                 <Plus size={12} /> Add Rules
               </button>
             )}
@@ -1173,7 +1089,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
                 const label = STATE_OPTIONS.find((s) => s.value === code)?.label ?? code;
                 return (
                   <button key={code} onClick={() => setSelectedState(code)}
-                    className={`rounded-full px-[10px] py-[2px] text-[11px] font-semibold font-['Open_Sans',sans-serif] transition-colors ${selectedState === code ? "bg-[#006fb0] text-white" : "bg-[#dcedf9] text-[#006fb0] hover:bg-[#b8d9f0]"}`}>
+                    className={`rounded-full px-[10px] py-[2px] text-[11px] font-semibold transition-colors ${selectedState === code ? "bg-[#006fb0] text-white" : "bg-[#dcedf9] text-[#006fb0] hover:bg-[#b8d9f0]"}`}>
                     {label}
                   </button>
                 );
@@ -1192,7 +1108,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
             />
           ) : (
             <div className="px-[20px] py-[20px] text-center">
-              <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
+              <p className="text-[12px] text-[#6a6e79]">
                 {selectedState
                   ? `No custom rules configured for ${STATE_OPTIONS.find((s) => s.value === selectedState)?.label}. Click "Add Rules" to create state-specific overrides.`
                   : "Select a state above to view or configure state-specific hour rules."}
@@ -1208,7 +1124,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
         <SectionBody>
           {/* Selector bar */}
           <div className="flex items-center gap-[10px] px-[20px] py-[14px] border-b border-[#f0f0f4]">
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] shrink-0">
+            <p className="text-[12px] text-[#464b52] shrink-0">
               You may specify different rules for each individual union.
             </p>
             <div className="flex-1 max-w-[220px]">
@@ -1224,7 +1140,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
             </div>
             {selectedUnion && !hasUnionRules && (
               <button onClick={addUnionRules}
-                className="flex items-center gap-[5px] rounded-[4px] bg-[#006fb0] px-[12px] py-[5px] text-[11px] font-semibold font-['Open_Sans',sans-serif] text-white hover:bg-[#005a8e] transition-colors">
+                className="flex items-center gap-[5px] rounded-[4px] bg-[#006fb0] px-[12px] py-[5px] text-[11px] font-semibold text-white hover:bg-[#005a8e] transition-colors">
                 <Plus size={12} /> Add Rules
               </button>
             )}
@@ -1243,7 +1159,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
                 const label = UNION_OPTIONS.find((u) => u.value === code)?.label ?? code;
                 return (
                   <button key={code} onClick={() => setSelectedUnion(code)}
-                    className={`rounded-full px-[10px] py-[2px] text-[11px] font-semibold font-['Open_Sans',sans-serif] transition-colors ${selectedUnion === code ? "bg-[#006fb0] text-white" : "bg-[#dcedf9] text-[#006fb0] hover:bg-[#b8d9f0]"}`}>
+                    className={`rounded-full px-[10px] py-[2px] text-[11px] font-semibold transition-colors ${selectedUnion === code ? "bg-[#006fb0] text-white" : "bg-[#dcedf9] text-[#006fb0] hover:bg-[#b8d9f0]"}`}>
                     {label}
                   </button>
                 );
@@ -1262,7 +1178,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
             />
           ) : (
             <div className="px-[20px] py-[20px] text-center">
-              <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">
+              <p className="text-[12px] text-[#6a6e79]">
                 {selectedUnion
                   ? `No custom rules configured for ${UNION_OPTIONS.find((u) => u.value === selectedUnion)?.label}. Click "Add Rules" to create union-specific overrides.`
                   : "Select a union above to view or configure union-specific hour rules."}
@@ -1347,7 +1263,7 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={onClose}>
       <div className="relative w-[440px] rounded-[8px] bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[14px]">
-          <span className="text-[14px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">{title}</span>
+          <span className="text-[14px] font-bold text-[#252a2e]">{title}</span>
           <button onClick={onClose} className="text-[#6a6e79] hover:text-[#252a2e] transition-colors"><X size={18} /></button>
         </div>
         <div className="flex flex-col gap-[14px] px-[20px] py-[16px]">
@@ -1386,7 +1302,7 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
               />
             </>
           )}
-          <p className="text-[11px] font-['Open_Sans',sans-serif] leading-[16px]"
+          <p className="text-[11px] leading-[16px]"
             style={{ color: duplicate ? "#b45309" : "#6a6e79" }}>
             {duplicate ? "This is already on the exclusion list." : hint}
           </p>
@@ -1413,7 +1329,7 @@ function ExclusionSection({ title, description, items, onDelete, onAdd }: {
       <SectionBody>
         <div className="px-[20px] py-[14px]">
           <div className="flex items-center justify-between mb-[10px]">
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#464b52] leading-[18px]">{description}</p>
+            <p className="text-[12px] text-[#464b52] leading-[18px]">{description}</p>
             <div className="ml-[16px] shrink-0">
               <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={onAdd}>
                 <ModusWcIcon decorative name="add" size="xs" />
@@ -1422,14 +1338,14 @@ function ExclusionSection({ title, description, items, onDelete, onAdd }: {
             </div>
           </div>
           {items.length === 0 ? (
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79] italic">No excluded items configured.</p>
+            <p className="text-[12px] text-[#6a6e79] italic">No excluded items configured.</p>
           ) : (
             <div className="flex flex-col divide-y divide-[#f0f0f4]">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-[8px]">
                   <div>
-                    <span className="text-[12px] font-semibold font-['Open_Sans',sans-serif] text-[#252a2e]">{item.label}</span>
-                    {item.subLabel && <span className="ml-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">— {item.subLabel}</span>}
+                    <span className="text-[12px] font-semibold text-[#252a2e]">{item.label}</span>
+                    {item.subLabel && <span className="ml-[6px] text-[12px] text-[#6a6e79]">— {item.subLabel}</span>}
                   </div>
                   <button onClick={() => onDelete(item.id)} aria-label={`Remove ${item.label}`}
                     className="flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-[#6a6e79] hover:bg-[#fbdde2] hover:text-[#ab1f26] transition-colors">
@@ -1516,6 +1432,7 @@ const ON_DUTY_ROSTER: OnDutyEmployee[] = [
 ];
 
 type MealPenaltyState = {
+  breakType: BreakType;
   meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
   meal1WindowStart: string; meal1WindowEnd: string;
   meal2Enabled: boolean; meal2Trigger: number; meal2TriggerEnd: number; meal2Duration: number; meal2Schedule: ScheduleType;
@@ -1541,9 +1458,9 @@ type ViolationRule = {
 };
 
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed", label: "Missed meal break entirely", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "short",  label: "Short meal break (< 30 mins)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "late",   label: "Late meal break (past trigger hour)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed", label: "Missed break entirely", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "short",  label: "Short break (< 30 mins)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "late",   label: "Late break (past trigger hour)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
 // A window ending earlier than it starts is read as running past midnight.
@@ -1571,7 +1488,7 @@ const MealWindowFields = ({ start, end, onStart, onEnd, duration }: {
           value={start}
           onInputChange={(e) => onStart(e.target.value)}
         />
-        <span className="text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79] pb-[9px]">to</span>
+        <span className="text-[12px] text-[#6a6e79] pb-[9px]">to</span>
         <ModusWcTimeInput
           label="Window closes"
           size="sm"
@@ -1579,7 +1496,7 @@ const MealWindowFields = ({ start, end, onStart, onEnd, duration }: {
           onInputChange={(e) => onEnd(e.target.value)}
         />
       </div>
-      <p className="text-[11px] font-['Open_Sans',sans-serif] leading-[16px] mt-[8px]"
+      <p className="text-[11px] leading-[16px] mt-[8px]"
         style={{ color: tooShort ? "#b45309" : "#6a6e79" }}>
         {span === null
           ? "Enter a start and end time for the window."
@@ -1601,6 +1518,7 @@ const formatClock = (hhmm: string) => {
 };
 
 const defaultMealPenalty = (): MealPenaltyState => ({
+  breakType: "flagged",
   meal1Enabled: true, meal1Trigger: 5, meal1TriggerEnd: 6, meal1Duration: 30, meal1Schedule: "relative", meal1WindowStart: "12:00", meal1WindowEnd: "13:00",
   meal2Enabled: true, meal2Trigger: 10, meal2TriggerEnd: 11, meal2Duration: 30, meal2Schedule: "relative", meal2WindowStart: "17:00", meal2WindowEnd: "18:00",
   freeMealEnabled: true, freeMealTrigger: "always", freeMealMinutes: 30, freeMealBeforeMinutes: 10,
@@ -1635,7 +1553,7 @@ function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", act
           background: "#ffffff",
         }}
       >
-        <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#0e416c" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#0e416c" }}>
           {title}
         </span>
         {action}
@@ -1688,12 +1606,12 @@ function SoftOption({
         >
           {selected && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#006fb0" }} />}
         </div>
-        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "Open Sans, sans-serif", color: "#252a2e" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#252a2e" }}>
           {title}
         </span>
       </div>
       {description && (
-        <p style={{ margin: "0 0 8px 22px", fontSize: 11, fontFamily: "Open Sans, sans-serif", color: "#6a6e79", lineHeight: "15px" }}>
+        <p style={{ margin: "0 0 8px 22px", fontSize: 11, fontFamily: "var(--modus-wc-font-family), sans-serif", color: "#6a6e79", lineHeight: "15px" }}>
           {description}
         </p>
       )}
@@ -1709,17 +1627,17 @@ function PresetDialog({ open, onClose, onConfirm }: { open: boolean; onClose: ()
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div className="relative w-[440px] rounded-[8px] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[14px]">
-          <span className="text-[14px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">Load Statutory Presets</span>
+          <span className="text-[14px] font-bold text-[#252a2e]">Load Statutory Presets</span>
           <button onClick={onClose} className="text-[#6a6e79] hover:text-[#252a2e] transition-colors"><X size={18} /></button>
         </div>
         <div className="px-[20px] py-[16px]">
           <div className="mb-[16px] flex gap-[10px] rounded-[4px] border border-[#fbad26] bg-[#fffbf0] p-[12px]">
             <AlertTriangle size={16} className="mt-[1px] shrink-0 text-[#856404]" />
-            <p className="text-[12px] font-['Open_Sans',sans-serif] text-[#5a4a00] leading-[18px]">This action will overwrite all existing unsaved configurations with California baseline statutory values.</p>
+            <p className="text-[12px] text-[#5a4a00] leading-[18px]">This action will overwrite all existing unsaved configurations with California baseline statutory values.</p>
           </div>
           <ul className="flex flex-col gap-[4px]">
             {["5-hour meal trigger for Meal 1", "30-minute meal duration", "10-hour trigger for Meal 2", "LC § 226.7 premium pay penalty defaults", "Company → Union → State rule precedence"].map((item) => (
-              <li key={item} className="flex items-center gap-[6px] text-[12px] font-['Open_Sans',sans-serif] text-[#464b52]">
+              <li key={item} className="flex items-center gap-[6px] text-[12px] text-[#464b52]">
                 <Check size={12} className="text-[#006fb0] shrink-0" />{item}
               </li>
             ))}
@@ -1749,8 +1667,8 @@ function JurisdictionSettings() {
       <div className="bg-[#f1f1f6] px-[24px] pt-[16px]">
         <div className="flex items-start justify-between mb-[12px]">
           <div>
-            <h1 className="text-[22px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e] leading-[32px]">Timesheet Hour Rules</h1>
-            <p className="text-[11px] font-['Open_Sans',sans-serif] text-[#6a6e79] mt-[1px]">Configure hour rules, meal periods, break policies, and premiums by jurisdiction</p>
+            <h1 className="text-[22px] font-bold text-[#252a2e] leading-[32px]">Timesheet Hour Rules</h1>
+            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure hour rules, meal periods, break policies, and premiums by jurisdiction</p>
           </div>
           <div className="flex items-center gap-[8px] mt-[4px]">
             <ModusWcBadge color="success" size="sm" variant="filled">
@@ -1906,7 +1824,7 @@ const STATE_STYLE: Record<BreakState, { label: string; color: string; bg: string
 // An employee who has not clocked a break is who a foreman can still act on.
 const hasNotStartedBreak = (e: BreakEmployee) => e.state === "upcoming" || e.state === "missed";
 
-const OS = "Open Sans, sans-serif";
+const OS = "var(--modus-wc-font-family), sans-serif";
 const OS_FVS: CSSProperties = { fontVariationSettings: '"wdth" 100' };
 
 function StatusPill({ label, color, bg, borderColor }: { label: string; color: string; bg: string; borderColor: string }) {
@@ -2167,7 +2085,7 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
     <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 200, background: "rgba(0,0,0,0.45)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-label="On-duty meal employees"
-        className="bg-white rounded-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.18)] flex flex-col font-['Open_Sans',sans-serif]"
+        className="bg-white rounded-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.18)] flex flex-col"
         style={{ width: 820, maxHeight: "88vh", overflow: "hidden" }}>
         {/* Header */}
         <div className="flex items-start justify-between px-[24px] py-[18px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
@@ -4671,9 +4589,9 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       </button>
       <div className="flex items-center gap-[7px] mr-[16px]">
         <div className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[4px] bg-[#0d3560]">
-          <span className="text-[11px] font-black text-white font-['Open_Sans',sans-serif]">T</span>
+          <span className="text-[11px] font-black text-white">T</span>
         </div>
-        <span className="text-[14px] font-bold text-[#0d3560] font-['Open_Sans',sans-serif] whitespace-nowrap">Traqspera</span>
+        <span className="text-[14px] font-bold text-[#0d3560] whitespace-nowrap">Traqspera</span>
       </div>
       {/* Center: tenant selector */}
       <ModusWcSelect
@@ -4709,7 +4627,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         <button className="flex h-[32px] w-[32px] items-center justify-center rounded-full text-[#6a6e79] hover:text-[#252a2e] hover:bg-[#f1f1f6] transition-colors">
           <HelpCircle size={15} />
         </button>
-        <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[#252a2e] text-white text-[11px] font-bold font-['Open_Sans',sans-serif] cursor-pointer">
+        <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[#252a2e] text-white text-[11px] font-bold cursor-pointer">
           JD
         </div>
       </div>
@@ -4778,7 +4696,7 @@ function NavSidebar({ activePage, onNavigate, collapsed, onToggleCollapse }: {
                 </span>
                 {!collapsed && (
                   <>
-                    <span className="flex-1 text-left text-[13px] font-semibold text-white font-['Open_Sans',sans-serif] whitespace-nowrap">
+                    <span className="flex-1 text-left text-[13px] font-semibold text-white whitespace-nowrap">
                       {section.label}
                     </span>
                     {hasChildren
@@ -4807,7 +4725,7 @@ function NavSidebar({ activePage, onNavigate, collapsed, onToggleCollapse }: {
                           background: active ? "rgba(255,255,255,0.10)" : "transparent",
                           borderLeft: active ? "3px solid #4da6e8" : "3px solid transparent",
                         }}>
-                        <span className="text-[12px] font-['Open_Sans',sans-serif]"
+                        <span className="text-[12px]"
                           style={{ color: active ? "#fff" : "rgba(255,255,255,0.68)", fontWeight: active ? 600 : 400 }}>
                           {child.label}
                         </span>
@@ -4872,7 +4790,7 @@ function SettingsSubNav({ activePage, onNavigate, navW }: {
                   borderLeft: active ? "4px solid #0d3560" : "4px solid transparent",
                 }}>
                 <span style={{ color: active ? "#0063a3" : "#464b52" }} className="shrink-0 mt-[1px]">{item.icon}</span>
-                <span className="text-[14px] leading-[19px] font-['Open_Sans',sans-serif]"
+                <span className="text-[14px] leading-[19px]"
                   style={{ color: active ? "#0063a3" : "#252a2e", fontWeight: active ? 600 : 400 }}>
                   {item.label}
                 </span>
@@ -4893,8 +4811,8 @@ function PlaceholderPage({ title }: { title: string }) {
         <div className="mx-auto mb-[12px] flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#e0e1e9]">
           <FileText size={22} className="text-[#6a6e79]" />
         </div>
-        <p className="text-[16px] font-bold font-['Open_Sans',sans-serif] text-[#252a2e]">{title}</p>
-        <p className="mt-[4px] text-[12px] font-['Open_Sans',sans-serif] text-[#6a6e79]">This page is under construction.</p>
+        <p className="text-[16px] font-bold text-[#252a2e]">{title}</p>
+        <p className="mt-[4px] text-[12px] text-[#6a6e79]">This page is under construction.</p>
       </div>
     </div>
   );
@@ -4910,7 +4828,7 @@ export default function App() {
   const contentLeft = navW + (inSettings ? SETTINGS_NAV_W + 16 : 0);
 
   return (
-    <div className="min-h-screen bg-[#f1f1f6]">
+    <div className="min-h-screen font-sans bg-[var(--modus-wc-color-base-page,#f1f1f6)]">
       <Toaster position="top-right" richColors />
       <TopBar onMenuClick={() => setNavCollapsed((v) => !v)} />
       <NavSidebar

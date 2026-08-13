@@ -1,5 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
 @import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--modus-wc-font-family), sans-serif;
+  --text-2xs: var(--modus-wc-font-size-2xs);
+  --text-xs: var(--modus-wc-font-size-xs);
+  --text-sm: var(--modus-wc-font-size-sm);
+  --text-base: var(--modus-wc-font-size-md);
+  --text-lg: var(--modus-wc-font-size-lg);
+  --text-xl: var(--modus-wc-font-size-xl);
+  --text-2xl: var(--modus-wc-font-size-2xl);
+  --text-3xl: var(--modus-wc-font-size-3xl);
+  --text-4xl: var(--modus-wc-font-size-4xl);
+  --font-weight-light: var(--modus-wc-font-weight-light);
+  --font-weight-normal: var(--modus-wc-font-weight-normal);
+  --font-weight-semibold: var(--modus-wc-font-weight-semibold);
+  --font-weight-bold: var(--modus-wc-font-weight-bold);
+}
 
 html,
 body,
@@ -7,11 +23,19 @@ body,
   min-height: 100%;
 }
 
+html {
+  font-family: var(--modus-wc-font-family), sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   margin: 0;
-  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  background: #f1f1f6;
+  font-family: inherit;
+  font-weight: var(--modus-wc-font-weight-normal);
+  color: var(--modus-wc-color-base-content);
+  background: var(--modus-wc-color-base-page, #f1f1f6);
 }
 
 * {
@@ -25,9 +49,8 @@ textarea {
   font-family: inherit;
 }
 
-/* Keep Traqspera chrome readable alongside Modus global styles */
 .traqspera-shell {
-  font-family: "Open Sans", sans-serif;
+  font-family: inherit;
 }
 
 /*
