@@ -1458,9 +1458,10 @@ type ViolationRule = {
 };
 
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed", label: "Missed break entirely", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "short",  label: "Short break (< 30 mins)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "late",   label: "Late break (past trigger hour)", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_break_attestation", label: "Missed break (coffee breaks not clocked out for) - Through Attestation", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_meal", label: "Missed Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "late_meal", label: "Late Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "short_meal", label: "Short Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
 // A window ending earlier than it starts is read as running past midnight.
