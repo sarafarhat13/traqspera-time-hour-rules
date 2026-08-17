@@ -22,7 +22,7 @@ import {
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
   AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils,
-  MapPin, LoaderCircle,
+  MapPin, LoaderCircle, Calendar,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -2488,6 +2488,249 @@ const CLOCK_MOCK_ENTRIES = [
   { date: "Mon, Jul 28", jobNum: "740-EC2", start: "6:55 AM", end: "3:40 PM", dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt", payRule: "5b", reg: 8, ot: 0.75, ot2: 0, qty: 0, travel: 1.00, perDiem: 0 },
 ];
 
+type ClockTimesheetEntry = (typeof CLOCK_MOCK_ENTRIES)[number];
+
+type TimesheetPunchPin = {
+  site: JobSite;
+  fix: GeoFix;
+  title: string;
+  flagged?: boolean;
+};
+
+type TimesheetBreakMealRow = {
+  start: string;
+  end: string | null;
+  startLoc?: TimesheetPunchPin;
+  endLoc?: TimesheetPunchPin;
+};
+
+const MOBILE_CARD: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: 12,
+  border: "1px solid #e0e1e9",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+};
+
+const fmtTsHours = (n: number) => (n > 0 ? n.toFixed(2) : "—");
+const fmtTsQty = (n: number) => (n > 0 ? String(n) : "—");
+const fmtTsPerDiem = (n: number) => (n > 0 ? `$${n}` : "—");
+
+function TimesheetMobileKvRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+      <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>{label}</p>
+      <p style={{
+        fontSize: 12, fontWeight: 600, color: valueColor ?? "#252a2e", fontFamily: OS, ...OS_FVS,
+        textAlign: "right", overflow: "hidden", textOverflow: "ellipsis",
+      }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TimesheetMobileEntryCard({
+  entry,
+  onOpenMap,
+}: {
+  entry: EnrichedTimesheetEntry;
+  onOpenMap: (pin: TimesheetPunchPin) => void;
+}) {
+  const isBreak = entry.phase === "Break";
+  return (
+    <div style={{
+      ...MOBILE_CARD,
+      overflow: "hidden",
+      borderColor: isBreak ? "#fde68a" : "#e0e1e9",
+      background: isBreak ? "#fffbeb" : "#ffffff",
+    }}>
+      <div className="flex items-center gap-[8px]" style={{ padding: "10px 14px", borderBottom: `1px solid ${isBreak ? "#fde68a" : "#eef0f3"}` }}>
+        <Calendar size={14} style={{ color: isBreak ? "#d97706" : "#6a6e79", flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 700, color: isBreak ? "#92400e" : "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1 }}>
+          {entry.date}
+        </p>
+        {isBreak && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>
+            Break
+          </span>
+        )}
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <TimesheetMobileKvRow label="Job #" value={entry.jobNum} valueColor={isBreak ? "#92400e" : undefined} />
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Start</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: isBreak ? "#92400e" : "#252a2e", fontFamily: OS, ...OS_FVS }}>{entry.start}</p>
+            <TimesheetMapButton pin={entry.clockInLoc} onOpen={onOpenMap} />
+          </div>
+        </div>
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>End</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: isBreak ? "#92400e" : "#252a2e", fontFamily: OS, ...OS_FVS }}>{entry.end}</p>
+            <TimesheetMapButton pin={entry.clockOutLoc} onOpen={onOpenMap} />
+          </div>
+        </div>
+        {!isBreak && (
+          <>
+            <TimesheetMobileKvRow label="Dept" value={entry.dept} />
+            <TimesheetMobileKvRow label="Job" value={entry.job} />
+            <TimesheetMobileKvRow label="Phase" value={entry.phase} />
+            <TimesheetMobileKvRow label="Rule" value={entry.payRule} />
+            <div className="grid grid-cols-2 gap-x-[16px] mt-[4px] pt-[8px]" style={{ borderTop: "1px dashed #e0e1e9" }}>
+              <TimesheetMobileKvRow label="Reg" value={fmtTsHours(entry.reg)} />
+              <TimesheetMobileKvRow label="OT" value={fmtTsHours(entry.ot)} valueColor={entry.ot > 0 ? "#0063a3" : undefined} />
+              <TimesheetMobileKvRow label="OT2" value={fmtTsHours(entry.ot2)} />
+              <TimesheetMobileKvRow label="Qty" value={fmtTsQty(entry.qty)} />
+              <TimesheetMobileKvRow label="Travel" value={fmtTsHours(entry.travel)} />
+              <TimesheetMobileKvRow label="Per Diem" value={fmtTsPerDiem(entry.perDiem)} />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimesheetMobileBreakCard({
+  date, start, end, startLoc, endLoc, onOpenMap,
+}: {
+  date: string;
+  start: string;
+  end: string | null;
+  startLoc?: TimesheetPunchPin;
+  endLoc?: TimesheetPunchPin;
+  onOpenMap: (pin: TimesheetPunchPin) => void;
+}) {
+  return (
+    <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor: "#fde68a", background: "#fffbeb" }}>
+      <div className="flex items-center gap-[8px]" style={{ padding: "10px 14px", borderBottom: "1px solid #fde68a" }}>
+        <Calendar size={14} style={{ color: "#d97706", flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#92400e", fontFamily: OS, ...OS_FVS, flex: 1 }}>{date}</p>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>Break</span>
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Start</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#92400e", fontFamily: OS, ...OS_FVS }}>{start}</p>
+            <TimesheetMapButton pin={startLoc} onOpen={onOpenMap} />
+          </div>
+        </div>
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>End</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#92400e", fontFamily: OS, ...OS_FVS }}>{end ?? "—"}</p>
+            {end && <TimesheetMapButton pin={endLoc} onOpen={onOpenMap} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimesheetMobileMealCard({
+  date, start, end, startLoc, endLoc, onOpenMap,
+}: {
+  date: string;
+  start: string;
+  end: string | null;
+  startLoc?: TimesheetPunchPin;
+  endLoc?: TimesheetPunchPin;
+  onOpenMap: (pin: TimesheetPunchPin) => void;
+}) {
+  return (
+    <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor: "#bbe6ca", background: "#f2fbf5" }}>
+      <div className="flex items-center gap-[8px]" style={{ padding: "10px 14px", borderBottom: "1px solid #bbe6ca" }}>
+        <Calendar size={14} style={{ color: "#15803d", flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#15803d", fontFamily: OS, ...OS_FVS, flex: 1 }}>{date}</p>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#15803d", background: "#cdecd8", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>On-duty meal</span>
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Start</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#15803d", fontFamily: OS, ...OS_FVS }}>{start}</p>
+            <TimesheetMapButton pin={startLoc} onOpen={onOpenMap} />
+          </div>
+        </div>
+        <div className="flex items-start justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>End</p>
+          <div className="text-right">
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#15803d", fontFamily: OS, ...OS_FVS }}>{end ?? "—"}</p>
+            {end && <TimesheetMapButton pin={endLoc} onOpen={onOpenMap} />}
+          </div>
+        </div>
+        <p style={{ fontSize: 11, color: "#3f7d55", fontFamily: OS, ...OS_FVS, marginTop: 4 }}>Paid — counts toward hours</p>
+      </div>
+    </div>
+  );
+}
+
+function MobileTimesheetSection({
+  breakRows,
+  mealRows,
+  todayLabel,
+  onOpenMap,
+}: {
+  breakRows: TimesheetBreakMealRow[];
+  mealRows: TimesheetBreakMealRow[];
+  todayLabel: string;
+  onOpenMap: (pin: TimesheetPunchPin) => void;
+}) {
+  const entries = getMockTimesheetEntries();
+  const totalReg = entries.reduce((s, e) => s + e.reg, 0);
+  const totalOT = entries.reduce((s, e) => s + e.ot, 0);
+  const totalTravel = entries.reduce((s, e) => s + e.travel, 0);
+
+  return (
+    <div className="mt-[16px] mb-[16px]">
+      <div className="rounded-[10px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
+        <div style={{ padding: "12px 14px", background: "#0e416c" }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: OS, ...OS_FVS }}>
+            Timesheet for Pay Period August 1 – August 7, 2026
+          </p>
+        </div>
+        <div className="flex flex-col gap-[10px]" style={{ padding: "12px", background: "#f7f7f8" }}>
+          {entries.map((entry, i) => (
+            <TimesheetMobileEntryCard key={`${entry.date}-${entry.start}-${i}`} entry={entry} onOpenMap={onOpenMap} />
+          ))}
+          {breakRows.map((br, i) => (
+            <TimesheetMobileBreakCard
+              key={`break-${i}`}
+              date={todayLabel}
+              start={br.start}
+              end={br.end}
+              startLoc={br.startLoc}
+              endLoc={br.endLoc}
+              onOpenMap={onOpenMap}
+            />
+          ))}
+          {mealRows.map((mr, i) => (
+            <TimesheetMobileMealCard
+              key={`meal-${i}`}
+              date={todayLabel}
+              start={mr.start}
+              end={mr.end}
+              startLoc={mr.startLoc}
+              endLoc={mr.endLoc}
+              onOpenMap={onOpenMap}
+            />
+          ))}
+          <div style={{ ...MOBILE_CARD, padding: "12px 14px", background: "#f1f1f6", borderColor: "#cbced4" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>Totals</p>
+            <div className="grid grid-cols-2 gap-x-[16px]">
+              <TimesheetMobileKvRow label="Reg" value={totalReg.toFixed(2)} />
+              <TimesheetMobileKvRow label="OT" value={totalOT.toFixed(2)} valueColor="#0063a3" />
+              <TimesheetMobileKvRow label="Travel" value={totalTravel.toFixed(2)} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Days awaiting attestation, shared by the desktop panel and the mobile card.
 const ATTESTATION_DAYS = [
   { label: "Tue", date: 22 },
@@ -2552,6 +2795,35 @@ const simulateFix = (site: JobSite, offSite: boolean): GeoFix =>
   offSite
     ? { lat: site.lat + 0.0180, lng: site.lng - 0.0075, accuracyMeters: 22 }
     : { lat: site.lat + 0.0004, lng: site.lng + 0.0003, accuracyMeters: 8 };
+
+const timesheetPunchPin = (jobKey: string, offSite: boolean, title: string): TimesheetPunchPin | undefined => {
+  const jobSite = JOB_SITES[jobKey];
+  if (!jobSite) return undefined;
+  return { site: jobSite, fix: simulateFix(jobSite, offSite), title, flagged: offSite };
+};
+
+const mockEntryLocations = (entry: ClockTimesheetEntry): {
+  clockInLoc?: TimesheetPunchPin;
+  clockOutLoc?: TimesheetPunchPin;
+} => {
+  if (!entry.job || entry.job === "—") return {};
+  const isBreak = entry.phase === "Break";
+  const startTitle = isBreak ? `Break start · ${entry.start}` : `Clock in · ${entry.start}`;
+  const endTitle = isBreak ? `Break end · ${entry.end}` : `Clock out · ${entry.end}`;
+  const offSiteOut = entry.date === "Thu, Jul 24" && !isBreak;
+  return {
+    clockInLoc: timesheetPunchPin(entry.job, false, startTitle),
+    clockOutLoc: timesheetPunchPin(entry.job, offSiteOut, endTitle),
+  };
+};
+
+type EnrichedTimesheetEntry = ClockTimesheetEntry & {
+  clockInLoc?: TimesheetPunchPin;
+  clockOutLoc?: TimesheetPunchPin;
+};
+
+const getMockTimesheetEntries = (): EnrichedTimesheetEntry[] =>
+  CLOCK_MOCK_ENTRIES.map((entry) => ({ ...entry, ...mockEntryLocations(entry) }));
 
 /*
   Web Mercator, enough of it to lay out OpenStreetMap tiles by hand. A map
@@ -2691,6 +2963,80 @@ function SiteMap({ site, fix, width, height }: { site: JobSite; fix: GeoFix; wid
   );
 }
 
+function TimesheetMapButton({ pin, onOpen }: { pin?: TimesheetPunchPin; onOpen: (pin: TimesheetPunchPin) => void }) {
+  if (!pin) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(pin)}
+      aria-label={`View map for ${pin.title}`}
+      className="inline-flex items-center gap-[3px]"
+      style={{
+        marginTop: 3, padding: "1px 6px", fontSize: 10, fontWeight: 700, color: "#0063a3",
+        background: "#e8f2fa", border: "1px solid #b3d4ea", borderRadius: 4, cursor: "pointer", fontFamily: OS,
+      }}
+    >
+      <MapPin size={10} />
+      Map
+    </button>
+  );
+}
+
+function PunchLocationModalContent({
+  pin,
+  mapWidth,
+  mapHeight,
+  onClose,
+  closeLabel = "Close",
+  layout = "desktop",
+}: {
+  pin: TimesheetPunchPin;
+  mapWidth: number;
+  mapHeight: number;
+  onClose: () => void;
+  closeLabel?: string;
+  layout?: "mobile" | "desktop";
+}) {
+  const dist = distanceMeters(pin.fix, pin.site);
+  const onSite = dist <= pin.site.radiusMeters;
+  const accent = onSite ? "#15803d" : "#d97706";
+
+  return (
+    <>
+      <div className="flex items-center gap-[10px] mb-[12px]">
+        <div className="flex items-center justify-center shrink-0" style={{ width: 36, height: 36, borderRadius: 999, background: onSite ? "#e8f7ed" : "#fef3e2" }}>
+          <MapPin size={18} style={{ color: accent }} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{pin.title}</p>
+          <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+            {onSite
+              ? `On site · ${pin.site.name} · ${formatDistance(dist)} from center`
+              : `${formatDistance(dist)} from ${pin.site.name}`}
+            {pin.flagged ? " · flagged for review" : ""}
+          </p>
+        </div>
+      </div>
+      <SiteMap site={pin.site} fix={pin.fix} width={mapWidth} height={mapHeight} />
+      <p className="mt-[12px]" style={{ fontSize: 12, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.5, marginBottom: layout === "mobile" ? 16 : 24 }}>
+        {formatCoords(pin.fix)} · ±{pin.fix.accuracyMeters} m · {pin.site.address}
+      </p>
+      {layout === "mobile" ? (
+        <button type="button" onClick={onClose} className="w-full"
+          style={{ background: "#0063a3", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+          {closeLabel}
+        </button>
+      ) : (
+        <div className="flex justify-end">
+          <ModusWcButton color="primary" variant="filled" size="md" onButtonClick={onClose}>
+            {closeLabel}
+          </ModusWcButton>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockState }) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -2733,7 +3079,7 @@ function useClockSession() {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [breakStart, setBreakStart] = useState<Date | null>(null);
   const [mealStart, setMealStart] = useState<Date | null>(null);
-  const [mealRows, setMealRows] = useState<{ start: string; end: string | null }[]>([]);
+  const [mealRows, setMealRows] = useState<TimesheetBreakMealRow[]>([]);
   const [showMealModal, setShowMealModal] = useState(false);
   const [mealAck, setMealAck] = useState(false);
   // The shift starts blank: the punch is only as good as the details on it,
@@ -2755,8 +3101,9 @@ function useClockSession() {
   const [offSiteSim, setOffSiteSim] = useState(false);
   const [showOffSiteModal, setShowOffSiteModal] = useState(false);
   const [showSiteMap, setShowSiteMap] = useState(false);
+  const [punchMapPin, setPunchMapPin] = useState<TimesheetPunchPin | null>(null);
   const [clockedInOffSite, setClockedInOffSite] = useState(false);
-  const [breakRows, setBreakRows] = useState<{ start: string; end: string | null }[]>([]);
+  const [breakRows, setBreakRows] = useState<TimesheetBreakMealRow[]>([]);
   const [showEarlyBreakModal, setShowEarlyBreakModal] = useState(false);
   const MANDATORY_BREAK = 30; // seconds for testing (change to 30 * 60 for production)
 
@@ -2818,11 +3165,18 @@ function useClockSession() {
   const stateColorStrong= clocked === "out" ? "rgba(0,99,163,0.50)" : clocked === "break" ? "rgba(215,119,6,0.50)" : clocked === "meal" ? "rgba(21,128,61,0.50)" : "rgba(171,31,38,0.50)";
   const btnLabel = clocked === "out" ? "CLOCK IN" : clocked === "break" ? "END BREAK" : clocked === "meal" ? "END MEAL" : "CLOCK OUT";
 
+  const punchPinFromCurrent = (title: string): TimesheetPunchPin | undefined => {
+    if (!site || !fix) return undefined;
+    return { site, fix, title, flagged: !onSite };
+  };
+
   const confirmEndBreak = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     setClocked("in"); setBreakStart(null); setShowEarlyBreakModal(false);
     setTimeline(prev => [{ time: t, label: "Break Ended", sub: `After ${fmt(breakElapsed)}`, color: "#0063a3" }, ...prev]);
-    setBreakRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null ? { ...r, end: t } : r));
+    setBreakRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null
+      ? { ...r, end: t, endLoc: punchPinFromCurrent(`Break end · ${t}`) }
+      : r));
   };
 
   const doClockIn = () => {
@@ -2851,7 +3205,16 @@ function useClockSession() {
       doClockIn();
     } else if (clocked === "in") {
       setClocked("out"); setStartTime(null); setElapsed(0); setClockedInOffSite(false);
-      setTimeline(prev => [{ time: t, label: "Clocked Out", sub: `After ${fmt(elapsed)}`, color: "#ab1f26" }, ...prev]);
+      setTimeline(prev => [{
+        time: t,
+        label: "Clocked Out",
+        sub: `After ${fmt(elapsed)}`,
+        color: "#ab1f26",
+        location: site && fix
+          ? (onSite ? `${site.name} · ${formatDistance(siteDistance)} from site center` : `${formatDistance(siteDistance)} from ${site.name}`)
+          : undefined,
+        flagged: site ? !onSite : undefined,
+      }, ...prev]);
     } else if (clocked === "meal") {
       endOnDutyMeal();
     } else {
@@ -2868,14 +3231,16 @@ function useClockSession() {
     setClocked("meal"); setMealStart(new Date()); setMealElapsed(0);
     setShowMealModal(false); setMealAck(false); setShowBreakAlert(false);
     setTimeline(prev => [{ time: t, label: "On-Duty Meal Started", sub: "Staying on the clock", color: "#15803d" }, ...prev]);
-    setMealRows(prev => [...prev, { start: t, end: null }]);
+    setMealRows(prev => [...prev, { start: t, end: null, startLoc: punchPinFromCurrent(`On-duty meal start · ${t}`) }]);
   };
 
   const endOnDutyMeal = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     setClocked("in"); setMealStart(null);
     setTimeline(prev => [{ time: t, label: "On-Duty Meal Ended", sub: `After ${fmt(mealElapsed)} · paid`, color: "#0063a3" }, ...prev]);
-    setMealRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null ? { ...r, end: t } : r));
+    setMealRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null
+      ? { ...r, end: t, endLoc: punchPinFromCurrent(`On-duty meal end · ${t}`) }
+      : r));
   };
 
   const handleBreak = () => {
@@ -2883,7 +3248,7 @@ function useClockSession() {
     setClocked("break"); setBreakStart(new Date()); setBreakElapsed(0);
     setShowBreakAlert(false);
     setTimeline(prev => [{ time: t, label: "Break Started", sub: "Taking a break", color: "#d97706" }, ...prev]);
-    setBreakRows(prev => [...prev, { start: t, end: null }]);
+    setBreakRows(prev => [...prev, { start: t, end: null, startLoc: punchPinFromCurrent(`Break start · ${t}`) }]);
   };
 
   const [showBreakAlert, setShowBreakAlert] = useState(false);
@@ -2905,6 +3270,7 @@ function useClockSession() {
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
     showSiteMap, setShowSiteMap,
+    punchMapPin, setPunchMapPin,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
     travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
@@ -3099,10 +3465,12 @@ function MobileClockView({ session }: { session: ClockSession }) {
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
     showSiteMap, setShowSiteMap,
+    punchMapPin, setPunchMapPin,
     locating, offSiteSim, setOffSiteSim, clockedInOffSite,
     site, fix, siteDistance, onSite,
     missingDetails, detailsComplete, detailsPrompt,
     attested, attestDay,
+    breakRows, mealRows,
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
     handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
@@ -3119,10 +3487,7 @@ function MobileClockView({ session }: { session: ClockSession }) {
   const statusLabel = clocked === "out" ? "Not Clocked In" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock";
   const activeTimer = clocked === "break" ? breakElapsed : clocked === "meal" ? mealElapsed : elapsed;
 
-  const card: React.CSSProperties = {
-    background: "#ffffff", borderRadius: 12, border: "1px solid #e0e1e9",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-  };
+  const card: React.CSSProperties = MOBILE_CARD;
   // Filled in before the punch, mirroring the desktop Job Details form.
   const jobDetailsCard = (
           <div className="mt-[12px]" style={{ ...card, overflow: "hidden" }}>
@@ -3413,6 +3778,13 @@ function MobileClockView({ session }: { session: ClockSession }) {
               </div>
             </div>
 
+            <MobileTimesheetSection
+              breakRows={breakRows}
+              mealRows={mealRows}
+              todayLabel={now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+              onOpenMap={setPunchMapPin}
+            />
+
             {/* Activity */}
             {timeline.length > 0 && (
               <div className="mt-[16px] mb-[16px]">
@@ -3471,6 +3843,19 @@ function MobileClockView({ session }: { session: ClockSession }) {
                 day={attestDayOpen}
                 onClose={() => setAttestDayOpen(null)}
                 onSubmit={() => { attestDay(attestDayOpen.date); setAttestDayOpen(null); }}
+              />
+            </MobileSheet>
+          )}
+
+          {/* Punch location map */}
+          {punchMapPin && (
+            <MobileSheet open onClose={() => setPunchMapPin(null)}>
+              <PunchLocationModalContent
+                pin={punchMapPin}
+                mapWidth={350}
+                mapHeight={220}
+                onClose={() => setPunchMapPin(null)}
+                layout="mobile"
               />
             </MobileSheet>
           )}
@@ -3670,6 +4055,7 @@ function ClockInOutPage() {
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
     showSiteMap, setShowSiteMap,
+    punchMapPin, setPunchMapPin,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
     travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
@@ -3693,9 +4079,10 @@ function ClockInOutPage() {
   }, [detailsPrompt, viewMode]);
 
   const now = new Date();
-  const totalReg = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.reg, 0);
-  const totalOT  = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.ot, 0);
-  const totalTravel = CLOCK_MOCK_ENTRIES.reduce((s, e) => s + e.travel, 0);
+  const mockTimesheetEntries = getMockTimesheetEntries();
+  const totalReg = mockTimesheetEntries.reduce((s, e) => s + e.reg, 0);
+  const totalOT  = mockTimesheetEntries.reduce((s, e) => s + e.ot, 0);
+  const totalTravel = mockTimesheetEntries.reduce((s, e) => s + e.travel, 0);
 
   const SelectField = ({ label, value, onChange, options, required, invalid }: {
     label: string; value: string; onChange: (v: string) => void; options: string[];
@@ -3750,6 +4137,23 @@ function ClockInOutPage() {
                 Confirm Early Clock In
               </ModusWcButton>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Punch location map — timesheet entry clock in/out */}
+      {viewMode === "desktop" && punchMapPin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setPunchMapPin(null)}>
+          <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
+            style={{ width: 560, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+            <PunchLocationModalContent
+              pin={punchMapPin}
+              mapWidth={496}
+              mapHeight={320}
+              onClose={() => setPunchMapPin(null)}
+              layout="desktop"
+            />
           </div>
         </div>
       )}
@@ -4170,12 +4574,18 @@ function ClockInOutPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {CLOCK_MOCK_ENTRIES.map((e, i) => (
+                  {mockTimesheetEntries.map((e, i) => (
                     <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: "1px solid #e0e1e9" }}>
                       <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.date}</p></td>
                       <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.jobNum}</p></td>
-                      <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.start}</p></td>
-                      <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.end}</p></td>
+                      <td className="px-[6px] py-[6px]">
+                        <p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.start}</p>
+                        <TimesheetMapButton pin={e.clockInLoc} onOpen={setPunchMapPin} />
+                      </td>
+                      <td className="px-[6px] py-[6px]">
+                        <p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.end}</p>
+                        <TimesheetMapButton pin={e.clockOutLoc} onOpen={setPunchMapPin} />
+                      </td>
                       <td className="px-[6px] py-[6px]" style={{ maxWidth: 90 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.dept}</p></td>
                       <td className="px-[6px] py-[6px]" style={{ maxWidth: 120 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.job}</p></td>
                       <td className="px-[6px] py-[6px]" style={{ maxWidth: 110 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.phase}</p></td>
@@ -4194,11 +4604,15 @@ function ClockInOutPage() {
                         {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p></td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{br.start}</p></td>
+                      <td className="px-[10px] py-[8px]">
+                        <p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{br.start}</p>
+                        <TimesheetMapButton pin={br.startLoc} onOpen={setPunchMapPin} />
+                      </td>
                       <td className="px-[10px] py-[8px]">
                         <p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>
                           {br.end ?? "—"}
                         </p>
+                        {br.end && <TimesheetMapButton pin={br.endLoc} onOpen={setPunchMapPin} />}
                       </td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
@@ -4214,8 +4628,14 @@ function ClockInOutPage() {
                         {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p></td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.start}</p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.end ?? "—"}</p></td>
+                      <td className="px-[10px] py-[8px]">
+                        <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.start}</p>
+                        <TimesheetMapButton pin={mr.startLoc} onOpen={setPunchMapPin} />
+                      </td>
+                      <td className="px-[10px] py-[8px]">
+                        <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.end ?? "—"}</p>
+                        {mr.end && <TimesheetMapButton pin={mr.endLoc} onOpen={setPunchMapPin} />}
+                      </td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
                       <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
                       <td colSpan={8} className="px-[10px] py-[8px]">
