@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import {
   ModusWcAlert,
@@ -15,6 +15,7 @@ import {
   ModusWcTextInput,
   ModusWcTextarea,
   ModusWcTimeInput,
+  ModusWcTooltip,
 } from "@trimble-oss/moduswebcomponents-react";
 import {
   AlertTriangle, ChevronDown, ChevronUp, X, Check,
@@ -22,7 +23,7 @@ import {
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
   AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils,
-  MapPin, LoaderCircle, Calendar,
+  MapPin, LoaderCircle, Calendar, ClipboardList, Save,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -75,10 +76,10 @@ const defaultRuleSet = (): RuleSetData => ({
 });
 
 // ─── Shared Primitives (Modus) ────────────────────────────────────────────────
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ enabled, onChange, ariaLabel }: { enabled: boolean; onChange: (v: boolean) => void; ariaLabel?: string }) {
   return (
     <ModusWcSwitch
-      aria-label="Toggle"
+      aria-label={ariaLabel ?? (enabled ? "Enabled" : "Disabled")}
       size="sm"
       value={enabled}
       onInputChange={(e) => {
@@ -89,19 +90,39 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
   );
 }
 
+function SectionEnableToggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-[8px]">
+      <span
+        className="text-[12px] font-semibold"
+        style={{ fontFamily: OS, color: enabled ? "#464b52" : "#6a6e79" }}
+      >
+        {enabled ? "Enabled" : "Disabled"}
+      </span>
+      <Toggle
+        enabled={enabled}
+        onChange={onChange}
+        ariaLabel={enabled ? "Disable section" : "Enable section"}
+      />
+    </div>
+  );
+}
+
 function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88, disabled = false }: {
   value: number; onChange: (v: number) => void;
   step?: number; min?: number; suffix?: string; width?: number; disabled?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-[6px] ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+    <div className={`flex items-center gap-[6px] ${disabled ? "opacity-60 pointer-events-none select-none" : ""}`}>
       <ModusWcNumberInput
+        key={disabled ? "disabled" : "enabled"}
         aria-label="Value"
         size="sm"
         min={min}
         step={step}
         value={String(value)}
         disabled={disabled}
+        customClass={disabled ? "pointer-events-none" : ""}
         onInputChange={(e) => {
           if (disabled) return;
           const v = parseFloat(e.target.value);
@@ -109,20 +130,23 @@ function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88,
         }}
         style={{ width }}
       />
-      {suffix && <span className="text-[12px] text-[#6a6e79]">{suffix}</span>}
+      {suffix && (
+        <span className="text-[12px]" style={{ color: disabled ? "#a3a3a3" : "#6a6e79" }}>{suffix}</span>
+      )}
     </div>
   );
 }
 
-function SelectField({ value, onChange, options, placeholder }: {
+function SelectField({ value, onChange, options, placeholder, disabled }: {
   value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[]; placeholder?: string;
+  options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <ModusWcSelect
       aria-label={placeholder ?? "Select"}
       size="sm"
       value={value}
+      disabled={disabled}
       options={placeholder ? [{ label: placeholder, value: "" }, ...options] : options}
       onInputChange={(e) => onChange(e.target.value)}
     />
@@ -526,24 +550,29 @@ function RuleSetForm({
             </div>
 
             {/* Break 1 */}
-            <CardShell title="First Break" badge="Break 1" badgeColor="blue">
+            <CardShell title="First Break" badge="Break 1" badgeColor="blue"
+              action={<SectionEnableToggle enabled={mp.meal1Enabled} onChange={(v) => setMp("meal1Enabled", v)} />}>
+              <fieldset
+                disabled={!mp.meal1Enabled}
+                className={`border-0 p-0 m-0 min-w-0 transition-opacity duration-200 ${mp.meal1Enabled ? "" : "opacity-50 pointer-events-none"}`}
+              >
               <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
                 <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                   <SectionLabel>Break Trigger</SectionLabel>
-                  <p className="text-[11px] text-[#6a6e79] mb-[12px] leading-[15px]">
+                  <p className="text-[11px] mb-[12px] leading-[15px]" style={{ color: mp.meal1Enabled ? "#6a6e79" : "#a3a3a3" }}>
                     {breakUsesEndWindow
                       ? "Window measured from shift start."
                       : "Start threshold measured from shift start."}
                   </p>
                   <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                     <div>
-                      <p className="text-[11px] text-[#464b52] mb-[4px]">Break must begin after</p>
-                      <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
+                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break must begin after</p>
+                      <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal1Enabled} />
                     </div>
                     {breakUsesEndWindow && (
                       <div>
-                        <p className="text-[11px] text-[#464b52] mb-[4px]">Break must end after</p>
-                        <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
+                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break must end after</p>
+                        <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal1Enabled} />
                       </div>
                     )}
                   </div>
@@ -552,7 +581,7 @@ function RuleSetForm({
                   <div>
                     <SectionLabel>Break Duration</SectionLabel>
                     <FieldLabel>Minimum required length</FieldLabel>
-                    <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" />
+                    <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" disabled={!mp.meal1Enabled} />
                   </div>
                   <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                     <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
@@ -562,27 +591,33 @@ function RuleSetForm({
                   </div>
                 </div>
               </div>
+              </fieldset>
             </CardShell>
 
             {/* Break 2 */}
-            <CardShell title="Second Break" badge="Break 2" badgeColor="blue">
+            <CardShell title="Second Break" badge="Break 2" badgeColor="blue"
+              action={<SectionEnableToggle enabled={mp.meal2Enabled} onChange={(v) => setMp("meal2Enabled", v)} />}>
+              <fieldset
+                disabled={!mp.meal2Enabled}
+                className={`border-0 p-0 m-0 min-w-0 transition-opacity duration-200 ${mp.meal2Enabled ? "" : "opacity-50 pointer-events-none"}`}
+              >
               <div className="grid grid-cols-2 gap-0">
                 <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                   <SectionLabel>Break Trigger</SectionLabel>
-                  <p className="text-[11px] text-[#6a6e79] mb-[12px] leading-[15px]">
+                  <p className="text-[11px] mb-[12px] leading-[15px]" style={{ color: mp.meal2Enabled ? "#6a6e79" : "#a3a3a3" }}>
                     {breakUsesEndWindow
                       ? "Window measured from shift start."
                       : "Start threshold measured from shift start."}
                   </p>
                   <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                     <div>
-                      <p className="text-[11px] text-[#464b52] mb-[4px]">Break must begin after</p>
-                      <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" />
+                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break must begin after</p>
+                      <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal2Enabled} />
                     </div>
                     {breakUsesEndWindow && (
                       <div>
-                        <p className="text-[11px] text-[#464b52] mb-[4px]">Break must end after</p>
-                        <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" />
+                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break must end after</p>
+                        <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal2Enabled} />
                       </div>
                     )}
                   </div>
@@ -591,7 +626,7 @@ function RuleSetForm({
                   <div>
                     <SectionLabel>Break Duration</SectionLabel>
                     <FieldLabel>Minimum required length</FieldLabel>
-                    <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" />
+                    <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" disabled={!mp.meal2Enabled} />
                   </div>
                   <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
                     <div className="h-[6px] w-[6px] rounded-full bg-[#006fb0] shrink-0 mt-[4px]" />
@@ -601,36 +636,86 @@ function RuleSetForm({
                   </div>
                 </div>
               </div>
+              </fieldset>
             </CardShell>
 
             {mp.breakType === "premium" && (
               <CardShell title="Break Premium Violations" badge="LC § 226.7" badgeColor="red"
                 action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">Auto-calculate premium pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
                 <div className={`transition-opacity duration-200 ${mp.penaltiesEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-                  <div className="px-[20px] pt-[16px] pb-[4px]">
+                  <div className="px-[20px] pt-[14px] pb-[6px]">
+                    <p className="text-[12px] text-[#464b52] leading-[18px]">
+                      By default, premium pay posts to the employee&apos;s clocked job. Choose <strong>Override</strong> to send a violation&apos;s cost to a specific department, job, and sub-job (e.g. administrative overhead).
+                    </p>
+                  </div>
+                  <div className="px-[20px] pt-[8px] pb-[4px]">
                     <div className="overflow-x-auto rounded-[6px] border border-[#e0e1e9]">
-                      <table className="w-full border-collapse">
+                      <table className="w-full border-collapse min-w-[1100px] text-[12px]">
                         <thead>
                           <tr className="bg-[#f5f5f8]">
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79] w-[32px]" />
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79]">Violation</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[11px] font-semibold text-[#6a6e79] w-[180px]">Pay Type</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[11px] font-semibold text-[#6a6e79] w-[130px]">Hours Rate</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[32px]" />
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] min-w-[200px]">Violation</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Pay Type</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[130px]">Hours Rate</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Cost to</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[160px]">Department</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Job</th>
+                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Sub-job</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(mp.violations ?? defaultViolations()).map((v, idx) => {
+                          {(mp.violations ?? defaultViolations()).map((raw, idx) => {
+                            const v = withCostMapping(raw);
+                            const isOverride = v.costMapping.mode === "override";
+                            const job = jobFromCatalog(v.costMapping.jobCode || JOB_CATALOG[0].code);
+                            const phaseOptions = job.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` }));
+                            const overrideIncomplete = isOverride && v.enabled && (
+                              !v.costMapping.department || !v.costMapping.jobCode || !v.costMapping.phaseCode
+                            );
+
                             const updateViolation = (patch: Partial<ViolationRule>) => {
-                              const next = (mp.violations ?? defaultViolations()).map((r, i) => i === idx ? { ...r, ...patch } : r);
+                              const next = (mp.violations ?? defaultViolations()).map((r, i) =>
+                                i === idx ? withCostMapping({ ...withCostMapping(r), ...patch }) : withCostMapping(r),
+                              );
                               setMp("violations", next);
                             };
+
+                            const updateCostMapping = (patch: Partial<ViolationCostMapping>) => {
+                              updateViolation({ costMapping: { ...v.costMapping, ...patch } });
+                            };
+
                             return (
-                              <tr key={v.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}>
+                              <tr
+                                key={v.id}
+                                className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""} ${isOverride ? "border-l-[3px] border-l-[#006fb0]" : ""}`}
+                              >
                                 <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
                                   <Toggle enabled={v.enabled} onChange={(val) => updateViolation({ enabled: val })} />
                                 </td>
                                 <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
-                                  <span className="text-[12px] font-semibold text-[#252a2e]">{v.label}</span>
+                                  <div className="flex flex-col gap-[4px]">
+                                    <div className="flex flex-wrap items-center gap-[6px]">
+                                      <ModusWcTooltip
+                                        content={v.description}
+                                        position="auto"
+                                        tooltipId={`violation-tip-${v.id}`}
+                                      >
+                                        <button
+                                          type="button"
+                                          className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help"
+                                          aria-describedby={`violation-tip-${v.id}`}
+                                        >
+                                          {v.label}
+                                        </button>
+                                      </ModusWcTooltip>
+                                      {isOverride && (
+                                        <ModusWcBadge size="sm" variant="filled">Override</ModusWcBadge>
+                                      )}
+                                    </div>
+                                    {overrideIncomplete && (
+                                      <span className="text-[12px] text-[#b45309]">Complete department, job, and sub-job.</span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
                                   <div className="pointer-events-auto">
@@ -648,6 +733,72 @@ function RuleSetForm({
                                     <NumberInput value={v.hoursRate} onChange={(val) => updateViolation({ hoursRate: val })}
                                       step={0.25} min={0} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
                                   </div>
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                  <div className="pointer-events-auto min-w-[140px]">
+                                    <SelectField
+                                      value={v.costMapping.mode}
+                                      onChange={(val) => {
+                                        if (val === "override") {
+                                          updateViolation({ costMapping: defaultOverrideCostMapping() });
+                                        } else {
+                                          updateViolation({ costMapping: defaultCostMapping() });
+                                        }
+                                      }}
+                                      options={[
+                                        { value: "employee_job", label: "Employee job" },
+                                        { value: "override", label: "Override" },
+                                      ]}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                  {isOverride ? (
+                                    <div className="pointer-events-auto min-w-[140px]">
+                                      <SelectField
+                                        value={v.costMapping.department}
+                                        onChange={(val) => updateCostMapping({ department: val })}
+                                        placeholder="Select department"
+                                        options={VIOLATION_DEPT_OPTIONS.map((d) => ({ value: d, label: d }))}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
+                                  )}
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                  {isOverride ? (
+                                    <div className="pointer-events-auto min-w-[140px]">
+                                      <SelectField
+                                        value={v.costMapping.jobCode}
+                                        onChange={(val) => {
+                                          const nextJob = jobFromCatalog(val);
+                                          updateCostMapping({
+                                            jobCode: val,
+                                            phaseCode: nextJob.phases[0]?.code ?? "",
+                                          });
+                                        }}
+                                        placeholder="Select job"
+                                        options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
+                                  )}
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                  {isOverride ? (
+                                    <div className="pointer-events-auto min-w-[140px]">
+                                      <SelectField
+                                        value={v.costMapping.phaseCode}
+                                        onChange={(val) => updateCostMapping({ phaseCode: val })}
+                                        placeholder="Select sub-job"
+                                        options={phaseOptions}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1221,6 +1372,17 @@ const JOB_CATALOG: JobOption[] = [
   },
 ];
 
+const VIOLATION_DEPT_OPTIONS = ["3300 - Job Cost", "3400 - Operations", "3500 - Admin"];
+
+const defaultOverrideCostMapping = (): ViolationCostMapping => ({
+  mode: "override",
+  department: "3500 - Admin",
+  jobCode: JOB_CATALOG[0].code,
+  phaseCode: JOB_CATALOG[0].phases[0].code,
+});
+
+const jobFromCatalog = (code: string) => JOB_CATALOG.find((j) => j.code === code) ?? JOB_CATALOG[0];
+
 const RATE_LEVEL_OPTIONS = ["Holiday", "Standby", "Shift Differential", "Apprentice"];
 
 type ExclusionKind = "job" | "phase" | "rate";
@@ -1448,21 +1610,180 @@ type MealPenaltyState = {
 
 type PayType = "regular" | "overtime" | "double_time" | "flat";
 
+type CostMappingMode = "employee_job" | "override";
+
+type ViolationCostMapping = {
+  mode: CostMappingMode;
+  department: string;
+  jobCode: string;
+  phaseCode: string;
+};
+
 type ViolationRule = {
   id: string;
   label: string;
+  description: string;
   enabled: boolean;
   payType: PayType;
   hoursRate: number;
   maxPenalty: number;
+  costMapping: ViolationCostMapping;
 };
 
+const VIOLATION_DESCRIPTIONS: Record<string, string> = {
+  missed_break_attestation: "Coffee breaks not clocked out for — through attestation.",
+  missed_meal: "Premium applies when a required meal break was not taken.",
+  late_meal: "Premium applies when a meal break was taken outside the compliance window.",
+  short_meal: "Premium applies when a meal break was shorter than the minimum required duration.",
+};
+
+const defaultCostMapping = (): ViolationCostMapping => ({
+  mode: "employee_job",
+  department: "",
+  jobCode: "",
+  phaseCode: "",
+});
+
+const withCostMapping = (v: ViolationRule): ViolationRule => ({
+  ...v,
+  costMapping: v.costMapping ?? defaultCostMapping(),
+  description: v.description ?? VIOLATION_DESCRIPTIONS[v.id] ?? "",
+});
+
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed_break_attestation", label: "Missed break (coffee breaks not clocked out for) - Through Attestation", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "missed_meal", label: "Missed Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "late_meal", label: "Late Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
-  { id: "short_meal", label: "Short Meal", enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_break_attestation", label: "Missed break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
+  { id: "missed_meal", label: "Missed Meal", description: VIOLATION_DESCRIPTIONS.missed_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
+  { id: "late_meal", label: "Late Meal", description: VIOLATION_DESCRIPTIONS.late_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
+  { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
 ];
+
+const breakViolationOptions = () =>
+  defaultViolations().map((v) => ({ value: v.id, label: v.label }));
+
+type AttestationAnswer = "yes" | "no";
+
+type AttestationQuestion = {
+  id: string;
+  question: string;
+  validAnswer: AttestationAnswer;
+  requireComment: boolean;
+  requireCommentOnInvalid: boolean;
+  violationId: string;
+  persisted: boolean;
+};
+
+const defaultAttestationQuestions = (): AttestationQuestion[] => [
+  {
+    id: "aq_breaks",
+    question: "Did you take your breaks today?",
+    validAnswer: "yes",
+    requireComment: false,
+    requireCommentOnInvalid: true,
+    violationId: "missed_break_attestation",
+    persisted: true,
+  },
+  {
+    id: "aq_injury",
+    question: "Were you hurt on the job today?",
+    validAnswer: "no",
+    requireComment: false,
+    requireCommentOnInvalid: false,
+    violationId: "",
+    persisted: true,
+  },
+];
+
+type AttestationConfigContextValue = {
+  questions: AttestationQuestion[];
+  setQuestions: React.Dispatch<React.SetStateAction<AttestationQuestion[]>>;
+};
+
+const AttestationConfigContext = createContext<AttestationConfigContextValue | null>(null);
+
+function useAttestationConfig() {
+  const ctx = useContext(AttestationConfigContext);
+  if (!ctx) throw new Error("useAttestationConfig must be used within AttestationConfigProvider");
+  return ctx;
+}
+
+function AttestationYesNoToggle({
+  value,
+  onChange,
+  disabled = false,
+  ariaLabel = "Toggle yes or no",
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className={`relative inline-grid grid-cols-2 rounded-[6px] border border-[#d4d6dd] bg-[#eef0f4] p-[3px] ${disabled ? "opacity-60 pointer-events-none" : ""}`}
+      style={{ minWidth: 112, fontFamily: "var(--modus-wc-font-family), sans-serif" }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-[4px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.14)] transition-[left] duration-200 ease-out"
+        style={{
+          width: "calc(50% - 3px)",
+          left: value ? 3 : "calc(50%)",
+        }}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value}
+        onClick={() => onChange(true)}
+        className="relative z-[1] rounded-[4px] px-[10px] py-[5px] text-[12px] font-semibold transition-colors duration-200"
+        style={{
+          color: value ? "#0063a3" : "#6a6e79",
+          background: "transparent",
+          border: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
+      >
+        Yes
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!value}
+        onClick={() => onChange(false)}
+        className="relative z-[1] rounded-[4px] px-[10px] py-[5px] text-[12px] font-semibold transition-colors duration-200"
+        style={{
+          color: !value ? "#0063a3" : "#6a6e79",
+          background: "transparent",
+          border: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
+      >
+        No
+      </button>
+    </div>
+  );
+}
+
+function AttestationValidAnswerToggle({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: AttestationAnswer;
+  onChange: (v: AttestationAnswer) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <AttestationYesNoToggle
+      value={value === "yes"}
+      onChange={(v) => onChange(v ? "yes" : "no")}
+      disabled={disabled}
+      ariaLabel="Valid answer"
+    />
+  );
+}
 
 // A window ending earlier than it starts is read as running past midnight.
 const windowMinutes = (start: string, end: string): number | null => {
@@ -1653,6 +1974,179 @@ function PresetDialog({ open, onClose, onConfirm }: { open: boolean; onClose: ()
   );
 }
 
+// ─── Timesheet Settings ───────────────────────────────────────────────────────
+function TimesheetSettings() {
+  const { questions, setQuestions } = useAttestationConfig();
+  const [draftQuestions, setDraftQuestions] = useState<AttestationQuestion[]>(questions);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  const updateQuestion = (id: string, patch: Partial<AttestationQuestion>) => {
+    setDraftQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  };
+
+  const addQuestion = () => {
+    setDraftQuestions((prev) => [
+      ...prev,
+      {
+        id: `aq_${Date.now()}`,
+        question: "",
+        validAnswer: "yes",
+        requireComment: false,
+        requireCommentOnInvalid: false,
+        violationId: "",
+        persisted: false,
+      },
+    ]);
+  };
+
+  const removeQuestion = (id: string) => {
+    setDraftQuestions((prev) => prev.filter((q) => q.id !== id));
+  };
+
+  const handleSave = () => {
+    const incomplete = draftQuestions.some((q) => !q.question.trim());
+    if (incomplete) {
+      toast.error("Each question must have text before saving.");
+      return;
+    }
+    const saved = draftQuestions.map((q) => ({ ...q, persisted: true }));
+    setDraftQuestions(saved);
+    setQuestions(saved);
+    setSavedAt(new Date());
+    toast.success("Attestation questions saved.");
+  };
+
+  const violationOptions = breakViolationOptions();
+
+  return (
+    <div className="bg-[#f1f1f6] min-h-full">
+      <div className="bg-[#f1f1f6] px-[24px] pt-[16px]">
+        <div className="flex items-start justify-between mb-[12px]">
+          <div>
+            <h1 className="text-[22px] font-bold text-[#252a2e] leading-[32px]">Timesheet Settings</h1>
+            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure daily attestation questions and map them to break premium violations</p>
+          </div>
+          {savedAt && (
+            <ModusWcBadge color="success" size="sm" variant="filled">
+              Saved at {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </ModusWcBadge>
+          )}
+        </div>
+      </div>
+
+      <div className="px-[24px] pb-[32px]">
+        <CardShell
+          title="Attestation Questions"
+          action={
+            <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={addQuestion}>
+              <ModusWcIcon name="add" size="xs" decorative />
+              Add Question
+            </ModusWcButton>
+          }
+        >
+          <div className="px-[20px] pt-[14px] pb-[6px]">
+            <p className="text-[12px] text-[#464b52] leading-[18px]">
+              Questions cannot be changed after they are created in order to keep the integrity of the answers associated with them.
+              Invalid answers will be flagged on the timesheet summary. Map questions to break violations defined under premium break rules
+              to trigger the corresponding premium when an employee&apos;s answer is invalid.
+            </p>
+          </div>
+
+          <div className="px-[20px] pt-[8px] pb-[4px]">
+            <div className="overflow-x-auto rounded-[6px] border border-[#e0e1e9]">
+              <table className="w-full border-collapse min-w-[960px] text-[12px]">
+                <thead>
+                  <tr className="bg-[#f5f5f8]">
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] min-w-[240px]">Question</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Valid Answer</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Require Comment</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[210px]">Require Comment on Invalid Answer</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Break Violation</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[60px]" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftQuestions.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="border-b border-[#e0e1e9] px-[12px] py-[24px] text-center text-[12px] text-[#6a6e79]">
+                        No attestation questions yet. Click &quot;Add Question&quot; to create one.
+                      </td>
+                    </tr>
+                  )}
+                  {draftQuestions.map((q, idx) => (
+                    <tr key={q.id} className={idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"}>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                        {q.persisted ? (
+                          <span className="text-[12px] font-medium text-[#252a2e]">{q.question}</span>
+                        ) : (
+                          <ModusWcTextInput
+                            aria-label="Question text"
+                            size="sm"
+                            placeholder="Enter attestation question…"
+                            value={q.question}
+                            onInputChange={(e) => updateQuestion(q.id, { question: e.target.value })}
+                          />
+                        )}
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                        <AttestationValidAnswerToggle
+                          value={q.validAnswer}
+                          onChange={(v) => updateQuestion(q.id, { validAnswer: v })}
+                        />
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                        <AttestationYesNoToggle
+                          value={q.requireComment}
+                          onChange={(v) => updateQuestion(q.id, { requireComment: v })}
+                          ariaLabel="Require comment"
+                        />
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                        <AttestationYesNoToggle
+                          value={q.requireCommentOnInvalid}
+                          onChange={(v) => updateQuestion(q.id, { requireCommentOnInvalid: v })}
+                          ariaLabel="Require comment on invalid answer"
+                        />
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
+                        <SelectField
+                          value={q.violationId}
+                          onChange={(v) => updateQuestion(q.id, { violationId: v })}
+                          placeholder="None"
+                          options={violationOptions}
+                        />
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
+                        <ModusWcButton
+                          color="danger"
+                          variant="filled"
+                          size="sm"
+                          shape="square"
+                          aria-label={`Delete question: ${q.question || "new question"}`}
+                          onButtonClick={() => removeQuestion(q.id)}
+                        >
+                          <Trash2 size={14} />
+                        </ModusWcButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end px-[20px] py-[16px] border-t border-[#f0f0f4] mt-[12px]">
+            <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={handleSave}>
+              <Save size={14} />
+              Save Questions
+            </ModusWcButton>
+          </div>
+        </CardShell>
+      </div>
+    </div>
+  );
+}
+
 // ─── Root Settings Page ───────────────────────────────────────────────────────
 function JurisdictionSettings() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("hour");
@@ -1720,11 +2214,11 @@ type NavPage =
   | "timesheets" | "clock_in" | "timesheet_summary" | "time_off" | "compliance_dashboard"
   | "employees" | "jobs" | "expenses" | "reports" | "equipment" | "documents" | "global_admin"
   | "s_settings" | "s_permissions" | "s_time_off_setup" | "s_notifications"
-  | "s_tenant_images" | "s_hour_rules" | "s_rate_level" | "s_auto_job";
+  | "s_tenant_images" | "s_hour_rules" | "s_timesheet_settings" | "s_rate_level" | "s_auto_job";
 
 const SETTINGS_PAGES = new Set<NavPage>([
   "s_settings","s_permissions","s_time_off_setup","s_notifications",
-  "s_tenant_images","s_hour_rules","s_rate_level","s_auto_job",
+  "s_tenant_images","s_hour_rules","s_timesheet_settings","s_rate_level","s_auto_job",
 ]);
 
 type NavSection = {
@@ -2268,17 +2762,45 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
 }
 
 // ─── Attestation Modal ────────────────────────────────────────────────────────
+type AttestationAnswerState = Record<string, { answer: AttestationAnswer | null; comment: string }>;
+
+function attestationCommentRequired(q: AttestationQuestion, answer: AttestationAnswer | null): boolean {
+  if (!answer) return false;
+  if (q.requireComment) return true;
+  if (q.requireCommentOnInvalid && answer !== q.validAnswer) return true;
+  return false;
+}
+
+function attestationCanSubmit(questions: AttestationQuestion[], answers: AttestationAnswerState): boolean {
+  if (questions.length === 0) return false;
+  return questions.every((q) => {
+    const entry = answers[q.id];
+    if (!entry?.answer) return false;
+    if (attestationCommentRequired(q, entry.answer) && !entry.comment.trim()) return false;
+    return true;
+  });
+}
+
 function AttestationModal({ day, onClose, onSubmit }: {
   day: { label: string; date: number };
   onClose: () => void;
   onSubmit: () => void;
 }) {
-  const [brokeBreak, setBrokeBreak] = useState<"yes" | "no" | null>(null);
-  const [breakComment, setBreakComment] = useState("");
-  const [hurt, setHurt] = useState<"yes" | "no" | null>(null);
-  const [hurtComment, setHurtComment] = useState("");
+  const { questions } = useAttestationConfig();
+  const [answers, setAnswers] = useState<AttestationAnswerState>(() =>
+    Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
+  );
 
   const dateStr = `Tue 2026/07/${day.date}`;
+  const canSubmit = attestationCanSubmit(questions, answers);
+
+  const setAnswer = (id: string, answer: AttestationAnswer) => {
+    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], answer } }));
+  };
+
+  const setComment = (id: string, comment: string) => {
+    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
+  };
 
   const RadioRow = ({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) => (
     <button type="button" onClick={onSelect}
@@ -2308,14 +2830,12 @@ function AttestationModal({ day, onClose, onSubmit }: {
         </div>
 
         <div className="overflow-y-auto flex-1 px-[24px] py-[20px] flex flex-col gap-[20px]">
-          {/* Date selector */}
           <ModusWcSelect
             aria-label="Attestation date"
             value={dateStr}
             options={[{ label: dateStr, value: dateStr }]}
           />
 
-          {/* Summary */}
           <div>
             <div className="flex items-center gap-[8px] mb-[10px]">
               <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full" style={{ background: "#0063a3" }}>
@@ -2339,54 +2859,36 @@ function AttestationModal({ day, onClose, onSubmit }: {
             </div>
           </div>
 
-          {/* Did you take your breaks? */}
-          <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
-              Did you take your breaks today? <span style={{ color: "#ab1f26" }}>*</span>
-            </p>
-            <div className="flex flex-col rounded-[6px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
-              <RadioRow label="Yes" selected={brokeBreak === "yes"} onSelect={() => setBrokeBreak("yes")} />
-              <div style={{ height: 1, background: "#e0e1e9" }} />
-              <RadioRow label="No" selected={brokeBreak === "no"} onSelect={() => setBrokeBreak("no")} />
-            </div>
-            <div className="mt-[10px]">
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
-                Additional Comments <span style={{ color: "#ab1f26" }}>*</span>
-              </p>
-              <ModusWcTextInput
-                aria-label="Additional comments about your breaks"
-                value={breakComment}
-                required
-                feedback={breakComment ? undefined : { level: "error", message: "A comment is required." }}
-                onInputChange={(e) => setBreakComment(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Were you hurt? */}
-          <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
-              Were you hurt on the job today? <span style={{ color: "#ab1f26" }}>*</span>
-            </p>
-            <div className="flex flex-col rounded-[6px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
-              <RadioRow label="Yes" selected={hurt === "yes"} onSelect={() => setHurt("yes")} />
-              <div style={{ height: 1, background: "#e0e1e9" }} />
-              <RadioRow label="No" selected={hurt === "no"} onSelect={() => setHurt("no")} />
-            </div>
-            <div className="mt-[10px]">
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
-                Additional Comments
-              </p>
-              <ModusWcTextInput
-                aria-label="Additional comments about injuries"
-                value={hurtComment}
-                onInputChange={(e) => setHurtComment(e.target.value)}
-              />
-            </div>
-          </div>
+          {questions.map((q) => {
+            const entry = answers[q.id] ?? { answer: null, comment: "" };
+            const commentNeeded = attestationCommentRequired(q, entry.answer);
+            return (
+              <div key={q.id}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
+                  {q.question} <span style={{ color: "#ab1f26" }}>*</span>
+                </p>
+                <div className="flex flex-col rounded-[6px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
+                  <RadioRow label="Yes" selected={entry.answer === "yes"} onSelect={() => setAnswer(q.id, "yes")} />
+                  <div style={{ height: 1, background: "#e0e1e9" }} />
+                  <RadioRow label="No" selected={entry.answer === "no"} onSelect={() => setAnswer(q.id, "no")} />
+                </div>
+                <div className="mt-[10px]">
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
+                    Additional Comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
+                  </p>
+                  <ModusWcTextInput
+                    aria-label={`Additional comments for: ${q.question}`}
+                    value={entry.comment}
+                    required={commentNeeded}
+                    feedback={commentNeeded && !entry.comment.trim() ? { level: "error", message: "A comment is required." } : undefined}
+                    onInputChange={(e) => setComment(q.id, e.target.value)}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-[10px] px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
           <button type="button" onClick={onClose}
             className="px-[20px] py-[9px] rounded-[6px] font-semibold transition-colors"
@@ -2394,9 +2896,18 @@ function AttestationModal({ day, onClose, onSubmit }: {
             Cancel
           </button>
           <button type="button"
-            onClick={() => { if (brokeBreak && breakComment) { onSubmit(); onClose(); } }}
+            onClick={() => { if (canSubmit) { onSubmit(); onClose(); } }}
+            disabled={!canSubmit}
             className="px-[20px] py-[9px] rounded-[6px] font-semibold transition-colors"
-            style={{ background: "#0063a3", color: "#ffffff", border: "none", fontSize: 14, fontFamily: OS, ...OS_FVS, cursor: "pointer" }}>
+            style={{
+              background: canSubmit ? "#0063a3" : "#cbced4",
+              color: "#ffffff",
+              border: "none",
+              fontSize: 14,
+              fontFamily: OS,
+              ...OS_FVS,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+            }}>
             Submit
           </button>
         </div>
@@ -3356,11 +3867,11 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: () => void;
 }) {
-  const [tookBreaks, setTookBreaks] = useState<"yes" | "no" | null>(null);
-  const [breakComment, setBreakComment] = useState("");
-  const [hurt, setHurt] = useState<"yes" | "no" | null>(null);
-  const [hurtComment, setHurtComment] = useState("");
-  const canSubmit = !!tookBreaks && !!breakComment && !!hurt;
+  const { questions } = useAttestationConfig();
+  const [answers, setAnswers] = useState<AttestationAnswerState>(() =>
+    Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
+  );
+  const canSubmit = attestationCanSubmit(questions, answers);
 
   const YesNo = ({ value, onSelect }: { value: "yes" | "no" | null; onSelect: (v: "yes" | "no") => void }) => (
     <div className="flex gap-[8px]">
@@ -3378,6 +3889,14 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
       ))}
     </div>
   );
+
+  const setAnswer = (id: string, answer: AttestationAnswer) => {
+    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], answer } }));
+  };
+
+  const setComment = (id: string, comment: string) => {
+    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
+  };
 
   return (
     <>
@@ -3398,29 +3917,33 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
         </div>
       </div>
 
-      <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
-        Did you take your breaks today? <span style={{ color: "#ab1f26" }}>*</span>
-      </p>
-      <YesNo value={tookBreaks} onSelect={setTookBreaks} />
-      <div style={{ marginTop: 10, marginBottom: 18 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
-          Additional comments <span style={{ color: "#ab1f26" }}>*</span>
-        </p>
-        <input type="text" value={breakComment} placeholder="Required"
-          onChange={(e) => setBreakComment(e.target.value)} style={mobileInputStyle} />
-      </div>
-
-      <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
-        Were you hurt on the job today? <span style={{ color: "#ab1f26" }}>*</span>
-      </p>
-      <YesNo value={hurt} onSelect={setHurt} />
-      <div style={{ marginTop: 10, marginBottom: 20 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
-          Additional comments
-        </p>
-        <input type="text" value={hurtComment} placeholder="Optional note…"
-          onChange={(e) => setHurtComment(e.target.value)} style={mobileInputStyle} />
-      </div>
+      {questions.map((q) => {
+        const entry = answers[q.id] ?? { answer: null, comment: "" };
+        const commentNeeded = attestationCommentRequired(q, entry.answer);
+        return (
+          <div key={q.id} style={{ marginBottom: 18 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
+              {q.question} <span style={{ color: "#ab1f26" }}>*</span>
+            </p>
+            <YesNo value={entry.answer} onSelect={(v) => setAnswer(q.id, v)} />
+            <div style={{ marginTop: 10 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
+                Additional comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
+              </p>
+              <input
+                type="text"
+                value={entry.comment}
+                placeholder={commentNeeded ? "Required" : "Optional note…"}
+                onChange={(e) => setComment(q.id, e.target.value)}
+                style={{
+                  ...mobileInputStyle,
+                  borderColor: commentNeeded && !entry.comment.trim() ? "#ab1f26" : "#cbced4",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
 
       <button type="button" disabled={!canSubmit} onClick={onSubmit} className="w-full"
         style={{
@@ -5165,14 +5688,15 @@ function NavSidebar({ activePage, onNavigate, collapsed, onToggleCollapse }: {
 
 // ─── Settings Sub-Nav ─────────────────────────────────────────────────────────
 const SETTINGS_ITEMS: { key: NavPage; label: string; icon: ReactNode }[] = [
-  { key: "s_settings",       label: "Settings",               icon: <Settings size={17} /> },
-  { key: "s_permissions",    label: "Permissions",            icon: <Shield size={17} /> },
-  { key: "s_time_off_setup", label: "Time Off Setup",         icon: <Clock size={17} /> },
-  { key: "s_notifications",  label: "Notifications",          icon: <AlignJustify size={17} /> },
-  { key: "s_tenant_images",  label: "Tenant Images",          icon: <FileText size={17} /> },
-  { key: "s_hour_rules",     label: "Hour Rules",             icon: <Filter size={17} /> },
-  { key: "s_rate_level",     label: "Rate Level",             icon: <BarChart2 size={17} /> },
-  { key: "s_auto_job",       label: "Automatic Job Settings", icon: <Wrench size={17} /> },
+  { key: "s_settings",           label: "Settings",               icon: <Settings size={17} /> },
+  { key: "s_permissions",        label: "Permissions",            icon: <Shield size={17} /> },
+  { key: "s_time_off_setup",     label: "Time Off Setup",         icon: <Clock size={17} /> },
+  { key: "s_notifications",      label: "Notifications",          icon: <AlignJustify size={17} /> },
+  { key: "s_tenant_images",      label: "Tenant Images",          icon: <FileText size={17} /> },
+  { key: "s_hour_rules",         label: "Hour Rules",             icon: <Filter size={17} /> },
+  { key: "s_timesheet_settings", label: "Timesheet Settings",     icon: <ClipboardList size={17} /> },
+  { key: "s_rate_level",         label: "Rate Level",             icon: <BarChart2 size={17} /> },
+  { key: "s_auto_job",           label: "Automatic Job Settings", icon: <Wrench size={17} /> },
 ];
 
 function SettingsSubNav({ activePage, onNavigate, navW }: {
@@ -5243,12 +5767,14 @@ function PlaceholderPage({ title }: { title: string }) {
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("s_hour_rules");
   const [navCollapsed, setNavCollapsed] = useState(true);
+  const [attestationQuestions, setAttestationQuestions] = useState<AttestationQuestion[]>(defaultAttestationQuestions);
   const inSettings = SETTINGS_PAGES.has(activePage);
   const navW = navCollapsed ? NAV_COLLAPSED_W : NAV_EXPANDED_W;
 
   const contentLeft = navW + (inSettings ? SETTINGS_NAV_W + 16 : 0);
 
   return (
+    <AttestationConfigContext.Provider value={{ questions: attestationQuestions, setQuestions: setAttestationQuestions }}>
     <div className="min-h-screen font-sans bg-[var(--modus-wc-color-base-page,#f1f1f6)]">
       <Toaster position="top-right" richColors />
       <TopBar onMenuClick={() => setNavCollapsed((v) => !v)} />
@@ -5275,8 +5801,9 @@ export default function App() {
         {activePage === "documents"         && <PlaceholderPage title="Documents" />}
         {activePage === "global_admin"      && <PlaceholderPage title="Global Admin" />}
         {/* Settings sub-pages */}
-        {activePage === "s_hour_rules"      && <JurisdictionSettings />}
-        {activePage === "s_settings"        && <PlaceholderPage title="Settings" />}
+        {activePage === "s_hour_rules"          && <JurisdictionSettings />}
+        {activePage === "s_timesheet_settings"  && <TimesheetSettings />}
+        {activePage === "s_settings"            && <PlaceholderPage title="Settings" />}
         {activePage === "s_permissions"     && <PlaceholderPage title="Permissions" />}
         {activePage === "s_time_off_setup"  && <PlaceholderPage title="Time Off Setup" />}
         {activePage === "s_notifications"   && <PlaceholderPage title="Notifications" />}
@@ -5285,5 +5812,6 @@ export default function App() {
         {activePage === "s_auto_job"        && <PlaceholderPage title="Automatic Job Settings" />}
       </div>
     </div>
+    </AttestationConfigContext.Provider>
   );
 }
