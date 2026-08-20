@@ -371,7 +371,7 @@ function RuleSetForm({
 
   const allTabs: { key: RuleSetTab; label: string; show: boolean }[] = [
     { key: "daily",     label: "Daily & Weekly Rules", show: true },
-    { key: "breaks",    label: "Breaks",         show: true },
+    { key: "breaks",    label: "Meal Breaks",    show: true },
     { key: "onDuty",    label: "On-Duty Meal",   show: true },
     { key: "kiosk",     label: "Kiosk Break",    show: !!showKiosk },
     { key: "equipment", label: "Equipment",      show: !!showEquipment },
@@ -501,12 +501,12 @@ function RuleSetForm({
 
 
 
-        {/* ── Breaks ── */}
+        {/* ── Meal Breaks ── */}
         {activeTab === "breaks" && (
           <div className="flex flex-col gap-[24px]">
             <ModusWcAlert variant="info"
               alertTitle="Two breaks, one type"
-              alertDescription="Administrators can configure exactly two breaks. All breaks must use the same type — Automatic, Flagged, or Premium — for consistent calculation."
+              alertDescription="Administrators can configure exactly two breaks. All breaks must use the same type — Automatic, Flagged, or Meal penalty — for consistent calculation."
             />
 
             <div>
@@ -517,7 +517,7 @@ function RuleSetForm({
                 {([
                   { value: "flagged" as BreakType, title: "Flagged", desc: "Violations are flagged for supervisor review." },
                   { value: "automatic" as BreakType, title: "Automatic", desc: "The system inserts qualifying breaks automatically." },
-                  { value: "premium" as BreakType, title: "Premium", desc: "Late or missed breaks trigger premium pay per violation rules below." },
+                  { value: "premium" as BreakType, title: "Meal penalty", desc: "Late or missed breaks trigger meal penalty pay per violation rules below." },
                 ]).map((opt) => {
                   const selected = mp.breakType === opt.value;
                   return (
@@ -640,12 +640,12 @@ function RuleSetForm({
             </CardShell>
 
             {mp.breakType === "premium" && (
-              <CardShell title="Break Premium Violations" badge="LC § 226.7" badgeColor="red"
-                action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">Auto-calculate premium pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
+              <CardShell title="Meal Penalty Violations" badge="LC § 226.7" badgeColor="red"
+                action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">Auto-calculate meal penalty pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
                 <div className={`transition-opacity duration-200 ${mp.penaltiesEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
                   <div className="px-[20px] pt-[14px] pb-[6px]">
                     <p className="text-[12px] text-[#464b52] leading-[18px]">
-                      By default, premium pay posts to the employee&apos;s clocked job. Choose <strong>Override</strong> to send a violation&apos;s cost to a specific department, job, and sub-job (e.g. administrative overhead).
+                      By default, meal penalty pay posts to the employee&apos;s clocked job. Choose <strong>Override</strong> to send a violation&apos;s cost to a specific department, job, and sub-job (e.g. administrative overhead).
                     </p>
                   </div>
                   <div className="px-[20px] pt-[8px] pb-[4px]">
@@ -811,14 +811,14 @@ function RuleSetForm({
                     <div>
                       <FieldLabel>Daily Stacking Cap</FieldLabel>
                       <NumberInput value={mp.stackingCap} onChange={(v) => setMp("stackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
-                      <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total premium pay per workday across all violations</p>
+                      <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total meal penalty pay per workday across all violations</p>
                     </div>
                   </div>
                 </div>
               </CardShell>
             )}
 
-            <CardShell title="Custom Reminders & Notifications" badge="Breaks" badgeColor="blue"
+            <CardShell title="Custom Reminders & Notifications" badge="Meal Breaks" badgeColor="blue"
               action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">{mp.freeMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.freeMealEnabled} onChange={(v) => setMp("freeMealEnabled", v)} /></div>}>
               <div className={`transition-opacity duration-200 ${mp.freeMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
                 <div className="px-[20px] pt-[14px] pb-[2px]">
@@ -1632,9 +1632,9 @@ type ViolationRule = {
 
 const VIOLATION_DESCRIPTIONS: Record<string, string> = {
   missed_break_attestation: "Coffee breaks not clocked out for — through attestation.",
-  missed_meal: "Premium applies when a required meal break was not taken.",
-  late_meal: "Premium applies when a meal break was taken outside the compliance window.",
-  short_meal: "Premium applies when a meal break was shorter than the minimum required duration.",
+  missed_meal: "Meal penalty applies when a required meal break was not taken.",
+  late_meal: "Meal penalty applies when a meal break was taken outside the compliance window.",
+  short_meal: "Meal penalty applies when a meal break was shorter than the minimum required duration.",
 };
 
 const defaultCostMapping = (): ViolationCostMapping => ({
@@ -1958,7 +1958,7 @@ function PresetDialog({ open, onClose, onConfirm }: { open: boolean; onClose: ()
             <p className="text-[12px] text-[#5a4a00] leading-[18px]">This action will overwrite all existing unsaved configurations with California baseline statutory values.</p>
           </div>
           <ul className="flex flex-col gap-[4px]">
-            {["5-hour meal trigger for Meal 1", "30-minute meal duration", "10-hour trigger for Meal 2", "LC § 226.7 premium pay penalty defaults", "Company → Union → State rule precedence"].map((item) => (
+            {["5-hour meal trigger for Meal 1", "30-minute meal duration", "10-hour trigger for Meal 2", "LC § 226.7 meal penalty pay defaults", "Company → Union → State rule precedence"].map((item) => (
               <li key={item} className="flex items-center gap-[6px] text-[12px] text-[#464b52]">
                 <Check size={12} className="text-[#006fb0] shrink-0" />{item}
               </li>
@@ -2163,7 +2163,7 @@ function JurisdictionSettings() {
         <div className="flex items-start justify-between mb-[12px]">
           <div>
             <h1 className="text-[22px] font-bold text-[#252a2e] leading-[32px]">Timesheet Hour Rules</h1>
-            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure hour rules, meal periods, break policies, and premiums by jurisdiction</p>
+            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure hour rules, meal periods, break policies, and meal penalties by jurisdiction</p>
           </div>
           <div className="flex items-center gap-[8px] mt-[4px]">
             <ModusWcBadge color="success" size="sm" variant="filled">
