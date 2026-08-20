@@ -22,8 +22,8 @@ import {
   GripVertical, Plus, Pencil, Info, Trash2,
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
-  AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils,
-  MapPin, LoaderCircle, Calendar, ClipboardList, Save,
+  AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils, Coffee,
+  MapPin, LoaderCircle, Calendar, ClipboardList, Save, Paperclip,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -137,9 +137,10 @@ function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88,
   );
 }
 
-function SelectField({ value, onChange, options, placeholder, disabled }: {
+function SelectField({ value, onChange, options, placeholder, disabled, customClass }: {
   value: string; onChange: (v: string) => void;
   options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean;
+  customClass?: string;
 }) {
   return (
     <ModusWcSelect
@@ -147,6 +148,7 @@ function SelectField({ value, onChange, options, placeholder, disabled }: {
       size="sm"
       value={value}
       disabled={disabled}
+      customClass={customClass}
       options={placeholder ? [{ label: placeholder, value: "" }, ...options] : options}
       onInputChange={(e) => onChange(e.target.value)}
     />
@@ -503,7 +505,7 @@ function RuleSetForm({
 
         {/* ── Meal Breaks ── */}
         {activeTab === "breaks" && (
-          <div className="flex flex-col gap-[24px]">
+          <div className="flex flex-col gap-[24px] min-w-0">
             <ModusWcAlert variant="info"
               alertTitle="Two breaks, one type"
               alertDescription="Administrators can configure exactly two breaks. All breaks must use the same type — Automatic, Flagged, or Meal penalty — for consistent calculation."
@@ -648,19 +650,29 @@ function RuleSetForm({
                       By default, meal penalty pay posts to the employee&apos;s clocked job. Choose <strong>Override</strong> to send a violation&apos;s cost to a specific department, job, and sub-job (e.g. administrative overhead).
                     </p>
                   </div>
-                  <div className="px-[20px] pt-[8px] pb-[4px]">
-                    <div className="overflow-x-auto rounded-[6px] border border-[#e0e1e9]">
-                      <table className="w-full border-collapse min-w-[1100px] text-[12px]">
+                  <div className="px-[20px] pt-[8px] pb-[4px] min-w-0">
+                    <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
+                      <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
+                        <colgroup>
+                          <col style={{ width: "5%" }} />
+                          <col style={{ width: "17%" }} />
+                          <col style={{ width: "13%" }} />
+                          <col style={{ width: "11%" }} />
+                          <col style={{ width: "12%" }} />
+                          <col style={{ width: "14%" }} />
+                          <col style={{ width: "14%" }} />
+                          <col style={{ width: "14%" }} />
+                        </colgroup>
                         <thead>
                           <tr className="bg-[#f5f5f8]">
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[32px]" />
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] min-w-[200px]">Violation</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Pay Type</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[130px]">Hours Rate</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Cost to</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[160px]">Department</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Job</th>
-                            <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[180px]">Sub-job</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Cost to</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Department</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Job</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Sub-job</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -689,12 +701,12 @@ function RuleSetForm({
                                 key={v.id}
                                 className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""} ${isOverride ? "border-l-[3px] border-l-[#006fb0]" : ""}`}
                               >
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] text-center">
                                   <Toggle enabled={v.enabled} onChange={(val) => updateViolation({ enabled: val })} />
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
-                                  <div className="flex flex-col gap-[4px]">
-                                    <div className="flex flex-wrap items-center gap-[6px]">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] min-w-0">
+                                  <div className="flex flex-col gap-[4px] min-w-0">
+                                    <div className="flex flex-wrap items-center gap-[6px] min-w-0">
                                       <ModusWcTooltip
                                         content={v.description}
                                         position="auto"
@@ -702,7 +714,7 @@ function RuleSetForm({
                                       >
                                         <button
                                           type="button"
-                                          className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help"
+                                          className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help break-words min-w-0"
                                           aria-describedby={`violation-tip-${v.id}`}
                                         >
                                           {v.label}
@@ -713,13 +725,14 @@ function RuleSetForm({
                                       )}
                                     </div>
                                     {overrideIncomplete && (
-                                      <span className="text-[12px] text-[#b45309]">Complete department, job, and sub-job.</span>
+                                      <span className="text-[12px] text-[#b45309] break-words">Complete department, job, and sub-job.</span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
-                                  <div className="pointer-events-auto">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                  <div className="pointer-events-auto min-w-0">
                                     <SelectField value={v.payType} onChange={(val) => updateViolation({ payType: val as PayType })}
+                                      customClass="w-full min-w-0"
                                       options={[
                                         { value: "regular", label: "Regular Rate" },
                                         { value: "overtime", label: "Overtime Rate (1.5×)" },
@@ -728,16 +741,17 @@ function RuleSetForm({
                                       ]} />
                                   </div>
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center">
-                                  <div className="flex justify-center pointer-events-auto">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center min-w-0">
+                                  <div className="flex justify-center pointer-events-auto min-w-0">
                                     <NumberInput value={v.hoursRate} onChange={(val) => updateViolation({ hoursRate: val })}
-                                      step={0.25} min={0} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
+                                      step={0.25} min={0} width={72} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
                                   </div>
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
-                                  <div className="pointer-events-auto min-w-[140px]">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                  <div className="pointer-events-auto min-w-0">
                                     <SelectField
                                       value={v.costMapping.mode}
+                                      customClass="w-full min-w-0"
                                       onChange={(val) => {
                                         if (val === "override") {
                                           updateViolation({ costMapping: defaultOverrideCostMapping() });
@@ -752,11 +766,12 @@ function RuleSetForm({
                                     />
                                   </div>
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
                                   {isOverride ? (
-                                    <div className="pointer-events-auto min-w-[140px]">
+                                    <div className="pointer-events-auto min-w-0">
                                       <SelectField
                                         value={v.costMapping.department}
+                                        customClass="w-full min-w-0"
                                         onChange={(val) => updateCostMapping({ department: val })}
                                         placeholder="Select department"
                                         options={VIOLATION_DEPT_OPTIONS.map((d) => ({ value: d, label: d }))}
@@ -766,11 +781,12 @@ function RuleSetForm({
                                     <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
                                   )}
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
                                   {isOverride ? (
-                                    <div className="pointer-events-auto min-w-[140px]">
+                                    <div className="pointer-events-auto min-w-0">
                                       <SelectField
                                         value={v.costMapping.jobCode}
+                                        customClass="w-full min-w-0"
                                         onChange={(val) => {
                                           const nextJob = jobFromCatalog(val);
                                           updateCostMapping({
@@ -786,11 +802,12 @@ function RuleSetForm({
                                     <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
                                   )}
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[12px] py-[8px]">
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
                                   {isOverride ? (
-                                    <div className="pointer-events-auto min-w-[140px]">
+                                    <div className="pointer-events-auto min-w-0">
                                       <SelectField
                                         value={v.costMapping.phaseCode}
+                                        customClass="w-full min-w-0"
                                         onChange={(val) => updateCostMapping({ phaseCode: val })}
                                         placeholder="Select sub-job"
                                         options={phaseOptions}
@@ -1668,6 +1685,7 @@ type AttestationQuestion = {
   validAnswer: AttestationAnswer;
   requireComment: boolean;
   requireCommentOnInvalid: boolean;
+  safetyRelated: boolean;
   violationId: string;
   persisted: boolean;
 };
@@ -1679,6 +1697,7 @@ const defaultAttestationQuestions = (): AttestationQuestion[] => [
     validAnswer: "yes",
     requireComment: false,
     requireCommentOnInvalid: true,
+    safetyRelated: false,
     violationId: "missed_break_attestation",
     persisted: true,
   },
@@ -1688,6 +1707,7 @@ const defaultAttestationQuestions = (): AttestationQuestion[] => [
     validAnswer: "no",
     requireComment: false,
     requireCommentOnInvalid: false,
+    safetyRelated: true,
     violationId: "",
     persisted: true,
   },
@@ -1703,6 +1723,30 @@ const AttestationConfigContext = createContext<AttestationConfigContextValue | n
 function useAttestationConfig() {
   const ctx = useContext(AttestationConfigContext);
   if (!ctx) throw new Error("useAttestationConfig must be used within AttestationConfigProvider");
+  return ctx;
+}
+
+type ViewingRole = "admin" | "supervisor" | "foreman" | "payroll";
+
+const VIEWING_ROLE_LABELS: Record<ViewingRole, string> = {
+  admin: "System Administrator",
+  supervisor: "Supervisor",
+  foreman: "Foreman",
+  payroll: "Payroll Officer",
+};
+
+type ViewingRoleContextValue = {
+  viewingAs: ViewingRole;
+  setViewingAs: (role: ViewingRole) => void;
+  canDeleteBreakViolations: boolean;
+  viewerLabel: string;
+};
+
+const ViewingRoleContext = createContext<ViewingRoleContextValue | null>(null);
+
+function useViewingRole() {
+  const ctx = useContext(ViewingRoleContext);
+  if (!ctx) throw new Error("useViewingRole must be used within ViewingRoleProvider");
   return ctx;
 }
 
@@ -1993,6 +2037,7 @@ function TimesheetSettings() {
         validAnswer: "yes",
         requireComment: false,
         requireCommentOnInvalid: false,
+        safetyRelated: false,
         violationId: "",
         persisted: false,
       },
@@ -2061,6 +2106,7 @@ function TimesheetSettings() {
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Valid Answer</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Require Comment</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[210px]">Require Comment on Invalid Answer</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[120px]">Safety Related</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Break Violation</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[60px]" />
                   </tr>
@@ -2068,7 +2114,7 @@ function TimesheetSettings() {
                 <tbody>
                   {draftQuestions.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="border-b border-[#e0e1e9] px-[12px] py-[24px] text-center text-[12px] text-[#6a6e79]">
+                      <td colSpan={7} className="border-b border-[#e0e1e9] px-[12px] py-[24px] text-center text-[12px] text-[#6a6e79]">
                         No attestation questions yet. Click &quot;Add Question&quot; to create one.
                       </td>
                     </tr>
@@ -2106,6 +2152,20 @@ function TimesheetSettings() {
                           value={q.requireCommentOnInvalid}
                           onChange={(v) => updateQuestion(q.id, { requireCommentOnInvalid: v })}
                           ariaLabel="Require comment on invalid answer"
+                        />
+                      </td>
+                      <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
+                        <ModusWcCheckbox
+                          aria-label={`Safety related: ${q.question || "new question"}`}
+                          size="sm"
+                          value={q.safetyRelated}
+                          onInputChange={(e) => {
+                            const next = Boolean(
+                              (e as CustomEvent<{ target?: { checked?: boolean } }>).detail?.target?.checked
+                                ?? !q.safetyRelated,
+                            );
+                            updateQuestion(q.id, { safetyRelated: next });
+                          }}
                         />
                       </td>
                       <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
@@ -2439,10 +2499,12 @@ function EmployeeRow({ emp, idx, selected, onToggle, alerted, onAlert }: {
 const SEARCH_PATH = "M10.0173 8.96129L9.51484 8.99879L9.20734 8.69129C11.0373 6.58379 10.9173 3.36629 8.83234 1.41629C6.74734 -0.533713 3.57484 -0.428713 1.60234 1.47629C-0.51266 3.52379 -0.53516 6.89129 1.54234 8.96129C3.49984 10.9188 6.61984 11.0013 8.68234 9.21629L8.98984 9.52379L8.95234 10.0113L11.8698 12.9288C12.1623 13.2213 12.6348 13.2213 12.9273 12.9288C13.2198 12.6363 13.2198 12.1638 12.9273 11.8713L10.0173 8.96129ZM7.90234 7.90379C6.43984 9.36629 4.05484 9.36629 2.59234 7.90379C1.12984 6.44129 1.12984 4.05629 2.59234 2.59379C4.05484 1.13129 6.43984 1.13129 7.90234 2.59379C9.36484 4.05629 9.36484 6.44129 7.90234 7.90379Z";
 const CHEVRON_PATH = "M8.80125 0.323444C8.35875 -0.111556 7.64625 -0.104056 7.21125 0.323444L4.56375 2.97094L1.91625 0.323444C1.49625 -0.104056 0.75375 -0.104056 0.32625 0.323444C-0.10875 0.758444 -0.10875 1.47094 0.32625 1.91344L3.76875 5.35594C3.98625 5.57344 4.27875 5.68594 4.56375 5.68594C4.84875 5.68594 5.14125 5.57344 5.35875 5.35594L8.80125 1.91344C8.90566 1.80905 8.98848 1.68511 9.04498 1.5487C9.10149 1.41229 9.13057 1.26609 9.13057 1.11844C9.13057 0.970796 9.10149 0.824595 9.04498 0.688188C8.98848 0.551782 8.90566 0.427841 8.80125 0.323444Z";
 
-function StyledCheckbox({ checked, onChange, indeterminate }: { checked: boolean; onChange: () => void; indeterminate?: boolean }) {
+function StyledCheckbox({ checked, onChange, indeterminate, ariaLabel }: {
+  checked: boolean; onChange: () => void; indeterminate?: boolean; ariaLabel?: string;
+}) {
   return (
     <ModusWcCheckbox
-      aria-label="Select row"
+      aria-label={ariaLabel ?? "Select row"}
       size="sm"
       value={checked}
       indeterminate={!!indeterminate}
@@ -5519,10 +5581,2014 @@ function ComplianceDashboard() {
   );
 }
 
+// ─── Timesheet Summary ────────────────────────────────────────────────────────
+
+type ViolationRowStatus = "pending" | "approved" | "deleted";
+
+type SummaryAttestationDay = { label: string; date: number };
+
+type SummaryViolation = {
+  id: string;
+  parentEntryId: string;
+  violationTypeId: string;
+  label: string;
+  date: string;
+  start: string;
+  end: string;
+  dept: string;
+  job: string;
+  phase: string;
+  state: string;
+  wo: string;
+  payRate: string;
+  reg: number;
+  ot: number;
+  dt: number;
+  travel: number;
+  qty: number;
+  perDiem: number;
+  perDiemRate: number;
+  unionCode: string;
+  wageCode: string;
+  rateLevel: string;
+  comment: string;
+  approvedBy?: string;
+  secondApprovedBy?: string;
+  complete: boolean;
+  exported: boolean;
+  status: ViolationRowStatus;
+  deletionComment?: string;
+  deletedBy?: string;
+};
+
+type SummaryTimesheetEntry = {
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  dept: string;
+  job: string;
+  phase: string;
+  state: string;
+  wo: string;
+  payRate: string;
+  reg: number;
+  ot: number;
+  dt: number;
+  travel: number;
+  qty: number;
+  perDiem: number;
+  perDiemRate: number;
+  unionCode: string;
+  wageCode: string;
+  rateLevel: string;
+  comment: string;
+  approvedBy?: string;
+  secondApprovedBy?: string;
+  complete: boolean;
+  exported: boolean;
+  hourAlert?: boolean;
+  jobHighlight?: boolean;
+  phaseHighlight?: boolean;
+};
+
+type SummaryBreakRow = {
+  id: string;
+  parentEntryId: string;
+  date: string;
+  start: string;
+  end: string;
+  duration: number;
+  dept: string;
+  job: string;
+  state: string;
+  wo: string;
+  payRate: string;
+  unionCode: string;
+  wageCode: string;
+  rateLevel: string;
+  comment: string;
+  approvedBy?: string;
+  secondApprovedBy?: string;
+  complete: boolean;
+  exported: boolean;
+};
+
+type SummaryExpense = {
+  id: string;
+  date: string;
+  dept: string;
+  job: string;
+  phase: string;
+  name: string;
+  category: string;
+  vendor: string;
+  total: number;
+  addedBy: string;
+  attachments: number;
+  comment: string;
+  approvedBy?: string;
+  secondApprovedBy?: string;
+  exported: boolean;
+};
+
+type SummaryEmployee = {
+  id: string;
+  name: string;
+  employeeNum: string;
+  initials: string;
+  attestationDays: SummaryAttestationDay[];
+  entries: SummaryTimesheetEntry[];
+  breaks: SummaryBreakRow[];
+  expenses: SummaryExpense[];
+  violations: SummaryViolation[];
+};
+
+const violationFromEntry = (
+  id: string,
+  parentEntryId: string,
+  violationTypeId: string,
+  label: string,
+  entry: SummaryTimesheetEntry,
+  hours = 1.0,
+): SummaryViolation => ({
+  id,
+  parentEntryId,
+  violationTypeId,
+  label,
+  date: entry.date,
+  start: "—",
+  end: "—",
+  dept: entry.dept,
+  job: entry.job,
+  phase: `${label} Premium`,
+  state: entry.state,
+  wo: entry.wo,
+  payRate: entry.payRate,
+  reg: hours,
+  ot: 0,
+  dt: 0,
+  travel: 0,
+  qty: 0,
+  perDiem: 0,
+  perDiemRate: 0,
+  unionCode: entry.unionCode,
+  wageCode: entry.wageCode,
+  rateLevel: entry.rateLevel,
+  comment: "",
+  complete: false,
+  exported: false,
+  status: "pending",
+});
+
+const SUMMARY_MOCK_EMPLOYEES: SummaryEmployee[] = [
+  {
+    id: "emp-adam",
+    name: "Adam Hazey",
+    employeeNum: "740",
+    initials: "AH",
+    attestationDays: [{ label: "Sat", date: 15 }],
+    entries: [
+      {
+        id: "adam-1",
+        date: "Sat, Aug 15",
+        start: "7:00 AM", end: "10:00 AM",
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt",
+        state: "TX", wo: "WO-8841", payRate: "$42.50",
+        reg: 3, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+      },
+    ],
+    breaks: [
+      {
+        id: "adam-break-1",
+        parentEntryId: "adam-1",
+        date: "Sat, Aug 15",
+        start: "8:30 AM", end: "9:00 AM",
+        duration: 0.5,
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub",
+        state: "TX", wo: "WO-8841", payRate: "$42.50",
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+      },
+    ],
+    expenses: [],
+    violations: [],
+  },
+  {
+    id: "emp-connor",
+    name: "Connor McDavid",
+    employeeNum: "053",
+    initials: "CM",
+    attestationDays: [
+      { label: "Sat", date: 15 },
+      { label: "Mon", date: 17 },
+      { label: "Tue", date: 18 },
+    ],
+    entries: [
+      {
+        id: "connor-1",
+        date: "Sat, Aug 15",
+        start: "6:00 AM", end: "6:00 PM",
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt",
+        state: "TX", wo: "WO-8841", payRate: "$48.00",
+        reg: 12, ot: 2, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        complete: false, exported: false, hourAlert: true,
+      },
+      {
+        id: "connor-2",
+        date: "Mon, Aug 17",
+        start: "6:30 AM", end: "3:30 PM",
+        dept: "Main Orders", job: "003700 - Job B", phase: "5555 - Phase B",
+        state: "TX", wo: "WO-9012", payRate: "$48.00",
+        reg: 8, ot: 0, dt: 0, travel: 1, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+        hourAlert: true, jobHighlight: true, phaseHighlight: true,
+      },
+      {
+        id: "connor-3",
+        date: "Tue, Aug 18",
+        start: "7:00 AM", end: "3:00 PM",
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub", phase: "5554 - Renewal - Asphalt",
+        state: "TX", wo: "WO-8841", payRate: "$48.00",
+        reg: 8, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+        hourAlert: true,
+      },
+      {
+        id: "connor-4",
+        date: "Tue, Aug 18",
+        start: "3:00 PM", end: "5:00 PM",
+        dept: "Main Orders", job: "003701 - Job C", phase: "5556 - Phase C",
+        state: "TX", wo: "WO-9155", payRate: "$48.00",
+        reg: 0, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+        jobHighlight: true,
+      },
+    ],
+    breaks: [
+      {
+        id: "connor-break-sat",
+        parentEntryId: "connor-1",
+        date: "Sat, Aug 15",
+        start: "12:00 PM", end: "12:30 PM",
+        duration: 0.5,
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub",
+        state: "TX", wo: "WO-8841", payRate: "$48.00",
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        complete: false, exported: false,
+      },
+      {
+        id: "connor-break-tue",
+        parentEntryId: "connor-3",
+        date: "Tue, Aug 18",
+        start: "12:00 PM", end: "12:30 PM",
+        duration: 0.5,
+        dept: "Main Orders", job: "003699 - AEP Carrollton Sub",
+        state: "TX", wo: "WO-8841", payRate: "$48.00",
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
+        approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
+      },
+    ],
+    expenses: [
+      {
+        id: "connor-exp-1",
+        date: "Tue, Aug 18",
+        dept: "Main Orders",
+        job: "003699 - AEP Carrollton Sub",
+        phase: "5554 - Renewal - Asphalt",
+        name: "Connor McDavid",
+        category: "Airfare",
+        vendor: "American Airlines",
+        total: 30,
+        addedBy: "Connor McDavid",
+        attachments: 1,
+        comment: "",
+        approvedBy: "Luc Peron",
+        secondApprovedBy: "Luc Peron",
+        exported: false,
+      },
+    ],
+    violations: [],
+  },
+];
+
+const BREAK_VIOLATION_IDS = new Set([
+  "missed_break_attestation",
+  "missed_meal",
+  "late_meal",
+  "short_meal",
+]);
+
+const isBreakViolation = (v: SummaryViolation) => BREAK_VIOLATION_IDS.has(v.violationTypeId);
+
+const connorEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-connor")!;
+connorEmp.violations = [
+  violationFromEntry("viol-connor-1-meal", "connor-1", "missed_meal", "Missed Meal", connorEmp.entries[0]),
+  violationFromEntry("viol-connor-1-rest", "connor-1", "missed_break_attestation", "Missed Rest Break", connorEmp.entries[0]),
+  violationFromEntry("viol-connor-2-meal", "connor-2", "missed_meal", "Missed Meal", connorEmp.entries[1]),
+  violationFromEntry("viol-connor-3-late", "connor-3", "late_meal", "Late Meal", connorEmp.entries[2]),
+  {
+    ...violationFromEntry(
+      "viol-connor-deleted-break",
+      "connor-2",
+      "missed_break_attestation",
+      "Missed break",
+      connorEmp.entries[1],
+    ),
+    status: "deleted",
+    approvedBy: undefined,
+    secondApprovedBy: undefined,
+    complete: false,
+  },
+];
+
+function ViolationRemoveModal({
+  premiumLabel,
+  isBreakViolation: breakViolation,
+  onConfirm,
+  onClose,
+}: {
+  premiumLabel: string;
+  isBreakViolation?: boolean;
+  onConfirm: (comment: string) => void;
+  onClose: () => void;
+}) {
+  const [comment, setComment] = useState("");
+  const valid = comment.trim().length >= 8;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+      <div className="relative w-[480px] rounded-[8px] bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-[#e0e1e9] px-[20px] py-[14px]">
+          <span className="text-[14px] font-bold text-[#252a2e]" style={{ fontFamily: OS }}>
+            {breakViolation ? "Delete Break Violation" : "Remove Violation"}
+          </span>
+          <button type="button" onClick={onClose} className="text-[#6a6e79] hover:text-[#252a2e] transition-colors" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-[20px] py-[16px]">
+          <div className="mb-[14px] flex gap-[10px] rounded-[4px] border border-[#fbad26] bg-[#fffbf0] p-[12px]">
+            <AlertTriangle size={16} className="mt-[1px] shrink-0 text-[#856404]" />
+            <p className="text-[12px] text-[#5a4a00] leading-[18px]" style={{ fontFamily: OS }}>
+              Deleting <strong>{premiumLabel}</strong> removes premium pay but keeps the row on the timesheet for audit. A business reason is required.
+            </p>
+          </div>
+          <ModusWcTextarea
+            label="Deletion reason (required)"
+            size="sm"
+            required
+            value={comment}
+            placeholder="Explain why this penalty should not be paid…"
+            onInputChange={(e) => setComment(e.target.value)}
+          />
+          {comment.trim().length > 0 && !valid && (
+            <p className="mt-[6px] text-[11px] text-[#ab1f26]" style={{ fontFamily: OS }}>Enter at least 8 characters.</p>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-[8px] border-t border-[#e0e1e9] px-[20px] py-[12px]">
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={onClose}>Cancel</ModusWcButton>
+          <ModusWcButton
+            color="primary"
+            variant="filled"
+            size="sm"
+            disabled={!valid}
+            onButtonClick={() => { if (valid) onConfirm(comment.trim()); }}
+          >
+            <ModusWcIcon name="delete" variant="outlined" size="xs" decorative />
+            Delete Violation
+          </ModusWcButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SUMMARY_TABLE_COLS = [
+  "Approved By", "Second Approved By", "Complete", "Exported",
+  "Name", "Employee #", "Date", "Start", "End", "Department", "Job", "Phase", "State", "WO#",
+  "Pay Rate", "Reg", "OT", "DT", "Travel", "Quantity", "Per Diem", "Per Diem Rate", "Union Code", "Wage Code", "Rate Level", "Comment",
+] as const;
+
+const SUMMARY_TABLE_ICON_COL_WIDTH = "2%";
+const SUMMARY_TABLE_COL_WIDTH_OVERRIDES: Partial<Record<(typeof SUMMARY_TABLE_COLS)[number], number>> = {
+  Job: 11,
+  Phase: 9.5,
+  Comment: 8,
+};
+const SUMMARY_TABLE_RESERVED_COL_WIDTH = Object.values(SUMMARY_TABLE_COL_WIDTH_OVERRIDES).reduce((sum, width) => sum + width, 0);
+const SUMMARY_TABLE_DEFAULT_COL_WIDTH =
+  (98 - SUMMARY_TABLE_RESERVED_COL_WIDTH) / (SUMMARY_TABLE_COLS.length - Object.keys(SUMMARY_TABLE_COL_WIDTH_OVERRIDES).length);
+const SUMMARY_TABLE_COL_WIDTHS = SUMMARY_TABLE_COLS.map((col) => {
+  const override = SUMMARY_TABLE_COL_WIDTH_OVERRIDES[col];
+  return `${override ?? SUMMARY_TABLE_DEFAULT_COL_WIDTH}%`;
+});
+const SUMMARY_TABLE_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-top break-words";
+const BREAK_ROW_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-middle border-0";
+const SUMMARY_TABLE_HEADERS: { label: string; title: string }[] = [
+  { label: "Appr. By", title: "Approved By" },
+  { label: "2nd Appr.", title: "Second Approved By" },
+  { label: "Done", title: "Complete" },
+  { label: "Exp.", title: "Exported" },
+  { label: "Name", title: "Name" },
+  { label: "Emp #", title: "Employee #" },
+  { label: "Date", title: "Date" },
+  { label: "Start", title: "Start" },
+  { label: "End", title: "End" },
+  { label: "Dept", title: "Department" },
+  { label: "Job", title: "Job" },
+  { label: "Phase", title: "Phase" },
+  { label: "St", title: "State" },
+  { label: "WO#", title: "WO#" },
+  { label: "Pay Rt", title: "Pay Rate" },
+  { label: "Reg", title: "Reg" },
+  { label: "OT", title: "OT" },
+  { label: "DT", title: "DT" },
+  { label: "Trvl", title: "Travel" },
+  { label: "Qty", title: "Quantity" },
+  { label: "PD", title: "Per Diem" },
+  { label: "PD Rt", title: "Per Diem Rate" },
+  { label: "Union", title: "Union Code" },
+  { label: "Wage", title: "Wage Code" },
+  { label: "Rate", title: "Rate Level" },
+  { label: "Comment", title: "Comment" },
+];
+
+type SummaryTableRow =
+  | { kind: "entry"; data: SummaryTimesheetEntry }
+  | { kind: "break"; data: SummaryBreakRow }
+  | { kind: "violation"; data: SummaryViolation };
+
+function buildSummaryTableRows(employee: SummaryEmployee): SummaryTableRow[] {
+  const rows: SummaryTableRow[] = [];
+  for (const entry of employee.entries) {
+    rows.push({ kind: "entry", data: entry });
+    for (const breakRow of employee.breaks.filter((b) => b.parentEntryId === entry.id)) {
+      rows.push({ kind: "break", data: breakRow });
+    }
+  }
+  return rows;
+}
+
+function buildBreakViolationRows(employee: SummaryEmployee): SummaryViolation[] {
+  const rows: SummaryViolation[] = [];
+  for (const entry of employee.entries) {
+    for (const violation of employee.violations.filter(
+      (v) => v.parentEntryId === entry.id && isBreakViolation(v),
+    )) {
+      rows.push(violation);
+    }
+  }
+  return rows;
+}
+
+const SUMMARY_APPROVED_ROW_BG = "#e8f7ed";
+
+function isSummaryRowApproved(row: SummaryTableRow): boolean {
+  if (row.kind === "entry" || row.kind === "break") return !!row.data.approvedBy;
+  return row.data.status !== "deleted" && (row.data.status === "approved" || !!row.data.approvedBy);
+}
+
+function summaryEntryStripeIndex(tableRows: SummaryTableRow[], idx: number): number {
+  const row = tableRows[idx];
+  if (row.kind === "entry") {
+    return tableRows.slice(0, idx).filter((r) => r.kind === "entry").length;
+  }
+  if (row.kind === "break") {
+    const parentIdx = tableRows.findIndex(
+      (r) => r.kind === "entry" && r.data.id === row.data.parentEntryId,
+    );
+    if (parentIdx >= 0) {
+      return tableRows.slice(0, parentIdx).filter((r) => r.kind === "entry").length;
+    }
+  }
+  return idx;
+}
+
+function summaryRowBackground(row: SummaryTableRow, stripeIdx: number): string {
+  if (row.kind === "violation" && row.data.status === "deleted") return "#f7f7f8";
+  if (isSummaryRowApproved(row)) return SUMMARY_APPROVED_ROW_BG;
+  if (row.kind === "violation") return "#fffbeb";
+  return stripeIdx % 2 === 0 ? "#ffffff" : "#fafafa";
+}
+
+function summaryRowBorder(row: SummaryTableRow): string {
+  if (row.kind === "violation" && row.data.status === "deleted") return "1px solid #e0e1e9";
+  if (row.kind === "violation" && !isSummaryRowApproved(row)) return "1px solid #fde68a";
+  if (isSummaryRowApproved(row)) return "1px solid #bbe6ca";
+  return "1px solid #e0e1e9";
+}
+
+function readSummaryInputString(e: CustomEvent | { target?: { value?: string } }): string {
+  return String(
+    (e as CustomEvent<{ target?: { value?: string } }>).detail?.target?.value
+    ?? (e as { target?: { value?: string } }).target?.value
+    ?? "",
+  );
+}
+
+function summaryCellId(rowKind: SummaryTableRow["kind"], rowId: string, field: string) {
+  return `${rowKind}:${rowId}:${field}`;
+}
+
+type SummaryRowPatch = Partial<{
+  approvedBy: string | undefined;
+  secondApprovedBy: string | undefined;
+  complete: boolean;
+  exported: boolean;
+  date: string;
+  start: string;
+  end: string;
+  dept: string;
+  job: string;
+  phase: string;
+  state: string;
+  wo: string;
+  payRate: string;
+  reg: number;
+  ot: number;
+  dt: number;
+  travel: number;
+  qty: number;
+  perDiem: number;
+  perDiemRate: number;
+  unionCode: string;
+  wageCode: string;
+  rateLevel: string;
+  comment: string;
+  deletedBy: string | undefined;
+  deletionComment: string | undefined;
+}>;
+
+function SummaryClickEditTextCell({
+  cellId,
+  activeCellId,
+  setActiveCellId,
+  value,
+  onSave,
+  ariaLabel,
+  display,
+  editable = true,
+  className = "",
+  cellClassName = SUMMARY_TABLE_CELL,
+}: {
+  cellId: string;
+  activeCellId: string | null;
+  setActiveCellId: (id: string | null) => void;
+  value: string;
+  onSave: (v: string) => void;
+  ariaLabel: string;
+  display?: ReactNode;
+  editable?: boolean;
+  className?: string;
+  cellClassName?: string;
+}) {
+  const editing = activeCellId === cellId;
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    if (editing) setDraft(value);
+  }, [editing, value]);
+
+  const commit = () => {
+    if (draft !== value) onSave(draft);
+    setActiveCellId(null);
+  };
+
+  const cancel = () => {
+    setDraft(value);
+    setActiveCellId(null);
+  };
+
+  if (!editable) {
+    return (
+      <td className={`${cellClassName} ${className}`} style={{ fontFamily: OS, border: cellClassName === BREAK_ROW_CELL ? "none" : undefined }}>
+        {display ?? value}
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={`${cellClassName} ${!editing ? "cursor-text" : ""} ${className}`}
+      style={{ fontFamily: OS, border: cellClassName === BREAK_ROW_CELL ? "none" : undefined }}
+      onClick={!editing ? () => setActiveCellId(cellId) : undefined}
+    >
+      {editing ? (
+        <div
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") cancel();
+          }}
+        >
+          <ModusWcTextInput
+            aria-label={ariaLabel}
+            size="sm"
+            customClass="w-full min-w-0"
+            value={draft}
+            onInputChange={(e) => setDraft(readSummaryInputString(e))}
+            onBlur={commit}
+          />
+        </div>
+      ) : (
+        display ?? value
+      )}
+    </td>
+  );
+}
+
+function SummaryClickEditNumberCell({
+  cellId,
+  activeCellId,
+  setActiveCellId,
+  value,
+  onSave,
+  ariaLabel,
+  display,
+  editable = true,
+  className = "",
+}: {
+  cellId: string;
+  activeCellId: string | null;
+  setActiveCellId: (id: string | null) => void;
+  value: number;
+  onSave: (v: number) => void;
+  ariaLabel: string;
+  display?: ReactNode;
+  editable?: boolean;
+  className?: string;
+}) {
+  const editing = activeCellId === cellId;
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    if (editing) setDraft(String(value));
+  }, [editing, value]);
+
+  const commit = () => {
+    const parsed = parseFloat(draft);
+    const next = Number.isFinite(parsed) ? parsed : 0;
+    if (next !== value) onSave(next);
+    setActiveCellId(null);
+  };
+
+  const cancel = () => {
+    setDraft(String(value));
+    setActiveCellId(null);
+  };
+
+  if (!editable) {
+    return (
+      <td className={`${SUMMARY_TABLE_CELL} ${className}`} style={{ fontFamily: OS }}>
+        {display ?? (value > 0 ? value : "—")}
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={`${SUMMARY_TABLE_CELL} ${!editing ? "cursor-text" : ""} ${className}`}
+      style={{ fontFamily: OS }}
+      onClick={!editing ? () => setActiveCellId(cellId) : undefined}
+    >
+      {editing ? (
+        <div
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") cancel();
+          }}
+        >
+          <ModusWcNumberInput
+            aria-label={ariaLabel}
+            size="sm"
+            customClass="w-full min-w-0"
+            value={draft}
+            onInputChange={(e) => setDraft(readSummaryInputString(e))}
+            onBlur={commit}
+          />
+        </div>
+      ) : (
+        display ?? (value > 0 ? value : "—")
+      )}
+    </td>
+  );
+}
+
+function SummaryEditableDataCells({
+  rowKind,
+  rowId,
+  employee,
+  data,
+  activeCellId,
+  setActiveCellId,
+  onPatch,
+  onEmployeePatch,
+  editable = true,
+  hourAlert,
+  jobHighlight,
+  phaseHighlight,
+  deleted,
+  hoursMode = "full",
+  phaseExtra,
+  approvedByCell,
+  secondApprovedByCell,
+  completeCell,
+  exportedCell,
+}: {
+  rowKind: SummaryTableRow["kind"];
+  rowId: string;
+  employee: SummaryEmployee;
+  data: SummaryRowPatch & { complete: boolean; exported: boolean; date: string; start: string; end: string; dept: string; job: string; state: string; wo: string; payRate: string; unionCode: string; wageCode: string; rateLevel: string; comment: string; reg?: number; ot?: number; dt?: number; travel?: number; qty?: number; perDiem?: number; perDiemRate?: number; phase?: string; approvedBy?: string; secondApprovedBy?: string };
+  activeCellId: string | null;
+  setActiveCellId: (id: string | null) => void;
+  onPatch: (patch: SummaryRowPatch) => void;
+  onEmployeePatch: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
+  editable?: boolean;
+  hourAlert?: boolean;
+  jobHighlight?: boolean;
+  phaseHighlight?: boolean;
+  deleted?: boolean;
+  hoursMode?: "full" | "dash";
+  phaseExtra?: ReactNode;
+  approvedByCell?: ReactNode;
+  secondApprovedByCell?: ReactNode;
+  completeCell?: ReactNode;
+  exportedCell?: ReactNode;
+}) {
+  const cell = (field: string) => summaryCellId(rowKind, rowId, field);
+  const hourCell = (val: number, alert?: boolean, strike?: boolean) => (
+    <span style={{
+      color: strike ? "#6a6e79" : alert && val > 0 ? "#ab1f26" : "#252a2e",
+      fontWeight: alert && val > 0 && !strike ? 700 : 400,
+      textDecoration: strike ? "line-through" : "none",
+    }}>
+      {val > 0 ? val.toFixed(2) : "—"}
+    </span>
+  );
+  const highlightCell = (val: string, on?: boolean, strike?: boolean) => (
+    <span style={{
+      display: "inline-block",
+      padding: "2px 6px",
+      borderRadius: 4,
+      background: on && !strike ? "#dcedf9" : "transparent",
+      color: strike ? "#6a6e79" : "#252a2e",
+      textDecoration: strike ? "line-through" : "none",
+    }}>
+      {val}
+    </span>
+  );
+  const statusMark = (done: boolean) =>
+    done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
+  const dash = <span style={{ color: "#a3a3a3" }}>—</span>;
+  const hoursEditable = editable && hoursMode === "full";
+
+  return (
+    <>
+      <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+        {approvedByCell ?? (
+          data.approvedBy ? (
+            <span
+              className={editable ? "inline-flex cursor-text items-center gap-[4px] min-w-0" : "inline-flex items-center gap-[4px] min-w-0"}
+              onClick={editable ? () => setActiveCellId(cell("approvedBy")) : undefined}
+            >
+              <Check size={12} color="#15803d" />
+              {activeCellId === cell("approvedBy") ? (
+                <ModusWcTextInput
+                  aria-label="Approved by"
+                  size="sm"
+                  customClass="w-full min-w-0"
+                  value={data.approvedBy}
+                  onInputChange={(e) => onPatch({ approvedBy: readSummaryInputString(e) || undefined })}
+                  onBlur={() => setActiveCellId(null)}
+                />
+              ) : (
+                <span className="text-[10px] break-words">{data.approvedBy}</span>
+              )}
+            </span>
+          ) : (
+            <StyledCheckbox checked={false} onChange={() => {}} />
+          )
+        )}
+      </td>
+      <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+        {secondApprovedByCell ?? (
+          data.secondApprovedBy ? (
+            <span
+              className={editable ? "inline-flex cursor-text items-center gap-[4px] min-w-0" : "inline-flex items-center gap-[4px] min-w-0"}
+              onClick={editable ? () => setActiveCellId(cell("secondApprovedBy")) : undefined}
+            >
+              <Check size={12} color="#15803d" />
+              {activeCellId === cell("secondApprovedBy") ? (
+                <ModusWcTextInput
+                  aria-label="Second approved by"
+                  size="sm"
+                  customClass="w-full min-w-0"
+                  value={data.secondApprovedBy}
+                  onInputChange={(e) => onPatch({ secondApprovedBy: readSummaryInputString(e) || undefined })}
+                  onBlur={() => setActiveCellId(null)}
+                />
+              ) : (
+                <span className="text-[10px] break-words">{data.secondApprovedBy}</span>
+              )}
+            </span>
+          ) : (
+            <StyledCheckbox checked={false} onChange={() => {}} />
+          )
+        )}
+      </td>
+      <td
+        className={`${SUMMARY_TABLE_CELL} ${editable ? "cursor-pointer" : ""}`}
+        style={{ fontFamily: OS }}
+        onClick={editable && !completeCell ? () => onPatch({ complete: !data.complete }) : undefined}
+      >
+        {completeCell ?? statusMark(data.complete)}
+      </td>
+      <td
+        className={`${SUMMARY_TABLE_CELL} ${editable ? "cursor-pointer" : ""}`}
+        style={{ fontFamily: OS }}
+        onClick={editable && !exportedCell ? () => onPatch({ exported: !data.exported }) : undefined}
+      >
+        {exportedCell ?? statusMark(data.exported)}
+      </td>
+      <SummaryClickEditTextCell
+        cellId={cell("name")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={employee.name}
+        ariaLabel="Employee name"
+        editable={editable}
+        onSave={(v) => onEmployeePatch({ name: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("employeeNum")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={employee.employeeNum}
+        ariaLabel="Employee number"
+        editable={editable}
+        onSave={(v) => onEmployeePatch({ employeeNum: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("date")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.date}
+        ariaLabel="Date"
+        editable={editable}
+        onSave={(v) => onPatch({ date: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("start")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.start}
+        ariaLabel="Start time"
+        editable={editable}
+        onSave={(v) => onPatch({ start: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("end")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.end}
+        ariaLabel="End time"
+        editable={editable}
+        onSave={(v) => onPatch({ end: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("dept")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.dept}
+        ariaLabel="Department"
+        editable={editable}
+        onSave={(v) => onPatch({ dept: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("job")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.job}
+        ariaLabel="Job"
+        editable={editable}
+        display={highlightCell(data.job, jobHighlight, deleted)}
+        onSave={(v) => onPatch({ job: v })}
+      />
+      {phaseExtra ? (
+        <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }}>
+          {data.phase !== undefined ? (
+            <span className="inline-flex items-center gap-[6px] flex-wrap">
+              <span
+                className={editable ? "cursor-text" : undefined}
+                onClick={editable ? () => setActiveCellId(cell("phase")) : undefined}
+              >
+                {activeCellId === cell("phase") ? (
+                  <div
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setActiveCellId(null);
+                    }}
+                  >
+                    <ModusWcTextInput
+                      aria-label="Phase"
+                      size="sm"
+                      customClass="w-full min-w-0"
+                      value={data.phase}
+                      onInputChange={(e) => onPatch({ phase: readSummaryInputString(e) })}
+                      onBlur={() => setActiveCellId(null)}
+                    />
+                  </div>
+                ) : (
+                  highlightCell(data.phase, phaseHighlight, deleted)
+                )}
+              </span>
+              {phaseExtra}
+            </span>
+          ) : (
+            phaseExtra
+          )}
+        </td>
+      ) : (
+        <SummaryClickEditTextCell
+          cellId={cell("phase")}
+          activeCellId={activeCellId}
+          setActiveCellId={setActiveCellId}
+          value={data.phase ?? ""}
+          ariaLabel="Phase"
+          editable={editable && data.phase !== undefined}
+          display={data.phase !== undefined ? highlightCell(data.phase, phaseHighlight, deleted) : dash}
+          onSave={(v) => onPatch({ phase: v })}
+        />
+      )}
+      <SummaryClickEditTextCell
+        cellId={cell("state")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.state}
+        ariaLabel="State"
+        editable={editable}
+        onSave={(v) => onPatch({ state: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("wo")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.wo}
+        ariaLabel="Work order"
+        editable={editable}
+        onSave={(v) => onPatch({ wo: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("payRate")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.payRate}
+        ariaLabel="Pay rate"
+        editable={editable}
+        onSave={(v) => onPatch({ payRate: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("reg")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.reg ?? 0}
+        ariaLabel="Regular hours"
+        editable={hoursEditable}
+        display={hoursMode === "dash" ? dash : hourCell(data.reg ?? 0, hourAlert, deleted)}
+        onSave={(v) => onPatch({ reg: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("ot")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.ot ?? 0}
+        ariaLabel="Overtime hours"
+        editable={hoursEditable}
+        display={hoursMode === "dash" ? dash : hourCell(data.ot ?? 0, hourAlert, deleted)}
+        onSave={(v) => onPatch({ ot: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("dt")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.dt ?? 0}
+        ariaLabel="Double time hours"
+        editable={hoursEditable}
+        display={hoursMode === "dash" ? dash : hourCell(data.dt ?? 0, false, deleted)}
+        onSave={(v) => onPatch({ dt: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("travel")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.travel ?? 0}
+        ariaLabel="Travel hours"
+        editable={hoursEditable}
+        display={hoursMode === "dash" ? dash : hourCell(data.travel ?? 0, false, deleted)}
+        onSave={(v) => onPatch({ travel: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("qty")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.qty ?? 0}
+        ariaLabel="Quantity"
+        editable={hoursEditable}
+        display={(data.qty ?? 0) > 0 ? (data.qty ?? 0) : "—"}
+        onSave={(v) => onPatch({ qty: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("perDiem")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.perDiem ?? 0}
+        ariaLabel="Per diem"
+        editable={hoursEditable}
+        display={(data.perDiem ?? 0) > 0 ? (data.perDiem ?? 0) : "—"}
+        onSave={(v) => onPatch({ perDiem: v })}
+      />
+      <SummaryClickEditNumberCell
+        cellId={cell("perDiemRate")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.perDiemRate ?? 0}
+        ariaLabel="Per diem rate"
+        editable={hoursEditable}
+        display={(data.perDiemRate ?? 0) > 0 ? (data.perDiemRate ?? 0) : "—"}
+        onSave={(v) => onPatch({ perDiemRate: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("unionCode")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.unionCode}
+        ariaLabel="Union code"
+        editable={editable}
+        onSave={(v) => onPatch({ unionCode: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("wageCode")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.wageCode}
+        ariaLabel="Wage code"
+        editable={editable}
+        onSave={(v) => onPatch({ wageCode: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("rateLevel")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.rateLevel}
+        ariaLabel="Rate level"
+        editable={editable}
+        onSave={(v) => onPatch({ rateLevel: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("comment")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.comment ?? ""}
+        ariaLabel="Comment"
+        editable={editable}
+        display={data.comment?.trim() ? data.comment : "—"}
+        onSave={(v) => onPatch({ comment: v })}
+      />
+    </>
+  );
+}
+
+function SummaryTableColgroup() {
+  return (
+    <colgroup>
+      <col style={{ width: SUMMARY_TABLE_ICON_COL_WIDTH }} />
+      {SUMMARY_TABLE_COL_WIDTHS.map((width, idx) => (
+        <col key={SUMMARY_TABLE_COLS[idx]} style={{ width }} />
+      ))}
+    </colgroup>
+  );
+}
+
+function SummaryTableHeaderRow() {
+  return (
+    <tr style={{ background: TABLE_HEADER_BG, borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}>
+      <th className={SUMMARY_TABLE_CELL} style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }} />
+      {SUMMARY_TABLE_HEADERS.map((h) => (
+        <th
+          key={h.title}
+          title={h.title}
+          className={SUMMARY_TABLE_CELL}
+          style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}
+        >
+          <p className="text-[10px] font-semibold leading-[13px]" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
+            {h.label}
+          </p>
+        </th>
+      ))}
+    </tr>
+  );
+}
+
+function BreakLineSegment({
+  rowBackground,
+  label,
+  colSpan = 1,
+}: {
+  rowBackground: string;
+  label?: ReactNode;
+  colSpan?: number;
+}) {
+  return (
+    <td
+      colSpan={colSpan}
+      className={BREAK_ROW_CELL}
+      style={{ fontFamily: OS, border: "none" }}
+    >
+      <div className="relative flex min-h-[24px] w-full items-center">
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-[#252a2e]" aria-hidden />
+        {label ? (
+          <span
+            className="relative mx-auto inline-flex items-center gap-[4px] px-[8px] text-[11px] font-medium text-[#252a2e] whitespace-nowrap"
+            style={{ background: rowBackground }}
+          >
+            {label}
+          </span>
+        ) : null}
+      </div>
+    </td>
+  );
+}
+
+function SummaryBreakDataCells({
+  rowId,
+  data,
+  rowBackground,
+  activeCellId,
+  setActiveCellId,
+  onPatch,
+}: {
+  rowId: string;
+  data: SummaryBreakRow;
+  rowBackground: string;
+  activeCellId: string | null;
+  setActiveCellId: (id: string | null) => void;
+  onPatch: (patch: SummaryRowPatch) => void;
+}) {
+  const cell = (field: string) => summaryCellId("break", rowId, field);
+
+  return (
+    <>
+      <BreakLineSegment
+        rowBackground={rowBackground}
+        colSpan={7}
+        label={<Coffee size={12} aria-hidden />}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("start")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.start}
+        ariaLabel="Break start time"
+        cellClassName={BREAK_ROW_CELL}
+        className="text-center"
+        onSave={(v) => onPatch({ start: v })}
+      />
+      <SummaryClickEditTextCell
+        cellId={cell("end")}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        value={data.end}
+        ariaLabel="Break end time"
+        cellClassName={BREAK_ROW_CELL}
+        className="text-center"
+        onSave={(v) => onPatch({ end: v })}
+      />
+      <BreakLineSegment rowBackground={rowBackground} colSpan={6} label="Break" />
+      <td className={`${BREAK_ROW_CELL} text-center`} style={{ fontFamily: OS, border: "none" }}>
+        {data.duration > 0 ? (
+          <span style={{ color: "#d97706", fontWeight: 600 }}>
+            {data.duration.toFixed(2)}
+          </span>
+        ) : null}
+      </td>
+      <BreakLineSegment rowBackground={rowBackground} colSpan={10} />
+    </>
+  );
+}
+
+function SummaryViolationRow({
+  violation: v,
+  employee,
+  stripeIdx,
+  activeCellId,
+  setActiveCellId,
+  canDeleteBreakViolations,
+  onApproveViolation,
+  onDeleteViolation,
+  onUpdateEmployee,
+  onUpdateViolation,
+}: {
+  violation: SummaryViolation;
+  employee: SummaryEmployee;
+  stripeIdx: number;
+  activeCellId: string | null;
+  setActiveCellId: (id: string | null) => void;
+  canDeleteBreakViolations: boolean;
+  onApproveViolation: (violationId: string) => void;
+  onDeleteViolation: (violationId: string, label: string) => void;
+  onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
+  onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+}) {
+  const row: SummaryTableRow = { kind: "violation", data: v };
+  const isDeleted = v.status === "deleted";
+  const isApproved = v.status === "approved" || !!v.approvedBy;
+  const breakViolation = isBreakViolation(v);
+  const canDelete = canDeleteBreakViolations && breakViolation && !isDeleted;
+  const statusMark = (done: boolean) =>
+    done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
+
+  return (
+    <tr
+      key={v.id}
+      style={{
+        background: summaryRowBackground(row, stripeIdx),
+        borderBottom: summaryRowBorder(row),
+        opacity: isDeleted ? 0.92 : 1,
+      }}
+    >
+      <td className={`${SUMMARY_TABLE_CELL} text-center`}>
+        {breakViolation ? (
+          <div className="inline-flex flex-col items-center gap-[1px]" aria-label={isDeleted ? "Deleted break violation" : "Break violation"}>
+            <Coffee size={13} color={isDeleted ? "#a3a3a3" : "#92400e"} aria-hidden />
+            {isDeleted ? <X size={14} color="#a3a3a3" aria-hidden /> : <AlertTriangle size={16} color="#d97706" aria-hidden />}
+          </div>
+        ) : isDeleted ? (
+          <X size={14} color="#a3a3a3" aria-hidden />
+        ) : (
+          <AlertTriangle size={16} color="#d97706" aria-hidden />
+        )}
+      </td>
+      <SummaryEditableDataCells
+        rowKind="violation"
+        rowId={v.id}
+        employee={employee}
+        data={v}
+        activeCellId={activeCellId}
+        setActiveCellId={setActiveCellId}
+        onPatch={(patch) => onUpdateViolation(v.id, patch)}
+        onEmployeePatch={onUpdateEmployee}
+        editable={!isDeleted}
+        deleted={isDeleted}
+        hourAlert
+        approvedByCell={isDeleted ? (
+          <span style={{ color: "#a3a3a3" }}>—</span>
+        ) : isApproved ? undefined : (
+          <StyledCheckbox
+            checked={false}
+            ariaLabel="Approve violation"
+            onChange={() => onApproveViolation(v.id)}
+          />
+        )}
+        secondApprovedByCell={!isDeleted && (isApproved || v.secondApprovedBy) ? undefined : isDeleted ? (
+          <span style={{ color: "#a3a3a3" }}>—</span>
+        ) : (
+          <StyledCheckbox checked={false} onChange={() => {}} />
+        )}
+        completeCell={statusMark(isApproved && !isDeleted)}
+        exportedCell={statusMark(v.exported)}
+        phaseExtra={(
+          <>
+            {isDeleted ? (
+              <ModusWcBadge color="secondary" variant="outlined" size="sm">Deleted</ModusWcBadge>
+            ) : (
+              <>
+                <ModusWcBadge color="secondary" variant="filled" size="sm">Break Violation</ModusWcBadge>
+                {canDelete && (
+                  <ModusWcButton
+                    color="tertiary"
+                    variant="borderless"
+                    size="sm"
+                    shape="square"
+                    aria-label={`Delete break violation: ${v.label}`}
+                    onButtonClick={() => onDeleteViolation(v.id, v.label)}
+                  >
+                    <ModusWcIcon name="delete" variant="outlined" size="xs" decorative />
+                  </ModusWcButton>
+                )}
+              </>
+            )}
+          </>
+        )}
+      />
+    </tr>
+  );
+}
+
+function EmployeeSummarySection({
+  title,
+  trailing,
+  children,
+}: {
+  title: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 w-full border-t border-[#e0e1e9]">
+      <div className="flex flex-wrap items-center justify-between gap-[8px] px-[12px] py-[10px] bg-[#f8f9fb] border-b border-[#e0e1e9]">
+        <p className="text-[13px] font-bold text-[#252a2e]" style={{ fontFamily: OS }}>{title}</p>
+        {trailing ? (
+          <div className="flex flex-wrap items-center gap-[8px]">{trailing}</div>
+        ) : null}
+      </div>
+      <div className="overflow-x-auto">{children}</div>
+    </section>
+  );
+}
+
+const EXPENSE_TABLE_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-top break-words";
+const EXPENSE_TABLE_HEADERS: { label: string; title: string }[] = [
+  { label: "Appr. By", title: "Approved By" },
+  { label: "2nd Appr.", title: "Second Approved By" },
+  { label: "Exp.", title: "Exported" },
+  { label: "Date", title: "Date" },
+  { label: "Dept", title: "Department" },
+  { label: "Job", title: "Job" },
+  { label: "Phase", title: "Phase" },
+  { label: "Name", title: "Name" },
+  { label: "Category", title: "Category" },
+  { label: "Vendor", title: "Vendor" },
+  { label: "Total", title: "Total" },
+  { label: "Added By", title: "Added By" },
+  { label: "Attach.", title: "Attachments" },
+  { label: "Comment", title: "Comment" },
+];
+
+function SummaryExpensesTable({ expenses }: { expenses: SummaryExpense[] }) {
+  const total = expenses.reduce((sum, row) => sum + row.total, 0);
+  const statusMark = (done: boolean) =>
+    done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
+
+  return (
+    <table className="w-full min-w-[960px] border-collapse" style={{ tableLayout: "fixed" }}>
+      <thead>
+        <tr style={{ background: TABLE_HEADER_BG, borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}>
+          {EXPENSE_TABLE_HEADERS.map((h) => (
+            <th
+              key={h.title}
+              title={h.title}
+              className={EXPENSE_TABLE_CELL}
+              style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}
+            >
+              <p className="text-[10px] font-semibold leading-[13px]" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
+                {h.label}
+              </p>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {expenses.length === 0 ? (
+          <tr style={{ background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+            <td colSpan={EXPENSE_TABLE_HEADERS.length} className={`${EXPENSE_TABLE_CELL} text-center text-[#6a6e79]`} style={{ fontFamily: OS }}>
+              No expenses for this pay period
+            </td>
+          </tr>
+        ) : (
+          expenses.map((row, idx) => (
+            <tr
+              key={row.id}
+              style={{
+                background: row.approvedBy ? SUMMARY_APPROVED_ROW_BG : idx % 2 === 0 ? "#ffffff" : "#fafafa",
+                borderBottom: row.approvedBy ? "1px solid #bbe6ca" : "1px solid #e0e1e9",
+              }}
+            >
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
+                {row.approvedBy ? (
+                  <span className="inline-flex items-center gap-[4px]">
+                    <Check size={12} color="#15803d" />
+                    <span className="text-[10px] break-words">{row.approvedBy}</span>
+                  </span>
+                ) : (
+                  <StyledCheckbox checked={false} onChange={() => {}} />
+                )}
+              </td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
+                {row.secondApprovedBy ? (
+                  <span className="inline-flex items-center gap-[4px]">
+                    <Check size={12} color="#15803d" />
+                    <span className="text-[10px] break-words">{row.secondApprovedBy}</span>
+                  </span>
+                ) : (
+                  <StyledCheckbox checked={false} onChange={() => {}} />
+                )}
+              </td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{statusMark(row.exported)}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.date}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.dept}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.job}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.phase}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.name}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.category}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.vendor}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
+                ${row.total.toFixed(2)}
+              </td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.addedBy}</td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
+                {row.attachments > 0 ? (
+                  <span className="inline-flex items-center gap-[4px] text-[#0e416c]">
+                    <Paperclip size={12} aria-hidden />
+                    {row.attachments}
+                  </span>
+                ) : (
+                  <span style={{ color: "#a3a3a3" }}>—</span>
+                )}
+              </td>
+              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
+                {row.comment?.trim() ? row.comment : "—"}
+              </td>
+            </tr>
+          ))
+        )}
+        <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+          <td colSpan={10} className={`${EXPENSE_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+            Total
+          </td>
+          <td className={`${EXPENSE_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>
+            ${total.toFixed(2)}
+          </td>
+          <td colSpan={3} />
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+function SummaryEntryTable({
+  employee,
+  onUpdateEmployee,
+  onUpdateEntry,
+  onUpdateBreak,
+}: {
+  employee: SummaryEmployee;
+  onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
+  onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
+  onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
+}) {
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const tableRows = buildSummaryTableRows(employee);
+
+  const totals = {
+    reg: employee.entries.reduce((s, e) => s + e.reg, 0),
+    ot: employee.entries.reduce((s, e) => s + e.ot, 0),
+    dt: employee.entries.reduce((s, e) => s + e.dt, 0),
+    travel: employee.entries.reduce((s, e) => s + e.travel, 0),
+    all: 0,
+  };
+  totals.all = totals.reg + totals.ot + totals.dt;
+
+  return (
+    <div className="min-w-0 w-full">
+      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+        <SummaryTableColgroup />
+        <thead>
+          <SummaryTableHeaderRow />
+        </thead>
+        <tbody>
+          {tableRows.map((row, idx) => {
+            const stripeIdx = summaryEntryStripeIndex(tableRows, idx);
+            if (row.kind === "entry") {
+              const entry = row.data;
+              return (
+                <tr key={entry.id} style={{ background: summaryRowBackground(row, stripeIdx), borderBottom: summaryRowBorder(row) }}>
+                  <td className={`${SUMMARY_TABLE_CELL} text-center`}>
+                    <div className="inline-flex items-center justify-center" aria-label="Work entry">
+                      <Clock size={13} color="#6a6e79" aria-hidden />
+                    </div>
+                  </td>
+                  <SummaryEditableDataCells
+                    rowKind="entry"
+                    rowId={entry.id}
+                    employee={employee}
+                    data={entry}
+                    activeCellId={activeCellId}
+                    setActiveCellId={setActiveCellId}
+                    onPatch={(patch) => onUpdateEntry(entry.id, patch)}
+                    onEmployeePatch={onUpdateEmployee}
+                    hourAlert={entry.hourAlert}
+                    jobHighlight={entry.jobHighlight}
+                    phaseHighlight={entry.phaseHighlight}
+                  />
+                </tr>
+              );
+            }
+
+            if (row.kind === "break") {
+              const br = row.data;
+              const rowBg = summaryRowBackground(row, stripeIdx);
+              return (
+                <tr key={br.id} className="summary-break-row" style={{ background: rowBg, borderBottom: "1px solid #e0e1e9" }}>
+                  <td className={BREAK_ROW_CELL} style={{ border: "none" }}>
+                    <div className="relative min-h-[24px]">
+                      <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-[#252a2e]" aria-hidden />
+                    </div>
+                  </td>
+                  <SummaryBreakDataCells
+                    rowId={br.id}
+                    data={br}
+                    rowBackground={rowBg}
+                    activeCellId={activeCellId}
+                    setActiveCellId={setActiveCellId}
+                    onPatch={(patch) => onUpdateBreak(br.id, patch)}
+                  />
+                </tr>
+              );
+            }
+
+            return null;
+          })}
+          <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+            <td colSpan={15} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+              Totals
+            </td>
+            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
+            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
+            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.ot.toFixed(2)}</td>
+            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.dt.toFixed(2)}</td>
+            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.travel.toFixed(2)}</td>
+            <td colSpan={7} />
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SummaryBreakViolationsTable({
+  employee,
+  canDeleteBreakViolations,
+  onApproveViolation,
+  onDeleteViolation,
+  onUpdateEmployee,
+  onUpdateViolation,
+}: {
+  employee: SummaryEmployee;
+  canDeleteBreakViolations: boolean;
+  onApproveViolation: (violationId: string) => void;
+  onDeleteViolation: (violationId: string, label: string) => void;
+  onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
+  onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+}) {
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const violationRows = buildBreakViolationRows(employee);
+
+  const activeViolations = violationRows.filter((v) => v.status !== "deleted");
+  const totals = {
+    reg: activeViolations.reduce((s, v) => s + v.reg, 0),
+    ot: activeViolations.reduce((s, v) => s + v.ot, 0),
+    dt: activeViolations.reduce((s, v) => s + v.dt, 0),
+    travel: activeViolations.reduce((s, v) => s + v.travel, 0),
+    all: 0,
+  };
+  totals.all = totals.reg + totals.ot + totals.dt;
+
+  return (
+    <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+      <SummaryTableColgroup />
+      <thead>
+        <SummaryTableHeaderRow />
+      </thead>
+      <tbody>
+        {violationRows.length === 0 ? (
+          <tr style={{ background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+            <td colSpan={27} className={`${SUMMARY_TABLE_CELL} text-center text-[#6a6e79]`} style={{ fontFamily: OS }}>
+              No violations for this pay period
+            </td>
+          </tr>
+        ) : (
+          violationRows.map((v, idx) => (
+            <SummaryViolationRow
+              key={v.id}
+              violation={v}
+              employee={employee}
+              stripeIdx={idx}
+              activeCellId={activeCellId}
+              setActiveCellId={setActiveCellId}
+              canDeleteBreakViolations={canDeleteBreakViolations}
+              onApproveViolation={onApproveViolation}
+              onDeleteViolation={onDeleteViolation}
+              onUpdateEmployee={onUpdateEmployee}
+              onUpdateViolation={onUpdateViolation}
+            />
+          ))
+        )}
+        <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+          <td colSpan={15} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+            Totals
+          </td>
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.ot.toFixed(2)}</td>
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.dt.toFixed(2)}</td>
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.travel.toFixed(2)}</td>
+          <td colSpan={7} />
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+
+function EmployeeSummaryCard({
+  employee,
+  canDeleteBreakViolations,
+  onApproveViolation,
+  onDeleteViolation,
+  onApproveAll,
+  onUpdateEmployee,
+  onUpdateEntry,
+  onUpdateBreak,
+  onUpdateViolation,
+}: {
+  employee: SummaryEmployee;
+  canDeleteBreakViolations: boolean;
+  onApproveViolation: (violationId: string) => void;
+  onDeleteViolation: (violationId: string, label: string) => void;
+  onApproveAll?: () => void;
+  onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
+  onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
+  onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
+  onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+}) {
+  const [attested, setAttested] = useState<Set<number>>(new Set());
+  const entryRegTotal = employee.entries.reduce((sum, entry) => sum + entry.reg, 0);
+  const expenseTotal = employee.expenses.reduce((sum, row) => sum + row.total, 0);
+  const violationCount = buildBreakViolationRows(employee).length;
+
+  return (
+    <div className="mb-[16px] rounded-[8px] border border-[#e0e1e9] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-[12px] px-[16px] py-[14px] border-b border-[#f0f0f4]">
+        <div className="flex items-center gap-[12px]">
+          <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+            style={{ background: "#252a2e", color: "#ffffff", fontFamily: OS }}>
+            {employee.initials}
+          </div>
+          <div>
+            <p className="text-[15px] font-bold text-[#252a2e]" style={{ fontFamily: OS }}>{employee.name}</p>
+            <p className="text-[12px] text-[#6a6e79]" style={{ fontFamily: OS }}>{employee.initials} {employee.employeeNum}</p>
+          </div>
+        </div>
+        {onApproveAll && (
+          <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={onApproveAll}>
+            Approve All {employee.name.split(" ")[0]}&apos;s Entries
+          </ModusWcButton>
+        )}
+      </div>
+      <AttestationPanel
+        days={employee.attestationDays}
+        attested={attested}
+        onAttest={(date) => setAttested((prev) => new Set([...prev, date]))}
+      />
+      <EmployeeSummarySection
+        title="Timesheet Entries"
+        trailing={(
+          <>
+            <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Refreshing timesheet…")}>
+              Refresh
+            </ModusWcButton>
+            <span className="text-[12px] font-semibold text-[#252a2e]" style={{ fontFamily: OS }}>
+              Total Reg {entryRegTotal.toFixed(2)}
+            </span>
+          </>
+        )}
+      >
+        <SummaryEntryTable
+          employee={employee}
+          onUpdateEmployee={onUpdateEmployee}
+          onUpdateEntry={onUpdateEntry}
+          onUpdateBreak={onUpdateBreak}
+        />
+      </EmployeeSummarySection>
+      <EmployeeSummarySection
+        title="Expenses"
+        trailing={(
+          <span className="text-[12px] font-semibold text-[#252a2e]" style={{ fontFamily: OS }}>
+            Total ${expenseTotal.toFixed(2)}
+          </span>
+        )}
+      >
+        <SummaryExpensesTable expenses={employee.expenses} />
+      </EmployeeSummarySection>
+      <EmployeeSummarySection
+        title="Violations"
+        trailing={violationCount > 0 ? (
+          <>
+            <ModusWcBadge color="warning" variant="filled" size="sm">{violationCount}</ModusWcBadge>
+            <span className="text-[12px] font-semibold text-[#92400e]" style={{ fontFamily: OS }}>
+              Review required
+            </span>
+          </>
+        ) : (
+          <span className="text-[12px] text-[#6a6e79]" style={{ fontFamily: OS }}>None</span>
+        )}
+      >
+        <SummaryBreakViolationsTable
+          employee={employee}
+          canDeleteBreakViolations={canDeleteBreakViolations}
+          onApproveViolation={onApproveViolation}
+          onDeleteViolation={onDeleteViolation}
+          onUpdateEmployee={onUpdateEmployee}
+          onUpdateViolation={onUpdateViolation}
+        />
+      </EmployeeSummarySection>
+    </div>
+  );
+}
+
+function TimesheetSummary() {
+  const { canDeleteBreakViolations, viewerLabel } = useViewingRole();
+  const [employees, setEmployees] = useState<SummaryEmployee[]>(SUMMARY_MOCK_EMPLOYEES);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    empId: string;
+    violationId: string;
+    label: string;
+    isBreakViolation: boolean;
+  } | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const updateViolation = (empId: string, violationId: string, patch: Partial<SummaryViolation>) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id !== empId
+          ? emp
+          : {
+              ...emp,
+              violations: emp.violations.map((v) =>
+                v.id === violationId ? { ...v, ...patch } : v,
+              ),
+            },
+      ),
+    );
+  };
+
+  const updateEntry = (empId: string, entryId: string, patch: SummaryRowPatch) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id !== empId
+          ? emp
+          : {
+              ...emp,
+              entries: emp.entries.map((entry) =>
+                entry.id === entryId ? { ...entry, ...patch } : entry,
+              ),
+            },
+      ),
+    );
+  };
+
+  const updateBreak = (empId: string, breakId: string, patch: SummaryRowPatch) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id !== empId
+          ? emp
+          : {
+              ...emp,
+              breaks: emp.breaks.map((br) =>
+                br.id === breakId ? { ...br, ...patch } : br,
+              ),
+            },
+      ),
+    );
+  };
+
+  const updateEmployeeMeta = (empId: string, patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => {
+    setEmployees((prev) =>
+      prev.map((emp) => (emp.id !== empId ? emp : { ...emp, ...patch })),
+    );
+  };
+
+  const approveViolation = (empId: string, violationId: string) => {
+    updateViolation(empId, violationId, {
+      status: "approved",
+      approvedBy: "Luc Peron",
+      secondApprovedBy: "Luc Peron",
+      complete: true,
+    });
+    toast.success("Violation approved — premium pay row confirmed.");
+  };
+
+  const confirmDelete = (comment: string) => {
+    if (!deleteTarget) return;
+    updateViolation(deleteTarget.empId, deleteTarget.violationId, {
+      status: "deleted",
+      deletionComment: comment,
+      deletedBy: viewerLabel,
+      comment,
+      approvedBy: undefined,
+      secondApprovedBy: undefined,
+      complete: false,
+    });
+    setDeleteTarget(null);
+    toast.success("Break violation deleted — row retained on timesheet for audit.");
+  };
+
+  const approveAllForEmployee = (empId: string) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id !== empId
+          ? emp
+          : {
+              ...emp,
+              entries: emp.entries.map((entry) => ({
+                ...entry,
+                approvedBy: entry.approvedBy ?? "Luc Peron",
+                secondApprovedBy: entry.secondApprovedBy ?? "Luc Peron",
+                complete: true,
+              })),
+              breaks: emp.breaks.map((br) => ({
+                ...br,
+                approvedBy: br.approvedBy ?? "Luc Peron",
+                secondApprovedBy: br.secondApprovedBy ?? "Luc Peron",
+                complete: true,
+              })),
+              violations: emp.violations.map((v) =>
+                v.status === "pending"
+                  ? {
+                      ...v,
+                      status: "approved" as ViolationRowStatus,
+                      approvedBy: "Luc Peron",
+                      secondApprovedBy: "Luc Peron",
+                      complete: true,
+                    }
+                  : v,
+              ),
+            },
+      ),
+    );
+    toast.success("All entries approved for this employee.");
+  };
+
+  const grandTotals = employees.reduce(
+    (acc, emp) => {
+      emp.entries.forEach((e) => {
+        acc.reg += e.reg;
+        acc.ot += e.ot;
+        acc.dt += e.dt;
+        acc.travel += e.travel;
+        acc.qty += e.qty;
+        acc.perDiem += e.perDiem;
+      });
+      emp.violations.filter((v) => v.status !== "deleted").forEach((v) => {
+        acc.reg += v.reg;
+        acc.ot += v.ot;
+        acc.dt += v.dt;
+        acc.travel += v.travel;
+        acc.qty += v.qty;
+        acc.perDiem += v.perDiem;
+      });
+      emp.expenses.forEach((expense) => {
+        acc.expenses += expense.total;
+      });
+      return acc;
+    },
+    { reg: 0, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, expenses: 0 },
+  );
+
+  const violationCount = employees.reduce((n, emp) => n + emp.violations.length, 0);
+
+  return (
+    <div className="min-h-screen p-[24px] min-w-0" style={{ background: "#f1f1f6" }}>
+      {deleteTarget && (
+        <ViolationRemoveModal
+          premiumLabel={deleteTarget.label}
+          isBreakViolation={deleteTarget.isBreakViolation}
+          onConfirm={confirmDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
+
+      <div className="mb-[16px] flex flex-wrap items-start justify-between gap-[12px]">
+        <div>
+          <p className="font-bold text-[18px] leading-[27px]" style={{ color: "#000000", fontFamily: OS, ...OS_FVS }}>
+            Timesheet Summary
+          </p>
+          <p className="font-semibold text-[12px] leading-[16px] mt-[4px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+            Aug 15th – Aug 21st, 2026
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-[8px]">
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Timesheet list")}>Timesheet List</ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Exports")}>Exports</ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Expenses")}>Expenses (0)</ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Missing report")}>Missing Timesheets Report</ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Print")}>
+            <ModusWcIcon name="print" variant="outlined" size="xs" decorative />
+            Print
+          </ModusWcButton>
+        </div>
+      </div>
+
+      <div className="mb-[12px] rounded-[8px] overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center justify-between px-[16px] py-[10px]" style={{ background: "#0e416c", minHeight: 44 }}>
+          <p className="font-semibold text-[14px] text-white" style={{ fontFamily: OS }}>Filters</p>
+          <button type="button" onClick={() => setFiltersOpen((v) => !v)} className="text-white/80 hover:text-white" aria-label="Toggle filters">
+            <AlignJustify size={16} />
+          </button>
+        </div>
+        {filtersOpen && (
+          <div className="bg-white px-[16px] py-[14px] border-b border-[#e0e1e9]">
+            <div className="flex flex-wrap gap-[8px]">
+              <FilterInput placeholder="Employee" value="" onChange={() => {}} options={employees.map((e) => e.name)} />
+              <FilterInput placeholder="Department" value="" onChange={() => {}} options={["Main Orders"]} />
+              <FilterInput placeholder="Job" value="" onChange={() => {}} />
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-[8px] px-[16px] py-[10px] bg-white border-b border-[#e0e1e9]">
+          <Check size={14} color="#15803d" />
+          <p className="text-[12px] font-semibold text-[#15803d]" style={{ fontFamily: OS }}>All Employees Loaded</p>
+          {violationCount > 0 && (
+            <ModusWcBadge color="warning" variant="filled" size="sm" customClass="ml-[8px]">
+              {violationCount} row{violationCount !== 1 ? "s" : ""} with compliance violations
+            </ModusWcBadge>
+          )}
+        </div>
+      </div>
+
+      {employees.map((emp) => (
+        <EmployeeSummaryCard
+          key={emp.id}
+          employee={emp}
+          canDeleteBreakViolations={canDeleteBreakViolations}
+          onApproveViolation={(violationId) => approveViolation(emp.id, violationId)}
+          onDeleteViolation={(violationId, label) => {
+            const violation = emp.violations.find((v) => v.id === violationId);
+            if (!canDeleteBreakViolations) {
+              toast.error("Only administrators can delete break violations.");
+              return;
+            }
+            if (!violation || !isBreakViolation(violation)) return;
+            setDeleteTarget({
+              empId: emp.id,
+              violationId,
+              label,
+              isBreakViolation: true,
+            });
+          }}
+          onApproveAll={emp.id === "emp-connor" ? () => approveAllForEmployee(emp.id) : undefined}
+          onUpdateEmployee={(patch) => updateEmployeeMeta(emp.id, patch)}
+          onUpdateEntry={(entryId, patch) => updateEntry(emp.id, entryId, patch)}
+          onUpdateBreak={(breakId, patch) => updateBreak(emp.id, breakId, patch)}
+          onUpdateViolation={(violationId, patch) => updateViolation(emp.id, violationId, patch)}
+        />
+      ))}
+
+      <div className="rounded-[8px] border border-[#e0e1e9] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-[20px] py-[14px] border-b border-[#f0f0f4]">
+          <p className="text-[15px] font-bold text-[#0e416c]" style={{ fontFamily: OS }}>Grand Totals</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-[16px] px-[20px] py-[16px]">
+          {[
+            { label: "Employees", value: String(employees.length) },
+            { label: "Regular Hours", value: String(grandTotals.reg) },
+            { label: "Overtime Hours", value: String(grandTotals.ot) },
+            { label: "Double Time Hours", value: String(grandTotals.dt) },
+            { label: "Travel Hours", value: String(grandTotals.travel) },
+            { label: "Quantity Total", value: String(grandTotals.qty) },
+            { label: "Per Diem (days)", value: String(grandTotals.perDiem) },
+            { label: "Expenses Total", value: `$${grandTotals.expenses.toFixed(2)}` },
+          ].map((item) => (
+            <div key={item.label}>
+              <p className="text-[11px] text-[#6a6e79] mb-[4px]" style={{ fontFamily: OS }}>{item.label}</p>
+              <p className="text-[20px] font-bold text-[#252a2e]" style={{ fontFamily: OS }}>{item.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
 function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const [tenant, setTenant] = useState("enterprise");
-  const [viewingAs, setViewingAs] = useState("admin");
+  const { viewingAs, setViewingAs } = useViewingRole();
   return (
     <div className="fixed top-0 left-0 right-0 flex items-center bg-white border-b border-[#e0e1e9] px-[12px]"
       style={{ height: TOP_BAR_H, zIndex: 60 }}>
@@ -5562,7 +7628,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             { label: "Viewing as Foreman", value: "foreman" },
             { label: "Viewing as Payroll Officer", value: "payroll" },
           ]}
-          onInputChange={(e) => setViewingAs(e.target.value)}
+          onInputChange={(e) => setViewingAs(e.target.value as ViewingRole)}
           style={{ width: 200 }}
         />
         <button className="flex h-[32px] w-[32px] items-center justify-center rounded-full text-[#6a6e79] hover:text-[#252a2e] hover:bg-[#f1f1f6] transition-colors">
@@ -5768,12 +7834,21 @@ export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("s_hour_rules");
   const [navCollapsed, setNavCollapsed] = useState(true);
   const [attestationQuestions, setAttestationQuestions] = useState<AttestationQuestion[]>(defaultAttestationQuestions);
+  const [viewingAs, setViewingAs] = useState<ViewingRole>("admin");
   const inSettings = SETTINGS_PAGES.has(activePage);
   const navW = navCollapsed ? NAV_COLLAPSED_W : NAV_EXPANDED_W;
 
   const contentLeft = navW + (inSettings ? SETTINGS_NAV_W + 16 : 0);
 
+  const viewingRoleValue: ViewingRoleContextValue = {
+    viewingAs,
+    setViewingAs,
+    canDeleteBreakViolations: viewingAs === "admin",
+    viewerLabel: VIEWING_ROLE_LABELS[viewingAs],
+  };
+
   return (
+    <ViewingRoleContext.Provider value={viewingRoleValue}>
     <AttestationConfigContext.Provider value={{ questions: attestationQuestions, setQuestions: setAttestationQuestions }}>
     <div className="min-h-screen font-sans bg-[var(--modus-wc-color-base-page,#f1f1f6)]">
       <Toaster position="top-right" richColors />
@@ -5785,11 +7860,11 @@ export default function App() {
         onToggleCollapse={() => setNavCollapsed((v) => !v)}
       />
       {inSettings && <SettingsSubNav activePage={activePage} onNavigate={setActivePage} navW={navW} />}
-      <div style={{ marginLeft: contentLeft, marginTop: TOP_BAR_H, minHeight: `calc(100vh - ${TOP_BAR_H}px)` }}>
+      <div className="min-w-0" style={{ marginLeft: contentLeft, marginTop: TOP_BAR_H, minHeight: `calc(100vh - ${TOP_BAR_H}px)` }}>
         {/* Time */}
         {activePage === "timesheets"        && <PlaceholderPage title="Timesheets" />}
         {activePage === "clock_in"          && <ClockInOutPage />}
-        {activePage === "timesheet_summary" && <PlaceholderPage title="Timesheet Summary" />}
+        {activePage === "timesheet_summary" && <TimesheetSummary />}
         {activePage === "time_off"          && <PlaceholderPage title="Time Off" />}
         {activePage === "compliance_dashboard" && <ComplianceDashboard />}
         {/* Other */}
@@ -5813,5 +7888,6 @@ export default function App() {
       </div>
     </div>
     </AttestationConfigContext.Provider>
+    </ViewingRoleContext.Provider>
   );
 }
