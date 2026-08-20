@@ -76,23 +76,37 @@ const defaultRuleSet = (): RuleSetData => ({
 });
 
 // ─── Shared Primitives (Modus) ────────────────────────────────────────────────
-function Toggle({ enabled, onChange, ariaLabel }: { enabled: boolean; onChange: (v: boolean) => void; ariaLabel?: string }) {
+function readInputString(e: CustomEvent): string {
+  return String((e as CustomEvent<{ target?: { value?: string } }>).detail?.target?.value ?? "");
+}
+
+function readInputChecked(e: CustomEvent): boolean {
+  return Boolean((e as CustomEvent<{ target?: { checked?: boolean } }>).detail?.target?.checked);
+}
+
+function Toggle({ enabled, onChange, ariaLabel, disabled = false }: {
+  enabled: boolean; onChange: (v: boolean) => void; ariaLabel?: string; disabled?: boolean;
+}) {
   return (
     <ModusWcSwitch
       aria-label={ariaLabel ?? (enabled ? "Enabled" : "Disabled")}
       size="sm"
       value={enabled}
+      disabled={disabled}
       onInputChange={(e) => {
-        const next = Boolean((e as CustomEvent<{ target?: { value?: boolean } }>).detail?.target?.value ?? !enabled);
-        onChange(next);
+        if (disabled) return;
+        onChange(readInputChecked(e as CustomEvent));
       }}
     />
   );
 }
 
-function SectionEnableToggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function SectionEnableToggle({ enabled, onChange, label }: {
+  enabled: boolean; onChange: (v: boolean) => void; label?: string;
+}) {
   return (
     <div className="flex items-center gap-[8px]">
+      {label && <span className="text-[12px] text-[#464b52]">{label}</span>}
       <span
         className="text-[12px] font-semibold"
         style={{ fontFamily: OS, color: enabled ? "#464b52" : "#6a6e79" }}
@@ -105,6 +119,19 @@ function SectionEnableToggle({ enabled, onChange }: { enabled: boolean; onChange
         ariaLabel={enabled ? "Disable section" : "Enable section"}
       />
     </div>
+  );
+}
+
+function SectionFieldset({ enabled, children, className = "" }: {
+  enabled: boolean; children: ReactNode; className?: string;
+}) {
+  return (
+    <fieldset
+      disabled={!enabled}
+      className={`border-0 p-0 m-0 min-w-0 transition-opacity duration-200 ${enabled ? "" : "opacity-50"} ${className}`}
+    >
+      {children}
+    </fieldset>
   );
 }
 
@@ -125,7 +152,7 @@ function NumberInput({ value, onChange, step = 0.5, min = 0, suffix, width = 88,
         customClass={disabled ? "pointer-events-none" : ""}
         onInputChange={(e) => {
           if (disabled) return;
-          const v = parseFloat(e.target.value);
+          const v = parseFloat(readInputString(e as CustomEvent));
           if (!isNaN(v)) onChange(v);
         }}
         style={{ width }}
@@ -150,21 +177,27 @@ function SelectField({ value, onChange, options, placeholder, disabled, customCl
       disabled={disabled}
       customClass={customClass}
       options={placeholder ? [{ label: placeholder, value: "" }, ...options] : options}
-      onInputChange={(e) => onChange(e.target.value)}
+      onInputChange={(e) => {
+        if (disabled) return;
+        onChange(readInputString(e as CustomEvent));
+      }}
     />
   );
 }
 
-function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+function Checkbox({ checked, onChange, label, disabled = false }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
+}) {
   return (
     <ModusWcCheckbox
       aria-label={label}
       label={label}
       size="sm"
       value={checked}
+      disabled={disabled}
       onInputChange={(e) => {
-        const next = Boolean((e as CustomEvent<{ target?: { value?: boolean } }>).detail?.target?.value ?? !checked);
-        onChange(next);
+        if (disabled) return;
+        onChange(readInputChecked(e as CustomEvent));
       }}
     />
   );
@@ -373,7 +406,7 @@ function RuleSetForm({
 
   const allTabs: { key: RuleSetTab; label: string; show: boolean }[] = [
     { key: "daily",     label: "Daily & Weekly Rules", show: true },
-    { key: "breaks",    label: "Meal Breaks",    show: true },
+    { key: "breaks",    label: "Breaks",    show: true },
     { key: "onDuty",    label: "On-Duty Meal",   show: true },
     { key: "kiosk",     label: "Kiosk Break",    show: !!showKiosk },
     { key: "equipment", label: "Equipment",      show: !!showEquipment },
@@ -554,10 +587,7 @@ function RuleSetForm({
             {/* Break 1 */}
             <CardShell title="First Break" badge="Break 1" badgeColor="blue"
               action={<SectionEnableToggle enabled={mp.meal1Enabled} onChange={(v) => setMp("meal1Enabled", v)} />}>
-              <fieldset
-                disabled={!mp.meal1Enabled}
-                className={`border-0 p-0 m-0 min-w-0 transition-opacity duration-200 ${mp.meal1Enabled ? "" : "opacity-50 pointer-events-none"}`}
-              >
+              <SectionFieldset enabled={mp.meal1Enabled}>
               <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
                 <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                   <SectionLabel>Break Trigger</SectionLabel>
@@ -593,16 +623,13 @@ function RuleSetForm({
                   </div>
                 </div>
               </div>
-              </fieldset>
+              </SectionFieldset>
             </CardShell>
 
             {/* Break 2 */}
             <CardShell title="Second Break" badge="Break 2" badgeColor="blue"
               action={<SectionEnableToggle enabled={mp.meal2Enabled} onChange={(v) => setMp("meal2Enabled", v)} />}>
-              <fieldset
-                disabled={!mp.meal2Enabled}
-                className={`border-0 p-0 m-0 min-w-0 transition-opacity duration-200 ${mp.meal2Enabled ? "" : "opacity-50 pointer-events-none"}`}
-              >
+              <SectionFieldset enabled={mp.meal2Enabled}>
               <div className="grid grid-cols-2 gap-0">
                 <div className="px-[20px] py-[18px]" style={{ borderRight: "1px solid #f0f0f4" }}>
                   <SectionLabel>Break Trigger</SectionLabel>
@@ -638,30 +665,35 @@ function RuleSetForm({
                   </div>
                 </div>
               </div>
-              </fieldset>
+              </SectionFieldset>
             </CardShell>
 
             {mp.breakType === "premium" && (
               <CardShell title="Meal Penalty Violations" badge="LC § 226.7" badgeColor="red"
-                action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">Auto-calculate meal penalty pay</span><Toggle enabled={mp.penaltiesEnabled} onChange={(v) => setMp("penaltiesEnabled", v)} /></div>}>
-                <div className={`transition-opacity duration-200 ${mp.penaltiesEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                action={
+                  <div className="flex items-center gap-[8px]">
+                    <span className="text-[12px] text-[#464b52]">Auto-calculate meal penalty pay</span>
+                    <Toggle
+                      enabled={mp.penaltiesEnabled}
+                      onChange={(v) => setMp("penaltiesEnabled", v)}
+                      ariaLabel="Auto-calculate meal penalty pay"
+                    />
+                  </div>
+                }>
+                <>
                   <div className="px-[20px] pt-[14px] pb-[6px]">
                     <p className="text-[12px] text-[#464b52] leading-[18px]">
-                      By default, meal penalty pay posts to the employee&apos;s clocked job. Choose <strong>Override</strong> to send a violation&apos;s cost to a specific department, job, and sub-job (e.g. administrative overhead).
+                      Configure pay type and rate for each violation. By default, meal penalty pay posts to the employee&apos;s clocked job — use the job cost overrides table below to redirect costing for specific jobs.
                     </p>
                   </div>
                   <div className="px-[20px] pt-[8px] pb-[4px] min-w-0">
                     <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
                       <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
                         <colgroup>
-                          <col style={{ width: "5%" }} />
-                          <col style={{ width: "17%" }} />
-                          <col style={{ width: "13%" }} />
-                          <col style={{ width: "11%" }} />
-                          <col style={{ width: "12%" }} />
-                          <col style={{ width: "14%" }} />
-                          <col style={{ width: "14%" }} />
-                          <col style={{ width: "14%" }} />
+                          <col style={{ width: "8%" }} />
+                          <col style={{ width: "42%" }} />
+                          <col style={{ width: "30%" }} />
+                          <col style={{ width: "20%" }} />
                         </colgroup>
                         <thead>
                           <tr className="bg-[#f5f5f8]">
@@ -669,69 +701,50 @@ function RuleSetForm({
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation</th>
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Cost to</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Department</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Job</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Sub-job</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(mp.violations ?? defaultViolations()).map((raw, idx) => {
-                            const v = withCostMapping(raw);
-                            const isOverride = v.costMapping.mode === "override";
-                            const job = jobFromCatalog(v.costMapping.jobCode || JOB_CATALOG[0].code);
-                            const phaseOptions = job.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` }));
-                            const overrideIncomplete = isOverride && v.enabled && (
-                              !v.costMapping.department || !v.costMapping.jobCode || !v.costMapping.phaseCode
-                            );
+                            const v = withViolationDefaults(raw);
+                            const rowFieldsDisabled = !v.enabled;
 
                             const updateViolation = (patch: Partial<ViolationRule>) => {
                               const next = (mp.violations ?? defaultViolations()).map((r, i) =>
-                                i === idx ? withCostMapping({ ...withCostMapping(r), ...patch }) : withCostMapping(r),
+                                i === idx ? withViolationDefaults({ ...withViolationDefaults(r), ...patch }) : withViolationDefaults(r),
                               );
                               setMp("violations", next);
-                            };
-
-                            const updateCostMapping = (patch: Partial<ViolationCostMapping>) => {
-                              updateViolation({ costMapping: { ...v.costMapping, ...patch } });
                             };
 
                             return (
                               <tr
                                 key={v.id}
-                                className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""} ${isOverride ? "border-l-[3px] border-l-[#006fb0]" : ""}`}
+                                className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}
                               >
                                 <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] text-center">
-                                  <Toggle enabled={v.enabled} onChange={(val) => updateViolation({ enabled: val })} />
+                                  <Toggle
+                                    enabled={v.enabled}
+                                    onChange={(val) => updateViolation({ enabled: val })}
+                                  />
                                 </td>
                                 <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] min-w-0">
-                                  <div className="flex flex-col gap-[4px] min-w-0">
-                                    <div className="flex flex-wrap items-center gap-[6px] min-w-0">
-                                      <ModusWcTooltip
-                                        content={v.description}
-                                        position="auto"
-                                        tooltipId={`violation-tip-${v.id}`}
-                                      >
-                                        <button
-                                          type="button"
-                                          className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help break-words min-w-0"
-                                          aria-describedby={`violation-tip-${v.id}`}
-                                        >
-                                          {v.label}
-                                        </button>
-                                      </ModusWcTooltip>
-                                      {isOverride && (
-                                        <ModusWcBadge size="sm" variant="filled">Override</ModusWcBadge>
-                                      )}
-                                    </div>
-                                    {overrideIncomplete && (
-                                      <span className="text-[12px] text-[#b45309] break-words">Complete department, job, and sub-job.</span>
-                                    )}
-                                  </div>
+                                  <ModusWcTooltip
+                                    content={v.description}
+                                    position="auto"
+                                    tooltipId={`violation-tip-${v.id}`}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help break-words min-w-0"
+                                      aria-describedby={`violation-tip-${v.id}`}
+                                    >
+                                      {v.label}
+                                    </button>
+                                  </ModusWcTooltip>
                                 </td>
                                 <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  <div className="pointer-events-auto min-w-0">
+                                  <div className="min-w-0">
                                     <SelectField value={v.payType} onChange={(val) => updateViolation({ payType: val as PayType })}
+                                      disabled={rowFieldsDisabled}
                                       customClass="w-full min-w-0"
                                       options={[
                                         { value: "regular", label: "Regular Rate" },
@@ -742,54 +755,112 @@ function RuleSetForm({
                                   </div>
                                 </td>
                                 <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center min-w-0">
-                                  <div className="flex justify-center pointer-events-auto min-w-0">
+                                  <div className="flex justify-center min-w-0">
                                     <NumberInput value={v.hoursRate} onChange={(val) => updateViolation({ hoursRate: val })}
+                                      disabled={rowFieldsDisabled}
                                       step={0.25} min={0} width={72} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
                                   </div>
                                 </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  <div className="pointer-events-auto min-w-0">
-                                    <SelectField
-                                      value={v.costMapping.mode}
-                                      customClass="w-full min-w-0"
-                                      onChange={(val) => {
-                                        if (val === "override") {
-                                          updateViolation({ costMapping: defaultOverrideCostMapping() });
-                                        } else {
-                                          updateViolation({ costMapping: defaultCostMapping() });
-                                        }
-                                      }}
-                                      options={[
-                                        { value: "employee_job", label: "Employee job" },
-                                        { value: "override", label: "Override" },
-                                      ]}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  {isOverride ? (
-                                    <div className="pointer-events-auto min-w-0">
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="px-[20px] pt-[20px] pb-[4px] min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-[12px] mb-[10px]">
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#252a2e]">Job cost overrides</p>
+                        <p className="text-[11px] text-[#6a6e79] leading-[16px] mt-[4px]">
+                          When meal penalty pay is generated on a matched clocked job, cost it to a different department, job, and sub-job instead (e.g. administrative overhead).
+                        </p>
+                      </div>
+                      <ModusWcButton
+                        color="primary"
+                        variant="outlined"
+                        size="sm"
+                        onButtonClick={() => {
+                          const overrides = mp.jobCostOverrides ?? defaultJobCostOverrides();
+                          setMp("jobCostOverrides", [...overrides, newJobCostOverride()]);
+                        }}
+                      >
+                        <ModusWcIcon decorative name="add" size="xs" />
+                        Add override
+                      </ModusWcButton>
+                    </div>
+                    <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
+                      {(mp.jobCostOverrides ?? defaultJobCostOverrides()).length === 0 ? (
+                        <p className="px-[12px] py-[14px] text-[12px] text-[#6a6e79] italic">No job cost overrides configured.</p>
+                      ) : (
+                        <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
+                          <colgroup>
+                            <col style={{ width: "24%" }} />
+                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "16%" }} />
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-[#f5f5f8]">
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Clocked job</th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Department</th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Job</th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Sub-job</th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-right text-[12px] font-semibold text-[#6a6e79]">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(mp.jobCostOverrides ?? defaultJobCostOverrides()).map((raw, idx) => {
+                              const row = withJobCostOverrideDefaults(raw);
+                              const costJob = jobFromCatalog(row.jobCode || JOB_CATALOG[0].code);
+                              const phaseOptions = costJob.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` }));
+                              const rowIncomplete = (
+                                !row.sourceJobCode || !row.department || !row.jobCode || !row.phaseCode
+                              );
+
+                              const updateOverride = (patch: Partial<JobCostOverride>) => {
+                                const next = (mp.jobCostOverrides ?? defaultJobCostOverrides()).map((r, i) =>
+                                  i === idx ? withJobCostOverrideDefaults({ ...withJobCostOverrideDefaults(r), ...patch }) : withJobCostOverrideDefaults(r),
+                                );
+                                setMp("jobCostOverrides", next);
+                              };
+
+                              return (
+                                <tr
+                                  key={row.id}
+                                  className={idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"}
+                                >
+                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                    <div className="min-w-0">
                                       <SelectField
-                                        value={v.costMapping.department}
+                                        value={row.sourceJobCode}
                                         customClass="w-full min-w-0"
-                                        onChange={(val) => updateCostMapping({ department: val })}
+                                        onChange={(val) => updateOverride({ sourceJobCode: val })}
+                                        placeholder="Select job"
+                                        options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                    <div className="min-w-0">
+                                      <SelectField
+                                        value={row.department}
+                                        customClass="w-full min-w-0"
+                                        onChange={(val) => updateOverride({ department: val })}
                                         placeholder="Select department"
                                         options={VIOLATION_DEPT_OPTIONS.map((d) => ({ value: d, label: d }))}
                                       />
                                     </div>
-                                  ) : (
-                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
-                                  )}
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  {isOverride ? (
-                                    <div className="pointer-events-auto min-w-0">
+                                  </td>
+                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                    <div className="min-w-0">
                                       <SelectField
-                                        value={v.costMapping.jobCode}
+                                        value={row.jobCode}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => {
                                           const nextJob = jobFromCatalog(val);
-                                          updateCostMapping({
+                                          updateOverride({
                                             jobCode: val,
                                             phaseCode: nextJob.phases[0]?.code ?? "",
                                           });
@@ -798,30 +869,42 @@ function RuleSetForm({
                                         options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
                                       />
                                     </div>
-                                  ) : (
-                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
-                                  )}
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  {isOverride ? (
-                                    <div className="pointer-events-auto min-w-0">
-                                      <SelectField
-                                        value={v.costMapping.phaseCode}
-                                        customClass="w-full min-w-0"
-                                        onChange={(val) => updateCostMapping({ phaseCode: val })}
-                                        placeholder="Select sub-job"
-                                        options={phaseOptions}
-                                      />
+                                  </td>
+                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                                    <div className="flex flex-col gap-[4px] min-w-0">
+                                      <div className="min-w-0">
+                                        <SelectField
+                                          value={row.phaseCode}
+                                          customClass="w-full min-w-0"
+                                          onChange={(val) => updateOverride({ phaseCode: val })}
+                                          placeholder="Select sub-job"
+                                          options={phaseOptions}
+                                        />
+                                      </div>
+                                      {rowIncomplete && (
+                                        <span className="text-[11px] text-[#b45309] break-words">Complete all fields.</span>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <span className="text-[12px] text-[#6a6e79] opacity-50">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  </td>
+                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-right">
+                                    <button
+                                      type="button"
+                                      aria-label="Remove job cost override"
+                                      onClick={() => {
+                                        const next = (mp.jobCostOverrides ?? defaultJobCostOverrides()).filter((_, i) => i !== idx);
+                                        setMp("jobCostOverrides", next);
+                                      }}
+                                      className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-[#6a6e79] hover:bg-[#fbdde2] hover:text-[#ab1f26] transition-colors"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-end gap-[32px] px-[20px] pt-[14px] pb-[16px] border-t border-[#f0f0f4] mt-[12px]">
@@ -831,13 +914,13 @@ function RuleSetForm({
                       <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total meal penalty pay per workday across all violations</p>
                     </div>
                   </div>
-                </div>
+                </>
               </CardShell>
             )}
 
             <CardShell title="Custom Reminders & Notifications" badge="Meal Breaks" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">{mp.freeMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.freeMealEnabled} onChange={(v) => setMp("freeMealEnabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.freeMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+              action={<SectionEnableToggle enabled={mp.freeMealEnabled} onChange={(v) => setMp("freeMealEnabled", v)} />}>
+              <SectionFieldset enabled={mp.freeMealEnabled}>
                 <div className="px-[20px] pt-[14px] pb-[2px]">
                   <p className="text-[12px] text-[#464b52] leading-[18px]">
                     Configure when employees are prompted during breaks, and customize the message they see.
@@ -847,6 +930,7 @@ function RuleSetForm({
                   <div>
                     <SectionLabel>When to Notify</SectionLabel>
                     <SelectField value={mp.freeMealTrigger} onChange={(v) => setMp("freeMealTrigger", v as FreeMealTrigger)}
+                      disabled={!mp.freeMealEnabled}
                       options={[
                         { value: "always", label: "Every break" },
                         { value: "before_threshold", label: "Before threshold by..." },
@@ -854,7 +938,7 @@ function RuleSetForm({
                       ]} />
                     {mp.freeMealTrigger === "before_threshold" && (
                       <div className="mt-[8px] flex flex-col gap-[6px]">
-                        <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" />
+                        <NumberInput value={mp.freeMealBeforeMinutes} onChange={(v) => setMp("freeMealBeforeMinutes", v)} step={1} min={1} suffix="min before" disabled={!mp.freeMealEnabled} />
                         <p className="text-[11px] text-[#6a6e79] leading-[15px]">
                           Employee is notified {mp.freeMealBeforeMinutes} min before the break threshold is reached.
                         </p>
@@ -863,19 +947,20 @@ function RuleSetForm({
                     {mp.freeMealTrigger === "exceeding" && (
                       <div className="mt-[8px] flex items-center gap-[6px]">
                         <span className="text-[12px] text-[#464b52]">Longer than:</span>
-                        <NumberInput value={mp.freeMealMinutes} onChange={(v) => setMp("freeMealMinutes", v)} step={5} min={1} suffix="min" />
+                        <NumberInput value={mp.freeMealMinutes} onChange={(v) => setMp("freeMealMinutes", v)} step={5} min={1} suffix="min" disabled={!mp.freeMealEnabled} />
                       </div>
                     )}
                   </div>
                   <div className="col-span-2">
                     <SectionLabel>Notification Message</SectionLabel>
                     <ModusWcTextarea aria-label="Notification message" value={mp.freeMealPrompt}
-                      onInputChange={(e) => setMp("freeMealPrompt", e.target.value)} rows={3} maxLength={200}
+                      disabled={!mp.freeMealEnabled}
+                      onInputChange={(e) => setMp("freeMealPrompt", readInputString(e as CustomEvent))} rows={3} maxLength={200}
                       placeholder="Enter the message employees will see during their break..." />
                     <p className="mt-[4px] text-[11px] text-[#6a6e79]">{mp.freeMealPrompt.length}/200 characters</p>
                   </div>
                 </div>
-              </div>
+              </SectionFieldset>
             </CardShell>
           </div>
         )}
@@ -888,13 +973,13 @@ function RuleSetForm({
               alertDescription="On-duty meal is configured separately from standard breaks to meet California Labor Code requirements."
             />
             <CardShell title="On-Duty Meal" badge="CA Labor Code § 512(e)" badgeColor="blue"
-              action={<div className="flex items-center gap-[8px]"><span className="text-[12px] text-[#464b52]">{mp.onDutyMealEnabled ? "Enabled" : "Disabled"}</span><Toggle enabled={mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyMealEnabled", v)} /></div>}>
-              <div className={`transition-opacity duration-200 ${mp.onDutyMealEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+              action={<SectionEnableToggle enabled={mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyMealEnabled", v)} />}>
+              <SectionFieldset enabled={mp.onDutyMealEnabled}>
                 <div className="grid grid-cols-3 gap-[28px] px-[20px] py-[18px]">
                   <div>
                     <SectionLabel>Waiver Requirement</SectionLabel>
                     <div className="flex items-start gap-[10px]">
-                      <Toggle enabled={mp.onDutyRequireAgreement} onChange={(v) => setMp("onDutyRequireAgreement", v)} />
+                      <Toggle enabled={mp.onDutyRequireAgreement} disabled={!mp.onDutyMealEnabled} onChange={(v) => setMp("onDutyRequireAgreement", v)} />
                       <span className="text-[12px] text-[#252a2e] leading-[20px]">
                         Allowed only for employees assigned the waiver
                       </span>
@@ -917,6 +1002,7 @@ function RuleSetForm({
                         { value: "flag_and_pay", label: "Flag & pay as time worked" },
                       ] as { value: OnDutyMealAction; label: string }[]).map((opt) => (
                         <SoftOption key={opt.value} selected={mp.onDutyNoAgreementAction === opt.value}
+                          disabled={!mp.onDutyMealEnabled}
                           onSelect={() => setMp("onDutyNoAgreementAction", opt.value)} title={opt.label} />
                       ))}
                     </div>
@@ -955,13 +1041,14 @@ function RuleSetForm({
                       </span>
                     </div>
                     <ModusWcButton color="primary" variant="outlined" size="sm"
+                      disabled={!mp.onDutyMealEnabled}
                       onButtonClick={() => openEmployeeModal("all")}>
                       <ModusWcIcon decorative name="manage_people" size="xs" />
                       Manage employees
                     </ModusWcButton>
                   </div>
                 </div>
-              </div>
+              </SectionFieldset>
             </CardShell>
             {employeeModal && (
               <OnDutyEmployeeModal selected={mp.onDutyEmployees} initialFilter={employeeModal}
@@ -1391,13 +1478,6 @@ const JOB_CATALOG: JobOption[] = [
 
 const VIOLATION_DEPT_OPTIONS = ["3300 - Job Cost", "3400 - Operations", "3500 - Admin"];
 
-const defaultOverrideCostMapping = (): ViolationCostMapping => ({
-  mode: "override",
-  department: "3500 - Admin",
-  jobCode: JOB_CATALOG[0].code,
-  phaseCode: JOB_CATALOG[0].phases[0].code,
-});
-
 const jobFromCatalog = (code: string) => JOB_CATALOG.find((j) => j.code === code) ?? JOB_CATALOG[0];
 
 const RATE_LEVEL_OPTIONS = ["Holiday", "Standby", "Shift Differential", "Apprentice"];
@@ -1623,14 +1703,15 @@ type MealPenaltyState = {
   penaltiesEnabled: boolean;
   stackingCap: number;
   violations: ViolationRule[];
+  jobCostOverrides: JobCostOverride[];
 };
 
 type PayType = "regular" | "overtime" | "double_time" | "flat";
 
-type CostMappingMode = "employee_job" | "override";
-
-type ViolationCostMapping = {
-  mode: CostMappingMode;
+type JobCostOverride = {
+  id: string;
+  enabled: boolean;
+  sourceJobCode: string;
   department: string;
   jobCode: string;
   phaseCode: string;
@@ -1644,7 +1725,6 @@ type ViolationRule = {
   payType: PayType;
   hoursRate: number;
   maxPenalty: number;
-  costMapping: ViolationCostMapping;
 };
 
 const VIOLATION_DESCRIPTIONS: Record<string, string> = {
@@ -1654,24 +1734,35 @@ const VIOLATION_DESCRIPTIONS: Record<string, string> = {
   short_meal: "Meal penalty applies when a meal break was shorter than the minimum required duration.",
 };
 
-const defaultCostMapping = (): ViolationCostMapping => ({
-  mode: "employee_job",
-  department: "",
-  jobCode: "",
-  phaseCode: "",
+const defaultJobCostOverrides = (): JobCostOverride[] => [];
+
+const newJobCostOverride = (): JobCostOverride => ({
+  id: `jco-${Date.now()}`,
+  enabled: true,
+  sourceJobCode: JOB_CATALOG[0].code,
+  department: "3500 - Admin",
+  jobCode: JOB_CATALOG[0].code,
+  phaseCode: JOB_CATALOG[0].phases[0].code,
 });
 
-const withCostMapping = (v: ViolationRule): ViolationRule => ({
+const withJobCostOverrideDefaults = (row: JobCostOverride): JobCostOverride => ({
+  ...row,
+  sourceJobCode: row.sourceJobCode ?? JOB_CATALOG[0].code,
+  department: row.department ?? "",
+  jobCode: row.jobCode ?? JOB_CATALOG[0].code,
+  phaseCode: row.phaseCode ?? JOB_CATALOG[0].phases[0].code,
+});
+
+const withViolationDefaults = (v: ViolationRule): ViolationRule => ({
   ...v,
-  costMapping: v.costMapping ?? defaultCostMapping(),
   description: v.description ?? VIOLATION_DESCRIPTIONS[v.id] ?? "",
 });
 
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed_break_attestation", label: "Missed break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
-  { id: "missed_meal", label: "Missed Meal", description: VIOLATION_DESCRIPTIONS.missed_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
-  { id: "late_meal", label: "Late Meal", description: VIOLATION_DESCRIPTIONS.late_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
-  { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0, costMapping: defaultCostMapping() },
+  { id: "missed_break_attestation", label: "Missed break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_meal", label: "Missed Meal", description: VIOLATION_DESCRIPTIONS.missed_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "late_meal", label: "Late Meal", description: VIOLATION_DESCRIPTIONS.late_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
 const breakViolationOptions = () =>
@@ -1891,7 +1982,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(),
+  penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(), jobCostOverrides: defaultJobCostOverrides(),
 });
 
 function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", action, children }: {
@@ -1936,20 +2027,24 @@ function SoftOption({
   title,
   description,
   children,
+  disabled = false,
 }: {
   selected: boolean;
   onSelect: () => void;
   title: string;
   description?: string;
   children?: ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <div
       role="radio"
       aria-checked={selected}
-      onClick={onSelect}
+      aria-disabled={disabled}
+      onClick={() => { if (!disabled) onSelect(); }}
       style={{
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
         borderRadius: 8,
         padding: "12px 14px",
         background: selected ? "#eef5fa" : "transparent",
