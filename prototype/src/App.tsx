@@ -683,7 +683,7 @@ function RuleSetForm({
                 <>
                   <div className="px-[20px] pt-[14px] pb-[6px]">
                     <p className="text-[12px] text-[#464b52] leading-[18px]">
-                      Configure pay type and rate for each violation. By default, meal penalty pay posts to the employee&apos;s clocked job — use the job cost overrides table below to redirect costing for specific jobs.
+                      Configure pay type and rate for each violation. Use the job cost override below to redirect costing for all violations when needed.
                     </p>
                   </div>
                   <div className="px-[20px] pt-[8px] pb-[4px] min-w-0">
@@ -769,94 +769,87 @@ function RuleSetForm({
                     </div>
                   </div>
                   <div className="px-[20px] pt-[20px] pb-[4px] min-w-0">
-                    <div className="flex flex-wrap items-center justify-between gap-[12px] mb-[10px]">
-                      <div>
-                        <p className="text-[13px] font-semibold text-[#252a2e]">Job cost overrides</p>
-                        <p className="text-[11px] text-[#6a6e79] leading-[16px] mt-[4px]">
-                          When meal penalty pay is generated on a matched clocked job, cost it to a different department, job, and sub-job instead (e.g. administrative overhead).
-                        </p>
-                      </div>
-                      <ModusWcButton
-                        color="primary"
-                        variant="outlined"
-                        size="sm"
-                        onButtonClick={() => {
-                          const overrides = mp.jobCostOverrides ?? defaultJobCostOverrides();
-                          setMp("jobCostOverrides", [...overrides, newJobCostOverride()]);
-                        }}
-                      >
-                        <ModusWcIcon decorative name="add" size="xs" />
-                        Add override
-                      </ModusWcButton>
-                    </div>
-                    <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
-                      {(mp.jobCostOverrides ?? defaultJobCostOverrides()).length === 0 ? (
-                        <p className="px-[12px] py-[14px] text-[12px] text-[#6a6e79] italic">No job cost overrides configured.</p>
-                      ) : (
-                        <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
-                          <colgroup>
-                            <col style={{ width: "24%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "16%" }} />
-                          </colgroup>
-                          <thead>
-                            <tr className="bg-[#f5f5f8]">
-                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Clocked job</th>
-                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Department</th>
-                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Job</th>
-                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Sub-job</th>
-                              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-right text-[12px] font-semibold text-[#6a6e79]">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(mp.jobCostOverrides ?? defaultJobCostOverrides()).map((raw, idx) => {
-                              const row = withJobCostOverrideDefaults(raw);
-                              const costJob = jobFromCatalog(row.jobCode || JOB_CATALOG[0].code);
-                              const phaseOptions = costJob.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` }));
-                              const rowIncomplete = (
-                                !row.sourceJobCode || !row.department || !row.jobCode || !row.phaseCode
-                              );
+                    {(() => {
+                      const override = withJobCostOverrideDefaults(mp.jobCostOverride);
+                      const costJob = jobFromCatalog(override.jobCode || JOB_CATALOG[0].code);
+                      const jobPhaseOptions = costJob.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` }));
+                      const allPhaseOptions = JOB_CATALOG.flatMap((j) =>
+                        j.phases.map((p) => ({ value: p.code, label: `${p.code} - ${p.name}` })),
+                      );
+                      const fullOverrideIncomplete =
+                        override.mode === "department_job_phase"
+                        && (!override.department || !override.jobCode || !override.phaseCode);
+                      const phaseOverrideIncomplete = override.mode === "phase_only" && !override.phaseCode;
 
-                              const updateOverride = (patch: Partial<JobCostOverride>) => {
-                                const next = (mp.jobCostOverrides ?? defaultJobCostOverrides()).map((r, i) =>
-                                  i === idx ? withJobCostOverrideDefaults({ ...withJobCostOverrideDefaults(r), ...patch }) : withJobCostOverrideDefaults(r),
-                                );
-                                setMp("jobCostOverrides", next);
-                              };
+                      const updateOverride = (patch: Partial<JobCostOverrideConfig>) => {
+                        setMp("jobCostOverride", withJobCostOverrideDefaults({ ...override, ...patch }));
+                      };
 
+                      return (
+                        <div className="flex flex-col gap-[24px]">
+                          <div>
+                            <FieldLabel>Job cost override</FieldLabel>
+                            <p className="text-[11px] text-[#6a6e79] leading-[16px]">
+                              By default, meal penalty pay posts to the employee&apos;s clocked job. Choose one override to apply to <strong>all violations</strong>.
+                            </p>
+                          </div>
+                          <fieldset className="flex flex-col gap-[10px] border-0 p-0 m-0 min-w-0">
+                            <legend className="sr-only">Job cost override mode</legend>
+                            {([
+                              {
+                                value: "employee_job" as JobCostOverrideMode,
+                                title: "Employee's clocked job",
+                                desc: "Cost each violation to the department, job, and phase the employee was clocked into.",
+                              },
+                              {
+                                value: "department_job_phase" as JobCostOverrideMode,
+                                title: "Department, job, and phase",
+                                desc: "Route all violation costs to a fixed department, job, and sub-job (e.g. administrative overhead).",
+                              },
+                              {
+                                value: "phase_only" as JobCostOverrideMode,
+                                title: "Phase only",
+                                desc: "Keep the employee's clocked department and job; redirect all violations to a single sub-job phase.",
+                              },
+                            ]).map((opt) => {
+                              const selected = override.mode === opt.value;
                               return (
-                                <tr
-                                  key={row.id}
-                                  className={idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"}
+                                <div
+                                  key={opt.value}
+                                  role="presentation"
+                                  onClick={() => updateOverride({ mode: opt.value })}
+                                  className={`cursor-pointer rounded-[6px] border-2 px-[16px] py-[12px] transition-all ${
+                                    selected
+                                      ? "border-[#006fb0] bg-[#f5faff]"
+                                      : "border-[#e0e1e9] bg-white hover:border-[#cbced4]"
+                                  }`}
                                 >
-                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                    <div className="min-w-0">
+                                  <ModusWcRadio
+                                    name="job-cost-override-mode"
+                                    size="sm"
+                                    inputId={`job-cost-override-${opt.value}`}
+                                    label={opt.title}
+                                    customClass="font-bold"
+                                    value={selected}
+                                    onInputChange={() => updateOverride({ mode: opt.value })}
+                                  />
+                                  <p className="text-[11px] text-[var(--modus-wc-color-base-content-low-contrast)] leading-[16px] mt-[6px] ps-[22px]">
+                                    {opt.desc}
+                                  </p>
+                                  {selected && opt.value === "department_job_phase" && (
+                                    <div
+                                      className="mt-[12px] ps-[22px] grid grid-cols-1 md:grid-cols-3 gap-[12px] min-w-0"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       <SelectField
-                                        value={row.sourceJobCode}
-                                        customClass="w-full min-w-0"
-                                        onChange={(val) => updateOverride({ sourceJobCode: val })}
-                                        placeholder="Select job"
-                                        options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
-                                      />
-                                    </div>
-                                  </td>
-                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                    <div className="min-w-0">
-                                      <SelectField
-                                        value={row.department}
+                                        value={override.department}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => updateOverride({ department: val })}
                                         placeholder="Select department"
                                         options={VIOLATION_DEPT_OPTIONS.map((d) => ({ value: d, label: d }))}
                                       />
-                                    </div>
-                                  </td>
-                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                    <div className="min-w-0">
                                       <SelectField
-                                        value={row.jobCode}
+                                        value={override.jobCode}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => {
                                           const nextJob = jobFromCatalog(val);
@@ -868,44 +861,42 @@ function RuleSetForm({
                                         placeholder="Select job"
                                         options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
                                       />
-                                    </div>
-                                  </td>
-                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                    <div className="flex flex-col gap-[4px] min-w-0">
-                                      <div className="min-w-0">
-                                        <SelectField
-                                          value={row.phaseCode}
-                                          customClass="w-full min-w-0"
-                                          onChange={(val) => updateOverride({ phaseCode: val })}
-                                          placeholder="Select sub-job"
-                                          options={phaseOptions}
-                                        />
-                                      </div>
-                                      {rowIncomplete && (
-                                        <span className="text-[11px] text-[#b45309] break-words">Complete all fields.</span>
+                                      <SelectField
+                                        value={override.phaseCode}
+                                        customClass="w-full min-w-0"
+                                        onChange={(val) => updateOverride({ phaseCode: val })}
+                                        placeholder="Select sub-job"
+                                        options={jobPhaseOptions}
+                                      />
+                                      {fullOverrideIncomplete && (
+                                        <p className="md:col-span-3 text-[11px] text-[#b45309]">Complete department, job, and sub-job.</p>
                                       )}
                                     </div>
-                                  </td>
-                                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-right">
-                                    <button
-                                      type="button"
-                                      aria-label="Remove job cost override"
-                                      onClick={() => {
-                                        const next = (mp.jobCostOverrides ?? defaultJobCostOverrides()).filter((_, i) => i !== idx);
-                                        setMp("jobCostOverrides", next);
-                                      }}
-                                      className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-[#6a6e79] hover:bg-[#fbdde2] hover:text-[#ab1f26] transition-colors"
+                                  )}
+                                  {selected && opt.value === "phase_only" && (
+                                    <div
+                                      className="mt-[12px] ps-[22px] max-w-[320px] min-w-0"
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      <Trash2 size={13} />
-                                    </button>
-                                  </td>
-                                </tr>
+                                      <SelectField
+                                        value={override.phaseCode}
+                                        customClass="w-full min-w-0"
+                                        onChange={(val) => updateOverride({ phaseCode: val })}
+                                        placeholder="Select sub-job phase"
+                                        options={allPhaseOptions}
+                                      />
+                                      {phaseOverrideIncomplete && (
+                                        <p className="mt-[4px] text-[11px] text-[#b45309]">Select a sub-job phase.</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               );
                             })}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
+                          </fieldset>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-end gap-[32px] px-[20px] pt-[14px] pb-[16px] border-t border-[#f0f0f4] mt-[12px]">
                     <div>
@@ -1703,15 +1694,15 @@ type MealPenaltyState = {
   penaltiesEnabled: boolean;
   stackingCap: number;
   violations: ViolationRule[];
-  jobCostOverrides: JobCostOverride[];
+  jobCostOverride: JobCostOverrideConfig;
 };
 
 type PayType = "regular" | "overtime" | "double_time" | "flat";
 
-type JobCostOverride = {
-  id: string;
-  enabled: boolean;
-  sourceJobCode: string;
+type JobCostOverrideMode = "employee_job" | "department_job_phase" | "phase_only";
+
+type JobCostOverrideConfig = {
+  mode: JobCostOverrideMode;
   department: string;
   jobCode: string;
   phaseCode: string;
@@ -1734,23 +1725,20 @@ const VIOLATION_DESCRIPTIONS: Record<string, string> = {
   short_meal: "Meal penalty applies when a meal break was shorter than the minimum required duration.",
 };
 
-const defaultJobCostOverrides = (): JobCostOverride[] => [];
-
-const newJobCostOverride = (): JobCostOverride => ({
-  id: `jco-${Date.now()}`,
-  enabled: true,
-  sourceJobCode: JOB_CATALOG[0].code,
+const defaultJobCostOverride = (): JobCostOverrideConfig => ({
+  mode: "employee_job",
   department: "3500 - Admin",
   jobCode: JOB_CATALOG[0].code,
   phaseCode: JOB_CATALOG[0].phases[0].code,
 });
 
-const withJobCostOverrideDefaults = (row: JobCostOverride): JobCostOverride => ({
+const withJobCostOverrideDefaults = (row?: Partial<JobCostOverrideConfig>): JobCostOverrideConfig => ({
+  ...defaultJobCostOverride(),
   ...row,
-  sourceJobCode: row.sourceJobCode ?? JOB_CATALOG[0].code,
-  department: row.department ?? "",
-  jobCode: row.jobCode ?? JOB_CATALOG[0].code,
-  phaseCode: row.phaseCode ?? JOB_CATALOG[0].phases[0].code,
+  mode: row?.mode ?? "employee_job",
+  department: row?.department ?? "3500 - Admin",
+  jobCode: row?.jobCode ?? JOB_CATALOG[0].code,
+  phaseCode: row?.phaseCode ?? JOB_CATALOG[0].phases[0].code,
 });
 
 const withViolationDefaults = (v: ViolationRule): ViolationRule => ({
@@ -1982,7 +1970,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(), jobCostOverrides: defaultJobCostOverrides(),
+  penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
 });
 
 function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", action, children }: {
