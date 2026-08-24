@@ -540,19 +540,19 @@ function RuleSetForm({
         {activeTab === "breaks" && (
           <div className="flex flex-col gap-[24px] min-w-0">
             <ModusWcAlert variant="info"
-              alertTitle="Two breaks, one type"
-              alertDescription="Administrators can configure exactly two breaks. All breaks must use the same type — Automatic, Flagged, or Meal penalty — for consistent calculation."
+              alertTitle="Break Configuration Rules"
+              alertDescription="Up to two breaks can be enabled. Both breaks share the same enforcement method (Flagged, Automatic, or Penalty Pay)."
             />
 
             <div>
-              <FieldLabel>Break Type</FieldLabel>
-              <p className="text-[11px] text-[#6a6e79] mb-[10px]">Applies to both configured breaks. Fixed schedule windows are not supported in this release.</p>
+              <FieldLabel>Break Enforcement Method</FieldLabel>
+              <p className="text-[11px] text-[#6a6e79] mb-[10px]">Configure how break violations are set up in your organization.</p>
               <fieldset className="flex gap-[10px] border-0 p-0 m-0 min-w-0">
-                <legend className="sr-only">Break type</legend>
+                <legend className="sr-only">Break Enforcement Method</legend>
                 {([
-                  { value: "flagged" as BreakType, title: "Flagged", desc: "Violations are flagged for supervisor review." },
+                  { value: "flagged" as BreakType, title: "Flag", desc: "Violations are flagged for supervisor review." },
                   { value: "automatic" as BreakType, title: "Automatic", desc: "The system inserts qualifying breaks automatically." },
-                  { value: "premium" as BreakType, title: "Meal penalty", desc: "Late or missed breaks trigger meal penalty pay per violation rules below." },
+                  { value: "premium" as BreakType, title: "Penalty Pay", desc: "Late or missed breaks trigger automated penalty pay based on configured violation rules." },
                 ]).map((opt) => {
                   const selected = mp.breakType === opt.value;
                   return (
@@ -598,12 +598,12 @@ function RuleSetForm({
                   </p>
                   <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                     <div>
-                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break must begin after</p>
+                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break Must Begin After</p>
                       <NumberInput value={mp.meal1Trigger} onChange={(v) => setMealWindow(1, "start", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal1Enabled} />
                     </div>
                     {breakUsesEndWindow && (
                       <div>
-                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break must end after</p>
+                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal1Enabled ? "#464b52" : "#a3a3a3" }}>Break Must End After</p>
                         <NumberInput value={mp.meal1TriggerEnd} onChange={(v) => setMealWindow(1, "end", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal1Enabled} />
                       </div>
                     )}
@@ -612,7 +612,7 @@ function RuleSetForm({
                 <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
                   <div>
                     <SectionLabel>Break Duration</SectionLabel>
-                    <FieldLabel>Minimum required length</FieldLabel>
+                    <FieldLabel>Minimum Required Length</FieldLabel>
                     <NumberInput value={mp.meal1Duration} onChange={(v) => setMp("meal1Duration", v)} step={5} min={0} suffix="min" disabled={!mp.meal1Enabled} />
                   </div>
                   <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
@@ -640,12 +640,12 @@ function RuleSetForm({
                   </p>
                   <div className="flex flex-wrap items-end gap-x-[20px] gap-y-[10px]">
                     <div>
-                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break must begin after</p>
+                      <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break Must Begin After</p>
                       <NumberInput value={mp.meal2Trigger} onChange={(v) => setMealWindow(2, "start", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal2Enabled} />
                     </div>
                     {breakUsesEndWindow && (
                       <div>
-                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break must end after</p>
+                        <p className="text-[11px] mb-[4px]" style={{ color: mp.meal2Enabled ? "#464b52" : "#a3a3a3" }}>Break Must End After</p>
                         <NumberInput value={mp.meal2TriggerEnd} onChange={(v) => setMealWindow(2, "end", v)} step={0.5} min={0} suffix="hrs into shift" disabled={!mp.meal2Enabled} />
                       </div>
                     )}
@@ -654,7 +654,7 @@ function RuleSetForm({
                 <div className="px-[20px] py-[18px] flex flex-col gap-[20px]">
                   <div>
                     <SectionLabel>Break Duration</SectionLabel>
-                    <FieldLabel>Minimum required length</FieldLabel>
+                    <FieldLabel>Minimum Required Length</FieldLabel>
                     <NumberInput value={mp.meal2Duration} onChange={(v) => setMp("meal2Duration", v)} step={5} min={0} suffix="min" disabled={!mp.meal2Enabled} />
                   </div>
                   <div className="mt-auto flex items-start gap-[8px] rounded-[6px] bg-[#f1f1f6] px-[12px] py-[10px]">
@@ -672,11 +672,11 @@ function RuleSetForm({
               <CardShell title="Meal Penalty Violations" badge="LC § 226.7" badgeColor="red"
                 action={
                   <div className="flex items-center gap-[8px]">
-                    <span className="text-[12px] text-[#464b52]">Auto-calculate meal penalty pay</span>
+                    <span className="text-[12px] text-[#464b52]">Auto-Calculate Meal Penalty Pay</span>
                     <Toggle
                       enabled={mp.penaltiesEnabled}
                       onChange={(v) => setMp("penaltiesEnabled", v)}
-                      ariaLabel="Auto-calculate meal penalty pay"
+                      ariaLabel="Auto-Calculate Meal Penalty Pay"
                     />
                   </div>
                 }>
@@ -698,7 +698,7 @@ function RuleSetForm({
                         <thead>
                           <tr className="bg-[#f5f5f8]">
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation</th>
+                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation Type</th>
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
                             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
                           </tr>
@@ -788,27 +788,27 @@ function RuleSetForm({
                       return (
                         <div className="flex flex-col gap-[24px]">
                           <div>
-                            <FieldLabel>Job cost override</FieldLabel>
+                            <FieldLabel>Job Cost Override</FieldLabel>
                             <p className="text-[11px] text-[#6a6e79] leading-[16px]">
                               By default, meal penalty pay posts to the employee&apos;s clocked job. Choose one override to apply to <strong>all violations</strong>.
                             </p>
                           </div>
                           <fieldset className="flex flex-col gap-[10px] border-0 p-0 m-0 min-w-0">
-                            <legend className="sr-only">Job cost override mode</legend>
+                            <legend className="sr-only">Job Cost Override Mode</legend>
                             {([
                               {
                                 value: "employee_job" as JobCostOverrideMode,
-                                title: "Employee's clocked job",
+                                title: "Employee's Clocked Job",
                                 desc: "Cost each violation to the department, job, and phase the employee was clocked into.",
                               },
                               {
                                 value: "department_job_phase" as JobCostOverrideMode,
-                                title: "Department, job, and phase",
+                                title: "Department, Job, and Phase",
                                 desc: "Route all violation costs to a fixed department, job, and sub-job (e.g. administrative overhead).",
                               },
                               {
                                 value: "phase_only" as JobCostOverrideMode,
-                                title: "Phase only",
+                                title: "Phase Only",
                                 desc: "Keep the employee's clocked department and job; redirect all violations to a single sub-job phase.",
                               },
                             ]).map((opt) => {
@@ -937,14 +937,14 @@ function RuleSetForm({
                     )}
                     {mp.freeMealTrigger === "exceeding" && (
                       <div className="mt-[8px] flex items-center gap-[6px]">
-                        <span className="text-[12px] text-[#464b52]">Longer than:</span>
+                        <span className="text-[12px] text-[#464b52]">Longer Than:</span>
                         <NumberInput value={mp.freeMealMinutes} onChange={(v) => setMp("freeMealMinutes", v)} step={5} min={1} suffix="min" disabled={!mp.freeMealEnabled} />
                       </div>
                     )}
                   </div>
                   <div className="col-span-2">
                     <SectionLabel>Notification Message</SectionLabel>
-                    <ModusWcTextarea aria-label="Notification message" value={mp.freeMealPrompt}
+                    <ModusWcTextarea aria-label="Notification Message" value={mp.freeMealPrompt}
                       disabled={!mp.freeMealEnabled}
                       onInputChange={(e) => setMp("freeMealPrompt", readInputString(e as CustomEvent))} rows={3} maxLength={200}
                       placeholder="Enter the message employees will see during their break..." />
@@ -1747,7 +1747,7 @@ const withViolationDefaults = (v: ViolationRule): ViolationRule => ({
 });
 
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed_break_attestation", label: "Missed break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_break_attestation", label: "Missed Break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "missed_meal", label: "Missed Meal", description: VIOLATION_DESCRIPTIONS.missed_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "late_meal", label: "Late Meal", description: VIOLATION_DESCRIPTIONS.late_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
@@ -2212,8 +2212,7 @@ function TimesheetSettings() {
           <div className="px-[20px] pt-[14px] pb-[6px] flex flex-col gap-[12px]">
             <p className="text-[12px] text-[#464b52] leading-[18px]">
               Questions cannot be changed after they are created in order to keep the integrity of the answers associated with them.
-              Invalid answers will be flagged on the timesheet summary. When meal penalty is enabled with active violations under
-              Timesheet Hour Rules, you can map a question to a break violation so an invalid answer triggers the corresponding premium.
+              Invalid answers will be flagged on the timesheet summary. Map invalid answers to associated break violations to trigger the corresponding premium pay rule.
             </p>
             {!breakViolationSelectable && (
               <ModusWcAlert
@@ -2234,7 +2233,7 @@ function TimesheetSettings() {
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Require Comment</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[210px]">Require Comment on Invalid Answer</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[120px]">Safety Related</th>
-                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Break Violation</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Break Penalty Trigger</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[60px]" />
                   </tr>
                 </thead>
