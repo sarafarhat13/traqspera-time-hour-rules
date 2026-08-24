@@ -7721,10 +7721,24 @@ function TimesheetSummary() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-[8px]">
-          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Timesheet list")}>Timesheet List</ModusWcButton>
-          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Exports")}>Exports</ModusWcButton>
-          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Expenses")}>Expenses (0)</ModusWcButton>
-          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Missing report")}>Missing Timesheets Report</ModusWcButton>
+          <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={() => toast.message("Timesheet list")}>
+            <ModusWcIcon name="chevron_left" variant="outlined" size="xs" decorative />
+            Timesheet List
+          </ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Exports")}>
+            <ModusWcIcon name="export" variant="outlined" size="xs" decorative />
+            Exports
+            <ModusWcIcon name="caret_down" variant="outlined" size="xs" decorative />
+          </ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Expenses")}>
+            <ModusWcIcon name="payment_instant" variant="outlined" size="xs" decorative />
+            Expenses
+            <ModusWcBadge color="primary" size="sm" variant="filled">0</ModusWcBadge>
+          </ModusWcButton>
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Missing report")}>
+            <ModusWcIcon name="list_bulleted" variant="outlined" size="xs" decorative />
+            Missing Timesheets Report
+          </ModusWcButton>
           <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Print")}>
             <ModusWcIcon name="print" variant="outlined" size="xs" decorative />
             Print
