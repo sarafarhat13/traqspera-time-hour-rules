@@ -1196,8 +1196,8 @@ const UNION_OPTIONS = [
 
 function HourRulesTab({ onSave }: { onSave: () => void }) {
   // Company
+  const { companyMealPenalty, setCompanyMealPenalty: _setCompanyMealPenalty } = useMealPenaltyConfig();
   const [companyRules, _setCompanyRules] = useState<RuleSetData>(defaultRuleSet());
-  const [companyMealPenalty, _setCompanyMealPenalty] = useState<MealPenaltyState>(defaultMealPenalty());
   const [kioskMinHours, _setKioskMinHours] = useState(4);
   const [kioskBreakLength, _setKioskBreakLength] = useState(0.5);
   const [equipMaxHours, _setEquipMaxHours] = useState(10);
@@ -1753,8 +1753,16 @@ const defaultViolations = (): ViolationRule[] => [
   { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
-const breakViolationOptions = () =>
-  defaultViolations().map((v) => ({ value: v.id, label: v.label }));
+function getConfiguredBreakViolationOptions(mp: MealPenaltyState): { value: string; label: string }[] {
+  if (mp.breakType !== "premium" || !mp.penaltiesEnabled) return [];
+  return (mp.violations ?? defaultViolations())
+    .filter((v) => withViolationDefaults(v).enabled)
+    .map((v) => ({ value: withViolationDefaults(v).id, label: withViolationDefaults(v).label }));
+}
+
+function breakViolationMappingAvailable(mp: MealPenaltyState): boolean {
+  return getConfiguredBreakViolationOptions(mp).length > 0;
+}
 
 type AttestationAnswer = "yes" | "no";
 
@@ -1777,7 +1785,7 @@ const defaultAttestationQuestions = (): AttestationQuestion[] => [
     requireComment: false,
     requireCommentOnInvalid: true,
     safetyRelated: false,
-    violationId: "missed_break_attestation",
+    violationId: "",
     persisted: true,
   },
   {
@@ -1788,6 +1796,16 @@ const defaultAttestationQuestions = (): AttestationQuestion[] => [
     requireCommentOnInvalid: false,
     safetyRelated: true,
     violationId: "",
+    persisted: true,
+  },
+  {
+    id: "aq_missed_meal",
+    question: "Did you take your required meal break today?",
+    validAnswer: "yes",
+    requireComment: false,
+    requireCommentOnInvalid: true,
+    safetyRelated: false,
+    violationId: "missed_meal",
     persisted: true,
   },
 ];
@@ -1802,6 +1820,19 @@ const AttestationConfigContext = createContext<AttestationConfigContextValue | n
 function useAttestationConfig() {
   const ctx = useContext(AttestationConfigContext);
   if (!ctx) throw new Error("useAttestationConfig must be used within AttestationConfigProvider");
+  return ctx;
+}
+
+type MealPenaltyConfigContextValue = {
+  companyMealPenalty: MealPenaltyState;
+  setCompanyMealPenalty: React.Dispatch<React.SetStateAction<MealPenaltyState>>;
+};
+
+const MealPenaltyConfigContext = createContext<MealPenaltyConfigContextValue | null>(null);
+
+function useMealPenaltyConfig() {
+  const ctx = useContext(MealPenaltyConfigContext);
+  if (!ctx) throw new Error("useMealPenaltyConfig must be used within MealPenaltyConfigProvider");
   return ctx;
 }
 
@@ -2104,8 +2135,12 @@ function PresetDialog({ open, onClose, onConfirm }: { open: boolean; onClose: ()
 // ─── Timesheet Settings ───────────────────────────────────────────────────────
 function TimesheetSettings() {
   const { questions, setQuestions } = useAttestationConfig();
+  const { companyMealPenalty } = useMealPenaltyConfig();
   const [draftQuestions, setDraftQuestions] = useState<AttestationQuestion[]>(questions);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  const violationOptions = getConfiguredBreakViolationOptions(companyMealPenalty);
+  const breakViolationSelectable = breakViolationMappingAvailable(companyMealPenalty);
 
   const updateQuestion = (id: string, patch: Partial<AttestationQuestion>) => {
     setDraftQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
@@ -2137,14 +2172,16 @@ function TimesheetSettings() {
       toast.error("Each question must have text before saving.");
       return;
     }
-    const saved = draftQuestions.map((q) => ({ ...q, persisted: true }));
+    const saved = draftQuestions.map((q) => ({
+      ...q,
+      persisted: true,
+      violationId: breakViolationSelectable ? q.violationId : "",
+    }));
     setDraftQuestions(saved);
     setQuestions(saved);
     setSavedAt(new Date());
     toast.success("Attestation questions saved.");
   };
-
-  const violationOptions = breakViolationOptions();
 
   return (
     <div className="bg-[#f1f1f6] min-h-full">
@@ -2172,12 +2209,19 @@ function TimesheetSettings() {
             </ModusWcButton>
           }
         >
-          <div className="px-[20px] pt-[14px] pb-[6px]">
+          <div className="px-[20px] pt-[14px] pb-[6px] flex flex-col gap-[12px]">
             <p className="text-[12px] text-[#464b52] leading-[18px]">
               Questions cannot be changed after they are created in order to keep the integrity of the answers associated with them.
-              Invalid answers will be flagged on the timesheet summary. Map questions to break violations defined under premium break rules
-              to trigger the corresponding premium when an employee&apos;s answer is invalid.
+              Invalid answers will be flagged on the timesheet summary. When meal penalty is enabled with active violations under
+              Timesheet Hour Rules, you can map a question to a break violation so an invalid answer triggers the corresponding premium.
             </p>
+            {!breakViolationSelectable && (
+              <ModusWcAlert
+                variant="info"
+                alertTitle="Break violation mapping unavailable"
+                alertDescription="Select Meal penalty as the break type and enable at least one violation under Timesheet Hour Rules before mapping attestation questions to break violations."
+              />
+            )}
           </div>
 
           <div className="px-[20px] pt-[8px] pb-[4px]">
@@ -2252,12 +2296,21 @@ function TimesheetSettings() {
                         />
                       </td>
                       <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
-                        <SelectField
-                          value={q.violationId}
-                          onChange={(v) => updateQuestion(q.id, { violationId: v })}
-                          placeholder="None"
-                          options={violationOptions}
-                        />
+                        {breakViolationSelectable ? (
+                          <SelectField
+                            value={q.violationId}
+                            onChange={(v) => updateQuestion(q.id, { violationId: v })}
+                            placeholder="None"
+                            options={violationOptions}
+                          />
+                        ) : (
+                          <div className="flex flex-col gap-[2px] min-w-0">
+                            <span className="text-[12px] font-medium text-[#6a6e79]">Not available</span>
+                            <span className="text-[11px] text-[#a3a3a3] leading-[15px]">
+                              Configure meal penalty violations in Timesheet Hour Rules to enable mapping.
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="border-b border-[#e0e1e9] px-[12px] py-[10px] text-center">
                         <ModusWcButton
@@ -8009,6 +8062,11 @@ export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("s_hour_rules");
   const [navCollapsed, setNavCollapsed] = useState(true);
   const [attestationQuestions, setAttestationQuestions] = useState<AttestationQuestion[]>(defaultAttestationQuestions);
+  const [companyMealPenalty, setCompanyMealPenalty] = useState<MealPenaltyState>(() => ({
+    ...defaultMealPenalty(),
+    breakType: "premium",
+    penaltiesEnabled: true,
+  }));
   const [viewingAs, setViewingAs] = useState<ViewingRole>("admin");
   const inSettings = SETTINGS_PAGES.has(activePage);
   const navW = navCollapsed ? NAV_COLLAPSED_W : NAV_EXPANDED_W;
@@ -8024,6 +8082,7 @@ export default function App() {
 
   return (
     <ViewingRoleContext.Provider value={viewingRoleValue}>
+    <MealPenaltyConfigContext.Provider value={{ companyMealPenalty, setCompanyMealPenalty }}>
     <AttestationConfigContext.Provider value={{ questions: attestationQuestions, setQuestions: setAttestationQuestions }}>
     <div className="min-h-screen font-sans bg-[var(--modus-wc-color-base-page,#f1f1f6)]">
       <Toaster position="top-right" richColors />
@@ -8063,6 +8122,7 @@ export default function App() {
       </div>
     </div>
     </AttestationConfigContext.Provider>
+    </MealPenaltyConfigContext.Provider>
     </ViewingRoleContext.Provider>
   );
 }
