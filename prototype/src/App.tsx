@@ -7369,16 +7369,6 @@ function EmployeeSummaryCard({
         />
       </EmployeeSummarySection>
       <EmployeeSummarySection
-        title="Expenses"
-        trailing={(
-          <span className="text-[12px] font-semibold text-[#252a2e]" style={{ fontFamily: OS }}>
-            Total ${expenseTotal.toFixed(2)}
-          </span>
-        )}
-      >
-        <SummaryExpensesTable expenses={employee.expenses} />
-      </EmployeeSummarySection>
-      <EmployeeSummarySection
         title="Violations"
         trailing={violationCount > 0 ? (
           <>
@@ -7399,6 +7389,16 @@ function EmployeeSummaryCard({
           onUpdateEmployee={onUpdateEmployee}
           onUpdateViolation={onUpdateViolation}
         />
+      </EmployeeSummarySection>
+      <EmployeeSummarySection
+        title="Expenses"
+        trailing={(
+          <span className="text-[12px] font-semibold text-[#252a2e]" style={{ fontFamily: OS }}>
+            Total ${expenseTotal.toFixed(2)}
+          </span>
+        )}
+      >
+        <SummaryExpensesTable expenses={employee.expenses} />
       </EmployeeSummarySection>
     </div>
   );
