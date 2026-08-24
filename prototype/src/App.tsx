@@ -7483,7 +7483,7 @@ function EmployeeSummaryCard({
           </div>
         </div>
         {onApproveAll && (
-          <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={onApproveAll}>
+          <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={onApproveAll}>
             Approve All {employee.name.split(" ")[0]}&apos;s Entries
           </ModusWcButton>
         )}
