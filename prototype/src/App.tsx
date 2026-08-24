@@ -5804,7 +5804,7 @@ const violationFromEntry = (
   end: "—",
   dept: entry.dept,
   job: entry.job,
-  phase: `${label} Premium`,
+  phase: entry.phase,
   state: entry.state,
   wo: entry.wo,
   payRate: entry.payRate,
@@ -5970,6 +5970,9 @@ const BREAK_VIOLATION_IDS = new Set([
 
 const isBreakViolation = (v: SummaryViolation) => BREAK_VIOLATION_IDS.has(v.violationTypeId);
 
+const breakViolationDisplayLabel = (v: SummaryViolation) =>
+  defaultViolations().find((rule) => rule.id === v.violationTypeId)?.label ?? v.label;
+
 const connorEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-connor")!;
 connorEmp.violations = [
   violationFromEntry("viol-connor-1-meal", "connor-1", "missed_meal", "Missed Meal", connorEmp.entries[0]),
@@ -6083,8 +6086,8 @@ const BREAK_ROW_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-middle borde
 const SUMMARY_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Appr. By", title: "Approved By" },
   { label: "2nd Appr.", title: "Second Approved By" },
-  { label: "Done", title: "Complete" },
-  { label: "Exp.", title: "Exported" },
+  { label: "Complete", title: "Complete" },
+  { label: "Exported", title: "Exported" },
   { label: "Name", title: "Name" },
   { label: "Emp #", title: "Employee #" },
   { label: "Date", title: "Date" },
@@ -6108,6 +6111,42 @@ const SUMMARY_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Rate", title: "Rate Level" },
   { label: "Comment", title: "Comment" },
 ];
+
+const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
+  { label: "Appr. By", title: "Approved By" },
+  { label: "2nd Appr.", title: "Second Approved By" },
+  { label: "Complete", title: "Complete" },
+  { label: "Exported", title: "Exported" },
+  { label: "Violation Type", title: "Type of Violation" },
+  { label: "Name", title: "Name" },
+  { label: "Emp #", title: "Employee #" },
+  { label: "Date", title: "Date" },
+  { label: "Dept", title: "Department" },
+  { label: "Job", title: "Job" },
+  { label: "Phase", title: "Phase" },
+  { label: "St", title: "State" },
+  { label: "Pay Rt", title: "Pay Rate" },
+  { label: "Reg", title: "Reg" },
+  { label: "Union", title: "Union Code" },
+  { label: "Wage", title: "Wage Code" },
+  { label: "Rate", title: "Rate Level" },
+  { label: "Comment", title: "Comment" },
+];
+
+const BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES: Record<string, number> = {
+  "Type of Violation": 9,
+  Job: 11,
+  Phase: 9.5,
+  Comment: 8,
+};
+const BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH = Object.values(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).reduce((sum, width) => sum + width, 0);
+const BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH =
+  (98 - BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH) / (BREAK_VIOLATION_TABLE_HEADERS.length - Object.keys(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).length);
+const BREAK_VIOLATION_TABLE_COL_WIDTHS = BREAK_VIOLATION_TABLE_HEADERS.map((h) => {
+  const override = BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES[h.title];
+  return `${override ?? BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH}%`;
+});
+const BREAK_VIOLATION_TABLE_COL_COUNT = BREAK_VIOLATION_TABLE_HEADERS.length + 1;
 
 type SummaryTableRow =
   | { kind: "entry"; data: SummaryTimesheetEntry }
@@ -6393,6 +6432,8 @@ function SummaryEditableDataCells({
   secondApprovedByCell,
   completeCell,
   exportedCell,
+  afterExportedCell,
+  columnsMode = "full",
 }: {
   rowKind: SummaryTableRow["kind"];
   rowId: string;
@@ -6413,6 +6454,8 @@ function SummaryEditableDataCells({
   secondApprovedByCell?: ReactNode;
   completeCell?: ReactNode;
   exportedCell?: ReactNode;
+  afterExportedCell?: ReactNode;
+  columnsMode?: "full" | "breakViolation";
 }) {
   const cell = (field: string) => summaryCellId(rowKind, rowId, field);
   const hourCell = (val: number, alert?: boolean, strike?: boolean) => (
@@ -6440,6 +6483,7 @@ function SummaryEditableDataCells({
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
   const dash = <span style={{ color: "#a3a3a3" }}>—</span>;
   const hoursEditable = editable && hoursMode === "full";
+  const breakViolationColumns = columnsMode === "breakViolation";
 
   return (
     <>
@@ -6509,6 +6553,11 @@ function SummaryEditableDataCells({
       >
         {exportedCell ?? statusMark(data.exported)}
       </td>
+      {afterExportedCell ? (
+        <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+          {afterExportedCell}
+        </td>
+      ) : null}
       <SummaryClickEditTextCell
         cellId={cell("name")}
         activeCellId={activeCellId}
@@ -6536,24 +6585,28 @@ function SummaryEditableDataCells({
         editable={editable}
         onSave={(v) => onPatch({ date: v })}
       />
-      <SummaryClickEditTextCell
-        cellId={cell("start")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.start}
-        ariaLabel="Start time"
-        editable={editable}
-        onSave={(v) => onPatch({ start: v })}
-      />
-      <SummaryClickEditTextCell
-        cellId={cell("end")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.end}
-        ariaLabel="End time"
-        editable={editable}
-        onSave={(v) => onPatch({ end: v })}
-      />
+      {!breakViolationColumns && (
+        <>
+          <SummaryClickEditTextCell
+            cellId={cell("start")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.start}
+            ariaLabel="Start time"
+            editable={editable}
+            onSave={(v) => onPatch({ start: v })}
+          />
+          <SummaryClickEditTextCell
+            cellId={cell("end")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.end}
+            ariaLabel="End time"
+            editable={editable}
+            onSave={(v) => onPatch({ end: v })}
+          />
+        </>
+      )}
       <SummaryClickEditTextCell
         cellId={cell("dept")}
         activeCellId={activeCellId}
@@ -6575,10 +6628,10 @@ function SummaryEditableDataCells({
       />
       {phaseExtra ? (
         <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }}>
-          {data.phase !== undefined ? (
-            <span className="inline-flex items-center gap-[6px] flex-wrap">
+          <div className="flex flex-col items-start gap-[6px] min-w-0">
+            {data.phase !== undefined ? (
               <span
-                className={editable ? "cursor-text" : undefined}
+                className={`min-w-0 break-words ${editable ? "cursor-text" : ""}`}
                 onClick={editable ? () => setActiveCellId(cell("phase")) : undefined}
               >
                 {activeCellId === cell("phase") ? (
@@ -6600,11 +6653,9 @@ function SummaryEditableDataCells({
                   highlightCell(data.phase, phaseHighlight, deleted)
                 )}
               </span>
-              {phaseExtra}
-            </span>
-          ) : (
-            phaseExtra
-          )}
+            ) : null}
+            {phaseExtra}
+          </div>
         </td>
       ) : (
         <SummaryClickEditTextCell
@@ -6627,15 +6678,17 @@ function SummaryEditableDataCells({
         editable={editable}
         onSave={(v) => onPatch({ state: v })}
       />
-      <SummaryClickEditTextCell
-        cellId={cell("wo")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.wo}
-        ariaLabel="Work order"
-        editable={editable}
-        onSave={(v) => onPatch({ wo: v })}
-      />
+      {!breakViolationColumns && (
+        <SummaryClickEditTextCell
+          cellId={cell("wo")}
+          activeCellId={activeCellId}
+          setActiveCellId={setActiveCellId}
+          value={data.wo}
+          ariaLabel="Work order"
+          editable={editable}
+          onSave={(v) => onPatch({ wo: v })}
+        />
+      )}
       <SummaryClickEditTextCell
         cellId={cell("payRate")}
         activeCellId={activeCellId}
@@ -6655,66 +6708,74 @@ function SummaryEditableDataCells({
         display={hoursMode === "dash" ? dash : hourCell(data.reg ?? 0, hourAlert, deleted)}
         onSave={(v) => onPatch({ reg: v })}
       />
-      <SummaryClickEditNumberCell
-        cellId={cell("ot")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.ot ?? 0}
-        ariaLabel="Overtime hours"
-        editable={hoursEditable}
-        display={hoursMode === "dash" ? dash : hourCell(data.ot ?? 0, hourAlert, deleted)}
-        onSave={(v) => onPatch({ ot: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("dt")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.dt ?? 0}
-        ariaLabel="Double time hours"
-        editable={hoursEditable}
-        display={hoursMode === "dash" ? dash : hourCell(data.dt ?? 0, false, deleted)}
-        onSave={(v) => onPatch({ dt: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("travel")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.travel ?? 0}
-        ariaLabel="Travel hours"
-        editable={hoursEditable}
-        display={hoursMode === "dash" ? dash : hourCell(data.travel ?? 0, false, deleted)}
-        onSave={(v) => onPatch({ travel: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("qty")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.qty ?? 0}
-        ariaLabel="Quantity"
-        editable={hoursEditable}
-        display={(data.qty ?? 0) > 0 ? (data.qty ?? 0) : "—"}
-        onSave={(v) => onPatch({ qty: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("perDiem")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.perDiem ?? 0}
-        ariaLabel="Per diem"
-        editable={hoursEditable}
-        display={(data.perDiem ?? 0) > 0 ? (data.perDiem ?? 0) : "—"}
-        onSave={(v) => onPatch({ perDiem: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("perDiemRate")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.perDiemRate ?? 0}
-        ariaLabel="Per diem rate"
-        editable={hoursEditable}
-        display={(data.perDiemRate ?? 0) > 0 ? (data.perDiemRate ?? 0) : "—"}
-        onSave={(v) => onPatch({ perDiemRate: v })}
-      />
+      {!breakViolationColumns && (
+        <>
+          <SummaryClickEditNumberCell
+            cellId={cell("ot")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.ot ?? 0}
+            ariaLabel="Overtime hours"
+            editable={hoursEditable}
+            display={hoursMode === "dash" ? dash : hourCell(data.ot ?? 0, hourAlert, deleted)}
+            onSave={(v) => onPatch({ ot: v })}
+          />
+          <SummaryClickEditNumberCell
+            cellId={cell("dt")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.dt ?? 0}
+            ariaLabel="Double time hours"
+            editable={hoursEditable}
+            display={hoursMode === "dash" ? dash : hourCell(data.dt ?? 0, false, deleted)}
+            onSave={(v) => onPatch({ dt: v })}
+          />
+          <SummaryClickEditNumberCell
+            cellId={cell("travel")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.travel ?? 0}
+            ariaLabel="Travel hours"
+            editable={hoursEditable}
+            display={hoursMode === "dash" ? dash : hourCell(data.travel ?? 0, false, deleted)}
+            onSave={(v) => onPatch({ travel: v })}
+          />
+          <SummaryClickEditNumberCell
+            cellId={cell("qty")}
+            activeCellId={activeCellId}
+            setActiveCellId={setActiveCellId}
+            value={data.qty ?? 0}
+            ariaLabel="Quantity"
+            editable={hoursEditable}
+            display={(data.qty ?? 0) > 0 ? (data.qty ?? 0) : "—"}
+            onSave={(v) => onPatch({ qty: v })}
+          />
+        </>
+      )}
+      {!breakViolationColumns && (
+        <SummaryClickEditNumberCell
+          cellId={cell("perDiem")}
+          activeCellId={activeCellId}
+          setActiveCellId={setActiveCellId}
+          value={data.perDiem ?? 0}
+          ariaLabel="Per diem"
+          editable={hoursEditable}
+          display={(data.perDiem ?? 0) > 0 ? (data.perDiem ?? 0) : "—"}
+          onSave={(v) => onPatch({ perDiem: v })}
+        />
+      )}
+      {!breakViolationColumns && (
+        <SummaryClickEditNumberCell
+          cellId={cell("perDiemRate")}
+          activeCellId={activeCellId}
+          setActiveCellId={setActiveCellId}
+          value={data.perDiemRate ?? 0}
+          ariaLabel="Per diem rate"
+          editable={hoursEditable}
+          display={(data.perDiemRate ?? 0) > 0 ? (data.perDiemRate ?? 0) : "—"}
+          onSave={(v) => onPatch({ perDiemRate: v })}
+        />
+      )}
       <SummaryClickEditTextCell
         cellId={cell("unionCode")}
         activeCellId={activeCellId}
@@ -6753,6 +6814,37 @@ function SummaryEditableDataCells({
         onSave={(v) => onPatch({ comment: v })}
       />
     </>
+  );
+}
+
+function SummaryBreakViolationTableColgroup() {
+  return (
+    <colgroup>
+      <col style={{ width: SUMMARY_TABLE_ICON_COL_WIDTH }} />
+      {BREAK_VIOLATION_TABLE_COL_WIDTHS.map((width, idx) => (
+        <col key={BREAK_VIOLATION_TABLE_HEADERS[idx].title} style={{ width }} />
+      ))}
+    </colgroup>
+  );
+}
+
+function SummaryBreakViolationTableHeaderRow() {
+  return (
+    <tr style={{ background: TABLE_HEADER_BG, borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}>
+      <th className={SUMMARY_TABLE_CELL} style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }} />
+      {BREAK_VIOLATION_TABLE_HEADERS.map((h) => (
+        <th
+          key={h.title}
+          title={h.title}
+          className={SUMMARY_TABLE_CELL}
+          style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}
+        >
+          <p className="text-[10px] font-semibold leading-[13px]" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
+            {h.label}
+          </p>
+        </th>
+      ))}
+    </tr>
   );
 }
 
@@ -6938,6 +7030,7 @@ function SummaryViolationRow({
         editable={!isDeleted}
         deleted={isDeleted}
         hourAlert
+        columnsMode="breakViolation"
         approvedByCell={isDeleted ? (
           <span style={{ color: "#a3a3a3" }}>—</span>
         ) : isApproved ? undefined : (
@@ -6954,13 +7047,15 @@ function SummaryViolationRow({
         )}
         completeCell={statusMark(isApproved && !isDeleted)}
         exportedCell={statusMark(v.exported)}
-        phaseExtra={(
-          <>
+        afterExportedCell={
+          <div className="flex flex-wrap items-center gap-[6px] min-w-0">
             {isDeleted ? (
               <ModusWcBadge color="secondary" variant="outlined" size="sm">Deleted</ModusWcBadge>
             ) : (
               <>
-                <ModusWcBadge color="secondary" variant="filled" size="sm">Break Violation</ModusWcBadge>
+                <ModusWcBadge color="secondary" variant="filled" size="sm">
+                  {breakViolationDisplayLabel(v)}
+                </ModusWcBadge>
                 {canDelete && (
                   <ModusWcButton
                     color="tertiary"
@@ -6975,8 +7070,8 @@ function SummaryViolationRow({
                 )}
               </>
             )}
-          </>
-        )}
+          </div>
+        }
       />
     </tr>
   );
@@ -7008,7 +7103,7 @@ const EXPENSE_TABLE_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-top brea
 const EXPENSE_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Appr. By", title: "Approved By" },
   { label: "2nd Appr.", title: "Second Approved By" },
-  { label: "Exp.", title: "Exported" },
+  { label: "Exported", title: "Exported" },
   { label: "Date", title: "Date" },
   { label: "Dept", title: "Department" },
   { label: "Job", title: "Job" },
@@ -7253,14 +7348,14 @@ function SummaryBreakViolationsTable({
 
   return (
     <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
-      <SummaryTableColgroup />
+      <SummaryBreakViolationTableColgroup />
       <thead>
-        <SummaryTableHeaderRow />
+        <SummaryBreakViolationTableHeaderRow />
       </thead>
       <tbody>
         {violationRows.length === 0 ? (
           <tr style={{ background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
-            <td colSpan={27} className={`${SUMMARY_TABLE_CELL} text-center text-[#6a6e79]`} style={{ fontFamily: OS }}>
+            <td colSpan={BREAK_VIOLATION_TABLE_COL_COUNT} className={`${SUMMARY_TABLE_CELL} text-center text-[#6a6e79]`} style={{ fontFamily: OS }}>
               No violations for this pay period
             </td>
           </tr>
@@ -7282,15 +7377,12 @@ function SummaryBreakViolationsTable({
           ))
         )}
         <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
-          <td colSpan={15} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+          <td colSpan={13} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
             Totals
           </td>
           <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
           <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.ot.toFixed(2)}</td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.dt.toFixed(2)}</td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.travel.toFixed(2)}</td>
-          <td colSpan={7} />
+          <td colSpan={4} />
         </tr>
       </tbody>
     </table>
