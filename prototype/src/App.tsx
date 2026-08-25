@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback, createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import {
   ModusWcAlert,
+  ModusWcAutocomplete,
   ModusWcBadge,
   ModusWcButton,
   ModusWcCheckbox,
@@ -180,6 +181,60 @@ function SelectField({ value, onChange, options, placeholder, disabled, customCl
       onInputChange={(e) => {
         if (disabled) return;
         onChange(readInputString(e as CustomEvent));
+      }}
+    />
+  );
+}
+
+function SearchableSelectField({ value, onChange, options, placeholder, disabled, customClass }: {
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean;
+  customClass?: string;
+}) {
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
+  const [query, setQuery] = useState(selectedLabel);
+
+  useEffect(() => {
+    setQuery(selectedLabel);
+  }, [selectedLabel, value]);
+
+  const items = useMemo(
+    () =>
+      options.map((o) => ({
+        label: o.label,
+        value: o.value,
+        visibleInMenu: true,
+        selected: o.value === value,
+      })),
+    [options, value],
+  );
+
+  return (
+    <ModusWcAutocomplete
+      aria-label={placeholder ?? "Select"}
+      size="sm"
+      value={query}
+      disabled={disabled}
+      customClass={customClass}
+      placeholder={placeholder}
+      items={items}
+      includeSearch
+      minChars={0}
+      showMenuOnFocus
+      debounceMs={0}
+      onItemSelect={(e: CustomEvent<{ value?: string; label?: string }>) => {
+        if (disabled) return;
+        const item = e.detail;
+        if (!item?.value) return;
+        onChange(item.value);
+        setQuery(item.label ?? "");
+      }}
+      onInputChange={(e) => {
+        if (disabled) return;
+        setQuery(readInputString(e as CustomEvent));
+      }}
+      onInputBlur={() => {
+        setQuery(selectedLabel);
       }}
     />
   );
@@ -841,14 +896,14 @@ function RuleSetForm({
                                       className="mt-[12px] ps-[22px] grid grid-cols-1 md:grid-cols-3 gap-[12px] min-w-0"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <SelectField
+                                      <SearchableSelectField
                                         value={override.department}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => updateOverride({ department: val })}
                                         placeholder="Select department"
                                         options={VIOLATION_DEPT_OPTIONS.map((d) => ({ value: d, label: d }))}
                                       />
-                                      <SelectField
+                                      <SearchableSelectField
                                         value={override.jobCode}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => {
@@ -861,7 +916,7 @@ function RuleSetForm({
                                         placeholder="Select job"
                                         options={JOB_CATALOG.map((j) => ({ value: j.code, label: `${j.code} - ${j.name}` }))}
                                       />
-                                      <SelectField
+                                      <SearchableSelectField
                                         value={override.phaseCode}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => updateOverride({ phaseCode: val })}
@@ -878,7 +933,7 @@ function RuleSetForm({
                                       className="mt-[12px] ps-[22px] max-w-[320px] min-w-0"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <SelectField
+                                      <SearchableSelectField
                                         value={override.phaseCode}
                                         customClass="w-full min-w-0"
                                         onChange={(val) => updateOverride({ phaseCode: val })}
