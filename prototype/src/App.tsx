@@ -404,6 +404,7 @@ function RuleSetForm({
   descriptionText,
   mealPenaltyState,
   onMealPenaltyChange,
+  onOpenAttestationQuestions,
 }: {
   data: RuleSetData;
   onChange: (next: RuleSetData) => void;
@@ -418,6 +419,7 @@ function RuleSetForm({
   descriptionText?: string;
   mealPenaltyState: MealPenaltyState;
   onMealPenaltyChange: (next: MealPenaltyState) => void;
+  onOpenAttestationQuestions?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<RuleSetTab>("daily");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -430,6 +432,17 @@ function RuleSetForm({
   const mp = mealPenaltyState;
   const setMp = <K extends keyof MealPenaltyState>(key: K, val: MealPenaltyState[K]) =>
     onMealPenaltyChange({ ...mp, [key]: val });
+
+  const updateViolation = (id: string, patch: Partial<ViolationRule>) => {
+    const next = (mp.violations ?? defaultViolations()).map((r) =>
+      r.id === id ? withViolationDefaults({ ...withViolationDefaults(r), ...patch }) : withViolationDefaults(r),
+    );
+    setMp("violations", next);
+  };
+
+  const configuredViolations = () => (mp.violations ?? defaultViolations()).map(withViolationDefaults);
+  const breakViolationRules = () => configuredViolations().filter((v) => BREAK_VIOLATION_RULE_IDS.has(v.id));
+  const mealViolationRules = () => configuredViolations().filter((v) => MEAL_VIOLATION_RULE_IDS.has(v.id));
 
   const [employeeModal, setEmployeeModal] = useState<WaiverFilter | null>(null);
   const openEmployeeModal = (filter: WaiverFilter) => setEmployeeModal(filter);
@@ -639,8 +652,8 @@ function RuleSetForm({
               </fieldset>
             </div>
 
-            {/* Break 1 */}
-            <CardShell title="First Break" badge="Break 1" badgeColor="blue"
+            {/* Meal 1 */}
+            <CardShell title="First Meal" badge="Meal 1" badgeColor="blue"
               action={<SectionEnableToggle enabled={mp.meal1Enabled} onChange={(v) => setMp("meal1Enabled", v)} />}>
               <SectionFieldset enabled={mp.meal1Enabled}>
               <div className="grid grid-cols-2 gap-0" style={{ borderTop: "none" }}>
@@ -681,8 +694,8 @@ function RuleSetForm({
               </SectionFieldset>
             </CardShell>
 
-            {/* Break 2 */}
-            <CardShell title="Second Break" badge="Break 2" badgeColor="blue"
+            {/* Meal 2 */}
+            <CardShell title="Second Meal" badge="Meal 2" badgeColor="blue"
               action={<SectionEnableToggle enabled={mp.meal2Enabled} onChange={(v) => setMp("meal2Enabled", v)} />}>
               <SectionFieldset enabled={mp.meal2Enabled}>
               <div className="grid grid-cols-2 gap-0">
@@ -724,7 +737,7 @@ function RuleSetForm({
             </CardShell>
 
             {mp.breakType === "premium" && (
-              <CardShell title="Meal Penalty Violations" badge="LC § 226.7" badgeColor="red"
+              <CardShell title="Violation Penalties" badge="LC § 226.7" badgeColor="red"
                 action={
                   <div className="flex items-center gap-[8px]">
                     <span className="text-[12px] text-[#464b52]">Auto-Calculate Meal Penalty Pay</span>
@@ -741,89 +754,49 @@ function RuleSetForm({
                       Configure pay type and rate for each violation. Use the job cost override below to redirect costing for all violations when needed.
                     </p>
                   </div>
+
                   <div className="px-[20px] pt-[8px] pb-[4px] min-w-0">
-                    <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
-                      <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
-                        <colgroup>
-                          <col style={{ width: "8%" }} />
-                          <col style={{ width: "42%" }} />
-                          <col style={{ width: "30%" }} />
-                          <col style={{ width: "20%" }} />
-                        </colgroup>
-                        <thead>
-                          <tr className="bg-[#f5f5f8]">
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation Type</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
-                            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(mp.violations ?? defaultViolations()).map((raw, idx) => {
-                            const v = withViolationDefaults(raw);
-                            const rowFieldsDisabled = !v.enabled;
-
-                            const updateViolation = (patch: Partial<ViolationRule>) => {
-                              const next = (mp.violations ?? defaultViolations()).map((r, i) =>
-                                i === idx ? withViolationDefaults({ ...withViolationDefaults(r), ...patch }) : withViolationDefaults(r),
-                              );
-                              setMp("violations", next);
-                            };
-
-                            return (
-                              <tr
-                                key={v.id}
-                                className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}
-                              >
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] text-center">
-                                  <Toggle
-                                    enabled={v.enabled}
-                                    onChange={(val) => updateViolation({ enabled: val })}
-                                  />
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] min-w-0">
-                                  <ModusWcTooltip
-                                    content={v.description}
-                                    position="auto"
-                                    tooltipId={`violation-tip-${v.id}`}
-                                  >
-                                    <button
-                                      type="button"
-                                      className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help break-words min-w-0"
-                                      aria-describedby={`violation-tip-${v.id}`}
-                                    >
-                                      {v.label}
-                                    </button>
-                                  </ModusWcTooltip>
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
-                                  <div className="min-w-0">
-                                    <SelectField value={v.payType} onChange={(val) => updateViolation({ payType: val as PayType })}
-                                      disabled={rowFieldsDisabled}
-                                      customClass="w-full min-w-0"
-                                      options={[
-                                        { value: "regular", label: "Regular Rate" },
-                                        { value: "overtime", label: "Overtime Rate (1.5×)" },
-                                        { value: "double_time", label: "Double Time (2×)" },
-                                        { value: "flat", label: "Flat Dollar Amount" },
-                                      ]} />
-                                  </div>
-                                </td>
-                                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center min-w-0">
-                                  <div className="flex justify-center min-w-0">
-                                    <NumberInput value={v.hoursRate} onChange={(val) => updateViolation({ hoursRate: val })}
-                                      disabled={rowFieldsDisabled}
-                                      step={0.25} min={0} width={72} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    <p className="text-[13px] font-semibold text-[#252a2e] mb-[10px]">Break Violations</p>
+                    <div className="mb-[10px] rounded-[6px] border border-[#cce4f4] bg-[#f5faff] px-[12px] py-[10px]">
+                      <p className="text-[11px] text-[#464b52] leading-[16px]">
+                        Rest breaks must be specified under{" "}
+                        {onOpenAttestationQuestions ? (
+                          <button
+                            type="button"
+                            onClick={onOpenAttestationQuestions}
+                            className="inline p-0 border-0 bg-transparent text-[11px] font-medium text-[#006fb0] underline underline-offset-2 cursor-pointer hover:text-[#005a8e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006fb0]"
+                          >
+                            Attestation Questions
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-[#252a2e]">Attestation Questions</span>
+                        )}
+                        {" "}and mapped to Missed Break for this penalty to apply.
+                      </p>
+                    </div>
+                    <ViolationRulesTable violations={breakViolationRules()} onUpdate={updateViolation} />
+                    <div className="flex items-end gap-[32px] pt-[14px] pb-[4px]">
+                      <div>
+                        <FieldLabel>Daily Stacking Cap</FieldLabel>
+                        <NumberInput value={mp.breakStackingCap} onChange={(v) => setMp("breakStackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
+                        <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total break penalty pay per workday across all break violations</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="px-[20px] pt-[20px] pb-[4px] min-w-0">
+
+                  <div className="px-[20px] pt-[20px] pb-[4px] min-w-0 border-t border-[#f0f0f4] mt-[12px]">
+                    <p className="text-[13px] font-semibold text-[#252a2e] mb-[10px]">Meal Violations</p>
+                    <ViolationRulesTable violations={mealViolationRules()} onUpdate={updateViolation} />
+                    <div className="flex items-end gap-[32px] pt-[14px] pb-[4px]">
+                      <div>
+                        <FieldLabel>Daily Stacking Cap</FieldLabel>
+                        <NumberInput value={mp.mealStackingCap} onChange={(v) => setMp("mealStackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
+                        <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total meal penalty pay per workday across all meal violations</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-[20px] pt-[20px] pb-[16px] min-w-0 border-t border-[#f0f0f4] mt-[12px]">
                     {(() => {
                       const override = withJobCostOverrideDefaults(mp.jobCostOverride);
                       const costJob = jobFromCatalog(override.jobCode || JOB_CATALOG[0].code);
@@ -952,13 +925,6 @@ function RuleSetForm({
                         </div>
                       );
                     })()}
-                  </div>
-                  <div className="flex items-end gap-[32px] px-[20px] pt-[14px] pb-[16px] border-t border-[#f0f0f4] mt-[12px]">
-                    <div>
-                      <FieldLabel>Daily Stacking Cap</FieldLabel>
-                      <NumberInput value={mp.stackingCap} onChange={(v) => setMp("stackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
-                      <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total meal penalty pay per workday across all violations</p>
-                    </div>
                   </div>
                 </>
               </CardShell>
@@ -1249,7 +1215,13 @@ const UNION_OPTIONS = [
   { value: "uca", label: "UCA Local 55" },
 ];
 
-function HourRulesTab({ onSave }: { onSave: () => void }) {
+function HourRulesTab({
+  onSave,
+  onOpenAttestationQuestions,
+}: {
+  onSave: () => void;
+  onOpenAttestationQuestions?: () => void;
+}) {
   // Company
   const { companyMealPenalty, setCompanyMealPenalty: _setCompanyMealPenalty } = useMealPenaltyConfig();
   const [companyRules, _setCompanyRules] = useState<RuleSetData>(defaultRuleSet());
@@ -1345,6 +1317,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
             descriptionText="Enter in the max amount of hours allowed for each hour type (regular, overtime, etc.). Timesheet entries created with hours greater than the max amounts will be flagged and a warning will be displayed explaining the error and max number of hours allowed for that type. Company Rules are the default, but the most generous rule will be taken when compared with State and Union rules."
             mealPenaltyState={companyMealPenalty}
             onMealPenaltyChange={setCompanyMealPenalty}
+            onOpenAttestationQuestions={onOpenAttestationQuestions}
           />
         </SectionBody>
       </div>
@@ -1406,6 +1379,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
               descriptionText={`Override rules specific to ${STATE_OPTIONS.find((s) => s.value === selectedState)?.label ?? selectedState}. These will be compared against Company rules; the most generous value applies.`}
               mealPenaltyState={stateMealPenaltyMap[selectedState] ?? defaultMealPenalty()}
               onMealPenaltyChange={updateStateMealPenalty}
+              onOpenAttestationQuestions={onOpenAttestationQuestions}
             />
           ) : (
             <div className="px-[20px] py-[20px] text-center">
@@ -1476,6 +1450,7 @@ function HourRulesTab({ onSave }: { onSave: () => void }) {
               descriptionText={`Override rules specific to ${UNION_OPTIONS.find((u) => u.value === selectedUnion)?.label ?? selectedUnion}. These will be compared against Company rules; the most generous value applies.`}
               mealPenaltyState={unionMealPenaltyMap[selectedUnion] ?? defaultMealPenalty()}
               onMealPenaltyChange={updateUnionMealPenalty}
+              onOpenAttestationQuestions={onOpenAttestationQuestions}
             />
           ) : (
             <div className="px-[20px] py-[20px] text-center">
@@ -1533,6 +1508,21 @@ type ExclusionKind = "job" | "phase" | "rate";
 // Lets a job exclusion cover the whole job rather than one phase on it.
 const ALL_PHASES = "__all__";
 
+type PhaseCatalogEntry = { job: JobOption; phase: PhaseOption };
+
+const PHASE_CATALOG: PhaseCatalogEntry[] = JOB_CATALOG.flatMap((job) =>
+  job.phases.map((phase) => ({ job, phase })),
+);
+
+const phaseKeyFor = (jobCode: string, phaseCode: string) => `${jobCode}|${phaseCode}`;
+
+const parsePhaseKey = (key: string): PhaseCatalogEntry => {
+  const [jobCode, phaseCode] = key.split("|");
+  const job = JOB_CATALOG.find((j) => j.code === jobCode) ?? JOB_CATALOG[0];
+  const phase = job.phases.find((p) => p.code === phaseCode) ?? job.phases[0];
+  return { job, phase };
+};
+
 function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   kind: ExclusionKind;
   existing: ExclusionItem[];
@@ -1540,7 +1530,10 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   onAdd: (item: { label: string; subLabel?: string }) => void;
 }) {
   const [jobCode, setJobCode] = useState(JOB_CATALOG[0].code);
-  const [phaseCode, setPhaseCode] = useState(kind === "job" ? ALL_PHASES : JOB_CATALOG[0].phases[0].code);
+  const [phaseCode, setPhaseCode] = useState(ALL_PHASES);
+  const [phaseKey, setPhaseKey] = useState(
+    phaseKeyFor(JOB_CATALOG[0].code, JOB_CATALOG[0].phases[0].code),
+  );
   const [rateLevel, setRateLevel] = useState(RATE_LEVEL_OPTIONS[0]);
 
   useEffect(() => {
@@ -1550,19 +1543,25 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   }, [onClose]);
 
   const job = JOB_CATALOG.find(j => j.code === jobCode) ?? JOB_CATALOG[0];
-  const phase = job.phases.find(p => p.code === phaseCode) ?? (kind === "phase" ? job.phases[0] : undefined);
+  const phase = job.phases.find(p => p.code === phaseCode);
+  const phaseEntry = parsePhaseKey(phaseKey);
 
   const draft =
     kind === "rate" ? { label: rateLevel } :
-    phase           ? { label: `${job.code} · ${phase.code}`, subLabel: `${job.name} — ${phase.name}` } :
-                      { label: job.code, subLabel: `${job.name} — all phases` };
+    kind === "phase" ? {
+      label: `${phaseEntry.job.code} · ${phaseEntry.phase.code}`,
+      subLabel: `${phaseEntry.job.name} — ${phaseEntry.phase.name}`,
+    } :
+    phase ? { label: `${job.code} · ${phase.code}`, subLabel: `${job.name} — ${phase.name}` } :
+            { label: job.code, subLabel: `${job.name} — all phases` };
 
   const duplicate = existing.some(item => item.label === draft.label);
   const title = kind === "job" ? "Exclude a Job" : kind === "phase" ? "Exclude a Phase" : "Exclude a Rate Level";
   const hint =
     kind === "rate" ? "Hours at the selected rate level are skipped by the rules." :
-    phase           ? "Only the selected phase is excluded on this job." :
-                      "Every phase on the selected job is excluded.";
+    kind === "phase" ? "Only the selected phase is excluded on this job." :
+    phase ? "Only the selected phase is excluded on this job." :
+            "Every phase on the selected job is excluded.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={onClose}>
@@ -1578,7 +1577,18 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
               size="sm"
               value={rateLevel}
               options={RATE_LEVEL_OPTIONS.map(r => ({ label: r, value: r }))}
-              onInputChange={(e) => setRateLevel(e.target.value)}
+              onInputChange={(e) => setRateLevel(readInputString(e as CustomEvent))}
+            />
+          ) : kind === "phase" ? (
+            <ModusWcSelect
+              label="Phase"
+              size="sm"
+              value={phaseKey}
+              options={PHASE_CATALOG.map(({ job: j, phase: p }) => ({
+                label: `${j.code} · ${p.code} - ${p.name}`,
+                value: phaseKeyFor(j.code, p.code),
+              }))}
+              onInputChange={(e) => setPhaseKey(readInputString(e as CustomEvent))}
             />
           ) : (
             <>
@@ -1588,11 +1598,11 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
                 value={jobCode}
                 options={JOB_CATALOG.map(j => ({ label: `${j.code} - ${j.name}`, value: j.code }))}
                 onInputChange={(e) => {
-                  const next = e.target.value;
+                  const next = readInputString(e as CustomEvent);
                   setJobCode(next);
                   // The phase list is scoped to the job, so the old pick may not exist here.
                   const nextJob = JOB_CATALOG.find(j => j.code === next);
-                  if (nextJob) setPhaseCode(kind === "job" ? ALL_PHASES : nextJob.phases[0].code);
+                  if (nextJob) setPhaseCode(ALL_PHASES);
                 }}
               />
               <ModusWcSelect
@@ -1600,10 +1610,10 @@ function ExclusionPicker({ kind, existing, onClose, onAdd }: {
                 size="sm"
                 value={phase ? phase.code : ALL_PHASES}
                 options={[
-                  ...(kind === "job" ? [{ label: "All phases", value: ALL_PHASES }] : []),
+                  { label: "All phases", value: ALL_PHASES },
                   ...job.phases.map(p => ({ label: `${p.code} - ${p.name}`, value: p.code })),
                 ]}
-                onInputChange={(e) => setPhaseCode(e.target.value)}
+                onInputChange={(e) => setPhaseCode(readInputString(e as CustomEvent))}
               />
             </>
           )}
@@ -1747,7 +1757,8 @@ type MealPenaltyState = {
   onDutyMealEnabled: boolean; onDutyRequireAgreement: boolean; onDutyNoAgreementAction: OnDutyMealAction;
   onDutyEmployees: string[];
   penaltiesEnabled: boolean;
-  stackingCap: number;
+  breakStackingCap: number;
+  mealStackingCap: number;
   violations: ViolationRule[];
   jobCostOverride: JobCostOverrideConfig;
 };
@@ -1808,10 +1819,97 @@ const defaultViolations = (): ViolationRule[] => [
   { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
 ];
 
+const BREAK_VIOLATION_RULE_IDS = new Set(["missed_break_attestation"]);
+const MEAL_VIOLATION_RULE_IDS = new Set(["missed_meal", "late_meal", "short_meal"]);
+
+function ViolationRulesTable({
+  violations,
+  onUpdate,
+}: {
+  violations: ViolationRule[];
+  onUpdate: (id: string, patch: Partial<ViolationRule>) => void;
+}) {
+  return (
+    <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
+      <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: "8%" }} />
+          <col style={{ width: "42%" }} />
+          <col style={{ width: "30%" }} />
+          <col style={{ width: "20%" }} />
+        </colgroup>
+        <thead>
+          <tr className="bg-[#f5f5f8]">
+            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
+            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation Type</th>
+            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
+            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {violations.map((raw, idx) => {
+            const v = withViolationDefaults(raw);
+            const rowFieldsDisabled = !v.enabled;
+
+            return (
+              <tr
+                key={v.id}
+                className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} ${!v.enabled ? "opacity-50" : ""}`}
+              >
+                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] text-center">
+                  <Toggle
+                    enabled={v.enabled}
+                    onChange={(val) => onUpdate(v.id, { enabled: val })}
+                  />
+                </td>
+                <td className="border-b border-[#e0e1e9] px-[8px] py-[10px] min-w-0">
+                  <ModusWcTooltip
+                    content={v.description}
+                    position="auto"
+                    tooltipId={`violation-tip-${v.id}`}
+                  >
+                    <button
+                      type="button"
+                      className="text-left text-[12px] font-semibold text-[#252a2e] bg-transparent border-0 p-0 cursor-help break-words min-w-0"
+                      aria-describedby={`violation-tip-${v.id}`}
+                    >
+                      {v.label}
+                    </button>
+                  </ModusWcTooltip>
+                </td>
+                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                  <div className="min-w-0">
+                    <SelectField value={v.payType} onChange={(val) => onUpdate(v.id, { payType: val as PayType })}
+                      disabled={rowFieldsDisabled}
+                      customClass="w-full min-w-0"
+                      options={[
+                        { value: "regular", label: "Regular Rate" },
+                        { value: "overtime", label: "Overtime Rate (1.5×)" },
+                        { value: "double_time", label: "Double Time (2×)" },
+                        { value: "flat", label: "Flat Dollar Amount" },
+                      ]} />
+                  </div>
+                </td>
+                <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center min-w-0">
+                  <div className="flex justify-center min-w-0">
+                    <NumberInput value={v.hoursRate} onChange={(val) => onUpdate(v.id, { hoursRate: val })}
+                      disabled={rowFieldsDisabled}
+                      step={0.25} min={0} width={72} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function getConfiguredBreakViolationOptions(mp: MealPenaltyState): { value: string; label: string }[] {
   if (mp.breakType !== "premium" || !mp.penaltiesEnabled) return [];
   return (mp.violations ?? defaultViolations())
-    .filter((v) => withViolationDefaults(v).enabled)
+    .filter((v) => withViolationDefaults(v).enabled && BREAK_VIOLATION_RULE_IDS.has(v.id))
     .map((v) => ({ value: withViolationDefaults(v).id, label: withViolationDefaults(v).label }));
 }
 
@@ -2056,7 +2154,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, stackingCap: 2.0, violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
+  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 2.0, violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
 });
 
 function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", action, children }: {
@@ -2254,7 +2352,7 @@ function TimesheetSettings() {
         </div>
       </div>
 
-      <div className="px-[24px] pb-[32px]">
+      <div className="px-[24px] pb-[32px]" id="attestation-questions">
         <CardShell
           title="Attestation Questions"
           action={
@@ -2361,7 +2459,7 @@ function TimesheetSettings() {
                           <div className="flex flex-col gap-[2px] min-w-0">
                             <span className="text-[12px] font-medium text-[#6a6e79]">Not available</span>
                             <span className="text-[11px] text-[#a3a3a3] leading-[15px]">
-                              Configure meal penalty violations in Timesheet Hour Rules to enable mapping.
+                              Configure violation penalties in Timesheet Hour Rules to enable mapping.
                             </span>
                           </div>
                         )}
@@ -2398,7 +2496,7 @@ function TimesheetSettings() {
 }
 
 // ─── Root Settings Page ───────────────────────────────────────────────────────
-function JurisdictionSettings() {
+function JurisdictionSettings({ onOpenAttestationQuestions }: { onOpenAttestationQuestions?: () => void }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("hour");
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -2449,7 +2547,9 @@ function JurisdictionSettings() {
 
       {/* Content */}
       <div className="px-[24px] py-[20px] pb-[40px]">
-        {activeTab === "hour" && <HourRulesTab onSave={scheduleAutosave} />}
+        {activeTab === "hour" && (
+          <HourRulesTab onSave={scheduleAutosave} onOpenAttestationQuestions={onOpenAttestationQuestions} />
+        )}
         {activeTab === "exclusions" && <ExclusionsTab onSave={scheduleAutosave} />}
       </div>
 
@@ -8148,6 +8248,13 @@ export default function App() {
     viewerLabel: VIEWING_ROLE_LABELS[viewingAs],
   };
 
+  const openAttestationQuestions = useCallback(() => {
+    setActivePage("s_timesheet_settings");
+    window.setTimeout(() => {
+      document.getElementById("attestation-questions")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }, []);
+
   return (
     <ViewingRoleContext.Provider value={viewingRoleValue}>
     <MealPenaltyConfigContext.Provider value={{ companyMealPenalty, setCompanyMealPenalty }}>
@@ -8178,7 +8285,9 @@ export default function App() {
         {activePage === "documents"         && <PlaceholderPage title="Documents" />}
         {activePage === "global_admin"      && <PlaceholderPage title="Global Admin" />}
         {/* Settings sub-pages */}
-        {activePage === "s_hour_rules"          && <JurisdictionSettings />}
+        {activePage === "s_hour_rules"          && (
+          <JurisdictionSettings onOpenAttestationQuestions={openAttestationQuestions} />
+        )}
         {activePage === "s_timesheet_settings"  && <TimesheetSettings />}
         {activePage === "s_settings"            && <PlaceholderPage title="Settings" />}
         {activePage === "s_permissions"     && <PlaceholderPage title="Permissions" />}
