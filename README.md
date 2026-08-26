@@ -251,7 +251,7 @@ Expected: pages show 8 employees at a time with an accurate "1–8 of N" range; 
 ## 9. Compliance Dashboard
 
 **TC-9.1 — Summary cards filter the table**
-1. Open **Time → Compliance Dashboard** and click **Upcoming Break**, then **Missed Break**, then **Late Break**.
+1. Open **Time → Compliance Dashboard** and click **Upcoming Break**, then **Missed Rest Break**, then **Late Break**.
 
 Expected: the table filters to that category and the card reads as selected. Clicking the selected card again clears the filter. An employee can legitimately appear under more than one category, so overlapping counts are not a defect.
 

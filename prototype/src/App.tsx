@@ -756,7 +756,7 @@ function RuleSetForm({
                   </div>
 
                   <div className="px-[20px] pt-[8px] pb-[4px] min-w-0">
-                    <p className="text-[13px] font-semibold text-[#252a2e] mb-[10px]">Break Violations</p>
+                    <p className="text-[13px] font-semibold text-[#252a2e] mb-[10px]">Rest Break Violations</p>
                     <div className="mb-[10px] rounded-[6px] border border-[#cce4f4] bg-[#f5faff] px-[12px] py-[10px]">
                       <p className="text-[11px] text-[#464b52] leading-[16px]">
                         Rest breaks must be specified under{" "}
@@ -771,7 +771,7 @@ function RuleSetForm({
                         ) : (
                           <span className="font-semibold text-[#252a2e]">Attestation Questions</span>
                         )}
-                        {" "}and mapped to Missed Break for this penalty to apply.
+                        {" "}and mapped to Missed Rest Break for this penalty to apply.
                       </p>
                     </div>
                     <ViolationRulesTable violations={breakViolationRules()} onUpdate={updateViolation} />
@@ -779,7 +779,7 @@ function RuleSetForm({
                       <div>
                         <FieldLabel>Daily Stacking Cap</FieldLabel>
                         <NumberInput value={mp.breakStackingCap} onChange={(v) => setMp("breakStackingCap", v)} step={0.5} min={0} suffix="hr(s)" />
-                        <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total break penalty pay per workday across all break violations</p>
+                        <p className="mt-[4px] text-[11px] text-[#6a6e79]">Max total rest break penalty pay per workday across all rest break violations</p>
                       </div>
                     </div>
                   </div>
@@ -1813,7 +1813,7 @@ const withViolationDefaults = (v: ViolationRule): ViolationRule => ({
 });
 
 const defaultViolations = (): ViolationRule[] => [
-  { id: "missed_break_attestation", label: "Missed Break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
+  { id: "missed_break_attestation", label: "Missed Rest Break", description: VIOLATION_DESCRIPTIONS.missed_break_attestation, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "missed_meal", label: "Missed Meal", description: VIOLATION_DESCRIPTIONS.missed_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "late_meal", label: "Late Meal", description: VIOLATION_DESCRIPTIONS.late_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
   { id: "short_meal", label: "Short Meal", description: VIOLATION_DESCRIPTIONS.short_meal, enabled: true, payType: "regular", hoursRate: 1.0, maxPenalty: 1.0 },
@@ -1906,15 +1906,18 @@ function ViolationRulesTable({
   );
 }
 
-function getConfiguredBreakViolationOptions(mp: MealPenaltyState): { value: string; label: string }[] {
+function getConfiguredPenaltyViolationOptions(mp: MealPenaltyState): { value: string; label: string }[] {
   if (mp.breakType !== "premium" || !mp.penaltiesEnabled) return [];
   return (mp.violations ?? defaultViolations())
-    .filter((v) => withViolationDefaults(v).enabled && BREAK_VIOLATION_RULE_IDS.has(v.id))
+    .filter((v) => {
+      const rule = withViolationDefaults(v);
+      return rule.enabled && (BREAK_VIOLATION_RULE_IDS.has(rule.id) || MEAL_VIOLATION_RULE_IDS.has(rule.id));
+    })
     .map((v) => ({ value: withViolationDefaults(v).id, label: withViolationDefaults(v).label }));
 }
 
-function breakViolationMappingAvailable(mp: MealPenaltyState): boolean {
-  return getConfiguredBreakViolationOptions(mp).length > 0;
+function penaltyViolationMappingAvailable(mp: MealPenaltyState): boolean {
+  return getConfiguredPenaltyViolationOptions(mp).length > 0;
 }
 
 type AttestationAnswer = "yes" | "no";
@@ -2292,8 +2295,8 @@ function TimesheetSettings() {
   const [draftQuestions, setDraftQuestions] = useState<AttestationQuestion[]>(questions);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
-  const violationOptions = getConfiguredBreakViolationOptions(companyMealPenalty);
-  const breakViolationSelectable = breakViolationMappingAvailable(companyMealPenalty);
+  const violationOptions = getConfiguredPenaltyViolationOptions(companyMealPenalty);
+  const penaltyViolationSelectable = penaltyViolationMappingAvailable(companyMealPenalty);
 
   const updateQuestion = (id: string, patch: Partial<AttestationQuestion>) => {
     setDraftQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
@@ -2328,7 +2331,7 @@ function TimesheetSettings() {
     const saved = draftQuestions.map((q) => ({
       ...q,
       persisted: true,
-      violationId: breakViolationSelectable ? q.violationId : "",
+      violationId: penaltyViolationSelectable ? q.violationId : "",
     }));
     setDraftQuestions(saved);
     setQuestions(saved);
@@ -2342,7 +2345,7 @@ function TimesheetSettings() {
         <div className="flex items-start justify-between mb-[12px]">
           <div>
             <h1 className="text-[22px] font-bold text-[#252a2e] leading-[32px]">Timesheet Settings</h1>
-            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure daily attestation questions and map them to break premium violations</p>
+            <p className="text-[11px] text-[#6a6e79] mt-[1px]">Configure daily attestation questions and map them to rest break and meal penalty violations</p>
           </div>
           {savedAt && (
             <ModusWcBadge color="success" size="sm" variant="filled">
@@ -2365,13 +2368,13 @@ function TimesheetSettings() {
           <div className="px-[20px] pt-[14px] pb-[6px] flex flex-col gap-[12px]">
             <p className="text-[12px] text-[#464b52] leading-[18px]">
               Questions cannot be changed after they are created in order to keep the integrity of the answers associated with them.
-              Invalid answers will be flagged on the timesheet summary. Map invalid answers to associated break violations to trigger the corresponding premium pay rule.
+              Invalid answers will be flagged on the timesheet summary. Map invalid answers to associated rest break or meal violations to trigger the corresponding premium pay rule.
             </p>
-            {!breakViolationSelectable && (
+            {!penaltyViolationSelectable && (
               <ModusWcAlert
                 variant="info"
-                alertTitle="Break violation mapping unavailable"
-                alertDescription="Select Meal penalty as the break type and enable at least one violation under Timesheet Hour Rules before mapping attestation questions to break violations."
+                alertTitle="Violation penalty mapping unavailable"
+                alertDescription="Select Meal penalty as the break type and enable at least one rest break or meal violation under Timesheet Hour Rules before mapping attestation questions."
               />
             )}
           </div>
@@ -2386,7 +2389,7 @@ function TimesheetSettings() {
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[150px]">Require Comment</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[210px]">Require Comment on Invalid Answer</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[120px]">Safety Related</th>
-                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Break Penalty Trigger</th>
+                    <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79] w-[200px]">Penalty Trigger</th>
                     <th className="border-b border-[#e0e1e9] px-[12px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79] w-[60px]" />
                   </tr>
                 </thead>
@@ -2448,7 +2451,7 @@ function TimesheetSettings() {
                         />
                       </td>
                       <td className="border-b border-[#e0e1e9] px-[12px] py-[10px]">
-                        {breakViolationSelectable ? (
+                        {penaltyViolationSelectable ? (
                           <SelectField
                             value={q.violationId}
                             onChange={(v) => updateQuestion(q.id, { violationId: v })}
@@ -5734,7 +5737,7 @@ function ComplianceDashboard() {
       <div className="grid grid-cols-4 gap-[16px] mb-[8px]">
         <SummaryCard label="Upcoming Break" count={upcoming.length} sub="No break taken yet, still in window"
           tone={{ color: STATE_STYLE.upcoming.color, bg: STATE_STYLE.upcoming.bg }} section="upcoming" />
-        <SummaryCard label="Missed Break" count={missed.length} sub="Past the window, no break taken"
+        <SummaryCard label="Missed Rest Break" count={missed.length} sub="Past the window, no break taken"
           tone={{ color: STATE_STYLE.missed.color, bg: STATE_STYLE.missed.bg }} section="missed" />
         <SummaryCard label="Late Break" count={lateTake.length} sub="Break taken outside the window"
           tone={{ color: STATE_STYLE.late.color, bg: STATE_STYLE.late.bg }} section="late" />
@@ -5775,7 +5778,7 @@ function ComplianceDashboard() {
             <AlertBadge
               label={
                 activeSection === "upcoming" ? "Upcoming Break" :
-                activeSection === "missed"   ? "Missed Break" :
+                activeSection === "missed"   ? "Missed Rest Break" :
                 activeSection === "late"     ? "Late Break" :
                 activeSection === "premium"  ? "Meal Premiums Incurred" : "On time"
               }
