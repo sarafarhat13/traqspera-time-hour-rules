@@ -556,18 +556,20 @@ function RuleSetForm({
                 </tbody>
               </table>
             </div>
-            <button type="button" onClick={() => onChange({ ...data, flag24thDay: !data.flag24thDay })}
-              className="mt-[10px] flex items-center gap-[6px] cursor-pointer"
-              style={{ background: "transparent", border: "none", padding: 0 }}>
-              <div className="h-[14px] w-[14px] rounded-[2px] flex items-center justify-center shrink-0"
-                style={{
-                  background: data.flag24thDay ? "#006fb0" : "#ffffff",
-                  border: `1px solid ${data.flag24thDay ? "#006fb0" : "#cbced4"}`,
-                }}>
-                {data.flag24thDay && <Check size={9} className="text-white" strokeWidth={3} />}
-              </div>
-              <span className="text-[11px] text-[#464b52]">Flag 24th Consecutive Day</span>
-            </button>
+            <div style={{ paddingTop: 24 }}>
+              <button type="button" onClick={() => onChange({ ...data, flag24thDay: !data.flag24thDay })}
+                className="flex items-center gap-[6px] cursor-pointer"
+                style={{ background: "transparent", border: "none", padding: 0 }}>
+                <div className="h-[14px] w-[14px] rounded-[2px] flex items-center justify-center shrink-0"
+                  style={{
+                    background: data.flag24thDay ? "#006fb0" : "#ffffff",
+                    border: `1px solid ${data.flag24thDay ? "#006fb0" : "#cbced4"}`,
+                  }}>
+                  {data.flag24thDay && <Check size={9} className="text-white" strokeWidth={3} />}
+                </div>
+                <span className="text-[11px] text-[#464b52]">Flag 14th Consecutive Day</span>
+              </button>
+            </div>
 
             {/* ── Weekly Rules ── */}
             <div className="mt-[24px]">
