@@ -1843,7 +1843,7 @@ function ViolationRulesTable({
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation Type</th>
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
-            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Hours Rate</th>
+            <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Penalty Amount</th>
           </tr>
         </thead>
         <tbody>
