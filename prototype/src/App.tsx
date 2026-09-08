@@ -6310,6 +6310,7 @@ const SUMMARY_TABLE_COL_WIDTHS = SUMMARY_TABLE_COLS.map((col) => {
   return `${override ?? SUMMARY_TABLE_DEFAULT_COL_WIDTH}%`;
 });
 const SUMMARY_TABLE_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-top break-words";
+const SUMMARY_TABLE_ACTIONS_CELL = "px-[4px] py-[6px] text-[11px] align-middle whitespace-nowrap";
 const BREAK_ROW_CELL = "px-[4px] py-[6px] text-[11px] min-w-0 align-middle border-0";
 const SUMMARY_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Appr. By", title: "Approved By" },
@@ -6362,15 +6363,22 @@ const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
 ];
 
 const BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES: Record<string, number> = {
-  "Type of Violation": 9,
-  Job: 11,
-  Phase: 9.5,
-  Comment: 8,
+  "Approved By": 4.5,
+  "Second Approved By": 4.5,
+  Complete: 3.5,
+  Exported: 3.5,
+  "Type of Violation": 8,
+  State: 3,
+  "Pay Rate": 4.5,
+  Reg: 3.5,
+  Job: 10,
+  Phase: 8.5,
+  Comment: 7,
 };
-const BREAK_VIOLATION_TABLE_ACTIONS_COL_WIDTH = "2%";
+const BREAK_VIOLATION_TABLE_ACTIONS_COL_WIDTH = "5%";
 const BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH = Object.values(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).reduce((sum, width) => sum + width, 0);
 const BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH =
-  (96 - BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH) / (BREAK_VIOLATION_TABLE_HEADERS.length - Object.keys(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).length);
+  (93 - BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH) / (BREAK_VIOLATION_TABLE_HEADERS.length - Object.keys(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).length);
 const BREAK_VIOLATION_TABLE_COL_WIDTHS = BREAK_VIOLATION_TABLE_HEADERS.map((h) => {
   const override = BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES[h.title];
   return `${override ?? BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH}%`;
@@ -7076,10 +7084,10 @@ function SummaryBreakViolationTableHeaderRow() {
       ))}
       <th
         title="Actions"
-        className={`${SUMMARY_TABLE_CELL} text-center`}
+        className={`${SUMMARY_TABLE_ACTIONS_CELL} text-center`}
         style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}
       >
-        <p className="text-[10px] font-semibold leading-[13px]" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
+        <p className="text-[10px] font-semibold leading-[13px] whitespace-nowrap" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
           Actions
         </p>
       </th>
@@ -7300,7 +7308,7 @@ function SummaryViolationRow({
           )
         }
       />
-      <td className={`${SUMMARY_TABLE_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+      <td className={`${SUMMARY_TABLE_ACTIONS_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
         {canDelete ? (
           <ModusWcButton
             color="tertiary"
