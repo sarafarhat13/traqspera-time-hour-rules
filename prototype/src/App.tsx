@@ -6201,6 +6201,20 @@ const isBreakViolation = (v: SummaryViolation) => BREAK_VIOLATION_IDS.has(v.viol
 const breakViolationDisplayLabel = (v: SummaryViolation) =>
   defaultViolations().find((rule) => rule.id === v.violationTypeId)?.label ?? v.label;
 
+function ViolationTypeBadge({ violation }: { violation: SummaryViolation }) {
+  const isDeleted = violation.status === "deleted";
+
+  return (
+    <ModusWcBadge
+      color="secondary"
+      variant={isDeleted ? "outlined" : "filled"}
+      size="sm"
+    >
+      {isDeleted ? "Deleted" : breakViolationDisplayLabel(violation)}
+    </ModusWcBadge>
+  );
+}
+
 const connorEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-connor")!;
 connorEmp.violations = [
   violationFromEntry("viol-connor-1-meal", "connor-1", "missed_meal", "Missed Meal", connorEmp.entries[0]),
@@ -7298,15 +7312,7 @@ function SummaryViolationRow({
         )}
         completeCell={statusMark(isApproved && !isDeleted)}
         exportedCell={statusMark(v.exported)}
-        afterExportedCell={
-          <ModusWcBadge
-            color="secondary"
-            variant={isDeleted ? "outlined" : "filled"}
-            size="sm"
-          >
-            {isDeleted ? "Deleted" : breakViolationDisplayLabel(v)}
-          </ModusWcBadge>
-        }
+        afterExportedCell={<ViolationTypeBadge violation={v} />}
       />
       <td className={`${SUMMARY_TABLE_ACTIONS_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
         {canDelete ? (
@@ -7626,7 +7632,7 @@ function SummaryBreakViolationsTable({
         ) : (
           violationRows.map((v, idx) => (
             <SummaryViolationRow
-              key={v.id}
+              key={`${v.id}-${v.status}`}
               violation={v}
               employee={employee}
               stripeIdx={idx}
