@@ -7299,13 +7299,13 @@ function SummaryViolationRow({
         completeCell={statusMark(isApproved && !isDeleted)}
         exportedCell={statusMark(v.exported)}
         afterExportedCell={
-          isDeleted ? (
-            <ModusWcBadge color="secondary" variant="outlined" size="sm">Deleted</ModusWcBadge>
-          ) : (
-            <ModusWcBadge color="secondary" variant="filled" size="sm">
-              {breakViolationDisplayLabel(v)}
-            </ModusWcBadge>
-          )
+          <ModusWcBadge
+            color="secondary"
+            variant={isDeleted ? "outlined" : "filled"}
+            size="sm"
+          >
+            {isDeleted ? "Deleted" : breakViolationDisplayLabel(v)}
+          </ModusWcBadge>
         }
       />
       <td className={`${SUMMARY_TABLE_ACTIONS_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
