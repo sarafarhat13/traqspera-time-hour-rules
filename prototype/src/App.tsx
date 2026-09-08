@@ -6367,14 +6367,15 @@ const BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES: Record<string, number> = {
   Phase: 9.5,
   Comment: 8,
 };
+const BREAK_VIOLATION_TABLE_ACTIONS_COL_WIDTH = "2%";
 const BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH = Object.values(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).reduce((sum, width) => sum + width, 0);
 const BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH =
-  (98 - BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH) / (BREAK_VIOLATION_TABLE_HEADERS.length - Object.keys(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).length);
+  (96 - BREAK_VIOLATION_TABLE_RESERVED_COL_WIDTH) / (BREAK_VIOLATION_TABLE_HEADERS.length - Object.keys(BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES).length);
 const BREAK_VIOLATION_TABLE_COL_WIDTHS = BREAK_VIOLATION_TABLE_HEADERS.map((h) => {
   const override = BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES[h.title];
   return `${override ?? BREAK_VIOLATION_TABLE_DEFAULT_COL_WIDTH}%`;
 });
-const BREAK_VIOLATION_TABLE_COL_COUNT = BREAK_VIOLATION_TABLE_HEADERS.length + 1;
+const BREAK_VIOLATION_TABLE_COL_COUNT = BREAK_VIOLATION_TABLE_HEADERS.length + 2;
 
 type SummaryTableRow =
   | { kind: "entry"; data: SummaryTimesheetEntry }
@@ -7052,6 +7053,7 @@ function SummaryBreakViolationTableColgroup() {
       {BREAK_VIOLATION_TABLE_COL_WIDTHS.map((width, idx) => (
         <col key={BREAK_VIOLATION_TABLE_HEADERS[idx].title} style={{ width }} />
       ))}
+      <col style={{ width: BREAK_VIOLATION_TABLE_ACTIONS_COL_WIDTH }} />
     </colgroup>
   );
 }
@@ -7072,6 +7074,15 @@ function SummaryBreakViolationTableHeaderRow() {
           </p>
         </th>
       ))}
+      <th
+        title="Actions"
+        className={`${SUMMARY_TABLE_CELL} text-center`}
+        style={{ borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}
+      >
+        <p className="text-[10px] font-semibold leading-[13px]" style={{ color: TABLE_HEADER_TEXT, fontFamily: OS }}>
+          Actions
+        </p>
+      </th>
     </tr>
   );
 }
@@ -7203,6 +7214,7 @@ function SummaryViolationRow({
   canDeleteBreakViolations,
   onApproveViolation,
   onDeleteViolation,
+  onRestoreViolation,
   onUpdateEmployee,
   onUpdateViolation,
 }: {
@@ -7214,6 +7226,7 @@ function SummaryViolationRow({
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
+  onRestoreViolation: (violationId: string) => void;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
 }) {
@@ -7221,7 +7234,9 @@ function SummaryViolationRow({
   const isDeleted = v.status === "deleted";
   const isApproved = v.status === "approved" || !!v.approvedBy;
   const breakViolation = isBreakViolation(v);
-  const canDelete = canDeleteBreakViolations && breakViolation && !isDeleted;
+  const canManage = canDeleteBreakViolations && breakViolation;
+  const canDelete = canManage && !isDeleted;
+  const canRestore = canManage && isDeleted;
   const statusMark = (done: boolean) =>
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
 
@@ -7276,31 +7291,42 @@ function SummaryViolationRow({
         completeCell={statusMark(isApproved && !isDeleted)}
         exportedCell={statusMark(v.exported)}
         afterExportedCell={
-          <div className="flex flex-wrap items-center gap-[6px] min-w-0">
-            {isDeleted ? (
-              <ModusWcBadge color="secondary" variant="outlined" size="sm">Deleted</ModusWcBadge>
-            ) : (
-              <>
-                <ModusWcBadge color="secondary" variant="filled" size="sm">
-                  {breakViolationDisplayLabel(v)}
-                </ModusWcBadge>
-                {canDelete && (
-                  <ModusWcButton
-                    color="tertiary"
-                    variant="borderless"
-                    size="sm"
-                    shape="square"
-                    aria-label={`Delete break violation: ${v.label}`}
-                    onButtonClick={() => onDeleteViolation(v.id, v.label)}
-                  >
-                    <ModusWcIcon name="delete" variant="outlined" size="xs" decorative />
-                  </ModusWcButton>
-                )}
-              </>
-            )}
-          </div>
+          isDeleted ? (
+            <ModusWcBadge color="secondary" variant="outlined" size="sm">Deleted</ModusWcBadge>
+          ) : (
+            <ModusWcBadge color="secondary" variant="filled" size="sm">
+              {breakViolationDisplayLabel(v)}
+            </ModusWcBadge>
+          )
         }
       />
+      <td className={`${SUMMARY_TABLE_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+        {canDelete ? (
+          <ModusWcButton
+            color="tertiary"
+            variant="borderless"
+            size="sm"
+            shape="square"
+            aria-label={`Delete break violation: ${v.label}`}
+            onButtonClick={() => onDeleteViolation(v.id, v.label)}
+          >
+            <ModusWcIcon name="delete" variant="outlined" size="xs" decorative />
+          </ModusWcButton>
+        ) : canRestore ? (
+          <ModusWcButton
+            color="tertiary"
+            variant="borderless"
+            size="sm"
+            shape="square"
+            aria-label={`Restore break violation: ${v.label}`}
+            onButtonClick={() => onRestoreViolation(v.id)}
+          >
+            <ModusWcIcon name="undo" variant="outlined" size="xs" decorative />
+          </ModusWcButton>
+        ) : (
+          <span style={{ color: "#a3a3a3" }}>—</span>
+        )}
+      </td>
     </tr>
   );
 }
@@ -7551,6 +7577,7 @@ function SummaryBreakViolationsTable({
   canDeleteBreakViolations,
   onApproveViolation,
   onDeleteViolation,
+  onRestoreViolation,
   onUpdateEmployee,
   onUpdateViolation,
 }: {
@@ -7558,6 +7585,7 @@ function SummaryBreakViolationsTable({
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
+  onRestoreViolation: (violationId: string) => void;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
 }) {
@@ -7599,6 +7627,7 @@ function SummaryBreakViolationsTable({
               canDeleteBreakViolations={canDeleteBreakViolations}
               onApproveViolation={onApproveViolation}
               onDeleteViolation={onDeleteViolation}
+              onRestoreViolation={onRestoreViolation}
               onUpdateEmployee={onUpdateEmployee}
               onUpdateViolation={onUpdateViolation}
             />
@@ -7610,7 +7639,7 @@ function SummaryBreakViolationsTable({
           </td>
           <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
           <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
-          <td colSpan={4} />
+          <td colSpan={5} />
         </tr>
       </tbody>
     </table>
@@ -7623,6 +7652,7 @@ function EmployeeSummaryCard({
   canDeleteBreakViolations,
   onApproveViolation,
   onDeleteViolation,
+  onRestoreViolation,
   onApproveAll,
   onUpdateEmployee,
   onUpdateEntry,
@@ -7633,6 +7663,7 @@ function EmployeeSummaryCard({
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
+  onRestoreViolation: (violationId: string) => void;
   onApproveAll?: () => void;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
@@ -7706,6 +7737,7 @@ function EmployeeSummaryCard({
           canDeleteBreakViolations={canDeleteBreakViolations}
           onApproveViolation={onApproveViolation}
           onDeleteViolation={onDeleteViolation}
+          onRestoreViolation={onRestoreViolation}
           onUpdateEmployee={onUpdateEmployee}
           onUpdateViolation={onUpdateViolation}
         />
@@ -7809,6 +7841,24 @@ function TimesheetSummary() {
     });
     setDeleteTarget(null);
     toast.success("Break violation deleted — row retained on timesheet for audit.");
+  };
+
+  const restoreViolation = (empId: string, violationId: string) => {
+    const violation = employees.find((e) => e.id === empId)?.violations.find((v) => v.id === violationId);
+    if (!canDeleteBreakViolations) {
+      toast.error("Only administrators can restore break violations.");
+      return;
+    }
+    if (!violation || !isBreakViolation(violation) || violation.status !== "deleted") return;
+    updateViolation(empId, violationId, {
+      status: "pending",
+      deletedBy: undefined,
+      deletionComment: undefined,
+      approvedBy: undefined,
+      secondApprovedBy: undefined,
+      complete: false,
+    });
+    toast.success("Break violation restored — premium pay row is active again.");
   };
 
   const approveAllForEmployee = (empId: string) => {
@@ -7968,6 +8018,7 @@ function TimesheetSummary() {
               isBreakViolation: true,
             });
           }}
+          onRestoreViolation={(violationId) => restoreViolation(emp.id, violationId)}
           onApproveAll={emp.id === "emp-connor" ? () => approveAllForEmployee(emp.id) : undefined}
           onUpdateEmployee={(patch) => updateEmployeeMeta(emp.id, patch)}
           onUpdateEntry={(entryId, patch) => updateEntry(emp.id, entryId, patch)}
