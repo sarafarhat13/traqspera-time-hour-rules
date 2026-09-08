@@ -1297,14 +1297,16 @@ function HourRulesTab({
 
   return (
     <div className="flex flex-col gap-[28px]">
-      <Checkbox
-        checked={useCustomRuleOrder}
-        onChange={(v) => {
-          setUseCustomRuleOrder(v);
-          onSave();
-        }}
-        label="Use custom order when applying rules (if not, will look for the lowest allowed per hour type that applies)"
-      />
+      <div className="rounded-[6px] border border-[#e0e1e9] bg-white px-5 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+        <Checkbox
+          checked={useCustomRuleOrder}
+          onChange={(v) => {
+            setUseCustomRuleOrder(v);
+            onSave();
+          }}
+          label="Use custom order when applying rules (if not, will look for the lowest allowed per hour type that applies)"
+        />
+      </div>
 
       {useCustomRuleOrder && <PrecedenceSection />}
 
