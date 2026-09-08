@@ -1293,11 +1293,20 @@ function HourRulesTab({
 
   const configuredStates = Object.keys(stateRulesMap);
   const configuredUnions = Object.keys(unionRulesMap);
+  const [useCustomRuleOrder, setUseCustomRuleOrder] = useState(false);
 
   return (
     <div className="flex flex-col gap-[28px]">
-      {/* Precedence */}
-      <PrecedenceSection />
+      <Checkbox
+        checked={useCustomRuleOrder}
+        onChange={(v) => {
+          setUseCustomRuleOrder(v);
+          onSave();
+        }}
+        label="Use custom order when applying rules (if not, will look for the lowest allowed per hour type that applies)"
+      />
+
+      {useCustomRuleOrder && <PrecedenceSection />}
 
       {/* ── Company ── */}
       <div>
