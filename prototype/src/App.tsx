@@ -240,14 +240,14 @@ function SearchableSelectField({ value, onChange, options, placeholder, disabled
   );
 }
 
-function Checkbox({ checked, onChange, label, disabled = false }: {
-  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
+function Checkbox({ checked, onChange, label, disabled = false, emphasized = false }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; emphasized?: boolean;
 }) {
-  return (
+  const checkbox = (
     <ModusWcCheckbox
       aria-label={label}
       label={label}
-      size="sm"
+      size={emphasized ? "md" : "sm"}
       value={checked}
       disabled={disabled}
       onInputChange={(e) => {
@@ -256,6 +256,12 @@ function Checkbox({ checked, onChange, label, disabled = false }: {
       }}
     />
   );
+
+  if (emphasized) {
+    return <div className="tq-checkbox-emphasized-label">{checkbox}</div>;
+  }
+
+  return checkbox;
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -1299,6 +1305,7 @@ function HourRulesTab({
     <div className="flex flex-col gap-[28px]">
       <div className="rounded-[6px] border border-[#e0e1e9] bg-white px-5 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
         <Checkbox
+          emphasized
           checked={useCustomRuleOrder}
           onChange={(v) => {
             setUseCustomRuleOrder(v);

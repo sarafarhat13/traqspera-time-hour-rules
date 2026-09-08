@@ -97,6 +97,13 @@ textarea {
   color: #252a2e;
 }
 
+.tq-checkbox-emphasized-label modus-wc-checkbox .modus-wc-input-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: #252a2e;
+}
+
 /*
   Modus ships no sizing rule for the icons inside a text input, so the SVG has
   no intrinsic width to defend and a narrow field shrinks it to zero. Pinning
