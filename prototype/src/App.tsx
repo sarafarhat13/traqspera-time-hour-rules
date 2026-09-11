@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import {
   ModusWcAlert,
@@ -7229,6 +7229,406 @@ function SummaryBreakDataCells({
   );
 }
 
+type SummaryDataViewMode = "table" | "card";
+
+const SUMMARY_CARD_BREAKPOINT_PX = 768;
+
+function useIsSummaryNarrowViewport() {
+  const query = `(max-width: ${SUMMARY_CARD_BREAKPOINT_PX - 1}px)`;
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const mq = window.matchMedia(query);
+      mq.addEventListener("change", onStoreChange);
+      return () => mq.removeEventListener("change", onStoreChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => true,
+  );
+}
+
+function SummaryViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: SummaryDataViewMode;
+  onChange: (mode: SummaryDataViewMode) => void;
+}) {
+  return (
+    <div
+      className="flex shrink-0 items-center gap-[2px] rounded-[6px] p-[3px]"
+      style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
+      role="group"
+      aria-label="Timesheet data view"
+    >
+      {([
+        { value: "table", label: "Table" },
+        { value: "card", label: "Card" },
+      ] as const).map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          aria-pressed={value === opt.value}
+          style={{
+            fontSize: 12,
+            fontFamily: OS,
+            fontWeight: value === opt.value ? 700 : 400,
+            padding: "5px 14px",
+            borderRadius: 4,
+            cursor: "pointer",
+            border: "none",
+            background: value === opt.value ? "#ffffff" : "transparent",
+            color: value === opt.value ? "#0e416c" : "#6a6e79",
+            boxShadow: value === opt.value ? "0 1px 2px rgba(0,0,0,0.12)" : "none",
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SummaryEntryCard({ entry }: { entry: SummaryTimesheetEntry }) {
+  const approved = !!entry.approvedBy;
+  const borderColor = approved ? "#bbe6ca" : "#e0e1e9";
+  const headerBorder = approved ? "#bbe6ca" : "#eef0f3";
+
+  return (
+    <div
+      style={{
+        ...MOBILE_CARD,
+        overflow: "hidden",
+        borderColor,
+        background: approved ? SUMMARY_APPROVED_ROW_BG : "#ffffff",
+      }}
+    >
+      <div
+        className="flex flex-wrap items-center gap-[8px]"
+        style={{ padding: "10px 14px", borderBottom: `1px solid ${headerBorder}` }}
+      >
+        <Clock size={14} style={{ color: approved ? "#15803d" : "#6a6e79", flexShrink: 0 }} aria-hidden />
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1, minWidth: 0 }}>
+          {entry.date}
+        </p>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
+          {entry.start} – {entry.end}
+        </p>
+        {approved && <Check size={14} color="#15803d" aria-label="Approved" />}
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <TimesheetMobileKvRow label="Dept" value={entry.dept} />
+        <TimesheetMobileKvRow label="Job" value={entry.job} />
+        <TimesheetMobileKvRow label="Phase" value={entry.phase} />
+        <TimesheetMobileKvRow label="State" value={entry.state} />
+        <TimesheetMobileKvRow label="WO#" value={entry.wo} />
+        {entry.comment?.trim() ? (
+          <TimesheetMobileKvRow label="Comment" value={entry.comment} />
+        ) : null}
+        <div className="grid grid-cols-2 gap-x-[16px] mt-[4px] pt-[8px]" style={{ borderTop: "1px dashed #e0e1e9" }}>
+          <TimesheetMobileKvRow label="Reg" value={fmtTsHours(entry.reg)} />
+          <TimesheetMobileKvRow
+            label="OT"
+            value={fmtTsHours(entry.ot)}
+            valueColor={entry.ot > 0 ? "#0063a3" : undefined}
+          />
+          <TimesheetMobileKvRow label="DT" value={fmtTsHours(entry.dt)} />
+          <TimesheetMobileKvRow label="Travel" value={fmtTsHours(entry.travel)} />
+          <TimesheetMobileKvRow label="Qty" value={fmtTsQty(entry.qty)} />
+          <TimesheetMobileKvRow label="Per Diem" value={fmtTsPerDiem(entry.perDiem)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryBreakCard({ breakRow }: { breakRow: SummaryBreakRow }) {
+  return (
+    <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor: "#fde68a", background: "#fffbeb" }}>
+      <div className="flex items-center gap-[8px]" style={{ padding: "10px 14px", borderBottom: "1px solid #fde68a" }}>
+        <Coffee size={14} style={{ color: "#d97706", flexShrink: 0 }} aria-hidden />
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#92400e", fontFamily: OS, ...OS_FVS, flex: 1 }}>
+          {breakRow.date}
+        </p>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>
+          Break
+        </span>
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <TimesheetMobileKvRow label="Start" value={breakRow.start} valueColor="#92400e" />
+        <TimesheetMobileKvRow label="End" value={breakRow.end} valueColor="#92400e" />
+        <TimesheetMobileKvRow
+          label="Duration"
+          value={breakRow.duration > 0 ? breakRow.duration.toFixed(2) : "—"}
+          valueColor="#92400e"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SummaryEntryCardsView({ employee }: { employee: SummaryEmployee }) {
+  const tableRows = buildSummaryTableRows(employee);
+  const totals = {
+    reg: employee.entries.reduce((s, e) => s + e.reg, 0),
+    ot: employee.entries.reduce((s, e) => s + e.ot, 0),
+    dt: employee.entries.reduce((s, e) => s + e.dt, 0),
+    travel: employee.entries.reduce((s, e) => s + e.travel, 0),
+    all: 0,
+  };
+  totals.all = totals.reg + totals.ot + totals.dt;
+
+  if (tableRows.length === 0) {
+    return (
+      <p className="px-[12px] py-[16px] text-center text-[12px] text-[#6a6e79]" style={{ fontFamily: OS }}>
+        No timesheet entries for this pay period
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+      {tableRows.map((row) => {
+        if (row.kind === "entry") {
+          return <SummaryEntryCard key={row.data.id} entry={row.data} />;
+        }
+        if (row.kind === "break") {
+          return <SummaryBreakCard key={row.data.id} breakRow={row.data} />;
+        }
+        return null;
+      })}
+      <div
+        className="rounded-[10px] px-[14px] py-[12px]"
+        style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
+      >
+        <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
+        <div className="grid grid-cols-2 gap-x-[16px]">
+          <TimesheetMobileKvRow label="All hours" value={totals.all.toFixed(2)} />
+          <TimesheetMobileKvRow label="Reg" value={totals.reg.toFixed(2)} />
+          <TimesheetMobileKvRow label="OT" value={totals.ot.toFixed(2)} />
+          <TimesheetMobileKvRow label="DT" value={totals.dt.toFixed(2)} />
+          <TimesheetMobileKvRow label="Travel" value={totals.travel.toFixed(2)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryViolationCard({
+  violation: v,
+  canDeleteBreakViolations,
+  onApproveViolation,
+  onDeleteViolation,
+  onRestoreViolation,
+}: {
+  violation: SummaryViolation;
+  canDeleteBreakViolations: boolean;
+  onApproveViolation: (violationId: string) => void;
+  onDeleteViolation: (violationId: string, label: string) => void;
+  onRestoreViolation: (violationId: string) => void;
+}) {
+  const isDeleted = v.status === "deleted";
+  const isApproved = v.status === "approved" || !!v.approvedBy;
+  const breakViolation = isBreakViolation(v);
+  const canManage = canDeleteBreakViolations && breakViolation;
+  const canDelete = canManage && !isDeleted;
+  const canRestore = canManage && isDeleted;
+  const borderColor = isDeleted ? "#e0e1e9" : isApproved ? "#bbe6ca" : "#fde68a";
+  const background = isDeleted ? "#f7f7f8" : isApproved ? SUMMARY_APPROVED_ROW_BG : "#fffbeb";
+
+  return (
+    <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor, background, opacity: isDeleted ? 0.92 : 1 }}>
+      <div
+        className="flex flex-wrap items-center gap-[8px]"
+        style={{ padding: "10px 14px", borderBottom: `1px solid ${borderColor}` }}
+      >
+        {breakViolation ? (
+          <Coffee size={14} style={{ color: isDeleted ? "#a3a3a3" : "#92400e", flexShrink: 0 }} aria-hidden />
+        ) : (
+          <AlertTriangle size={14} style={{ color: isDeleted ? "#a3a3a3" : "#d97706", flexShrink: 0 }} aria-hidden />
+        )}
+        <div className="min-w-0 flex-1">
+          <p style={{ fontSize: 12, fontWeight: 700, color: isDeleted ? "#6a6e79" : "#92400e", fontFamily: OS, ...OS_FVS }}>
+            {v.label}
+          </p>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{v.date}</p>
+        </div>
+        <ViolationTypeBadge violation={v} />
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <TimesheetMobileKvRow label="Dept" value={v.dept} />
+        <TimesheetMobileKvRow label="Job" value={v.job} />
+        <TimesheetMobileKvRow label="Phase" value={v.phase} />
+        <TimesheetMobileKvRow label="Reg" value={fmtTsHours(v.reg)} valueColor={v.reg > 0 ? "#ab1f26" : undefined} />
+        {v.comment?.trim() ? <TimesheetMobileKvRow label="Comment" value={v.comment} /> : null}
+        {isDeleted && v.deletedBy ? (
+          <TimesheetMobileKvRow label="Deleted by" value={v.deletedBy} />
+        ) : null}
+        {(!isDeleted && !isApproved) || canDelete || canRestore ? (
+          <div className="mt-[10px] flex flex-row flex-wrap items-center justify-end gap-[8px]">
+            {canDelete ? (
+              <ModusWcButton
+                color="tertiary"
+                variant="outlined"
+                size="sm"
+                onButtonClick={() => onDeleteViolation(v.id, v.label)}
+              >
+                <ModusWcIcon name="delete" variant="outlined" size="xs" decorative />
+                Delete
+              </ModusWcButton>
+            ) : null}
+            {canRestore ? (
+              <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => onRestoreViolation(v.id)}>
+                <ModusWcIcon name="undo" variant="outlined" size="xs" decorative />
+                Restore
+              </ModusWcButton>
+            ) : null}
+            {!isDeleted && !isApproved ? (
+              <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={() => onApproveViolation(v.id)}>
+                Approve
+              </ModusWcButton>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SummaryViolationCardsView({
+  employee,
+  canDeleteBreakViolations,
+  onApproveViolation,
+  onDeleteViolation,
+  onRestoreViolation,
+}: {
+  employee: SummaryEmployee;
+  canDeleteBreakViolations: boolean;
+  onApproveViolation: (violationId: string) => void;
+  onDeleteViolation: (violationId: string, label: string) => void;
+  onRestoreViolation: (violationId: string) => void;
+}) {
+  const violationRows = buildBreakViolationRows(employee);
+  const activeViolations = violationRows.filter((v) => v.status !== "deleted");
+  const totals = {
+    reg: activeViolations.reduce((s, v) => s + v.reg, 0),
+    ot: activeViolations.reduce((s, v) => s + v.ot, 0),
+    all: 0,
+  };
+  totals.all = totals.reg + totals.ot;
+
+  if (violationRows.length === 0) {
+    return (
+      <p className="px-[12px] py-[16px] text-center text-[12px] text-[#6a6e79]" style={{ fontFamily: OS }}>
+        No violations for this pay period
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+      {violationRows.map((v) => (
+        <SummaryViolationCard
+          key={`${v.id}-${v.status}`}
+          violation={v}
+          canDeleteBreakViolations={canDeleteBreakViolations}
+          onApproveViolation={onApproveViolation}
+          onDeleteViolation={onDeleteViolation}
+          onRestoreViolation={onRestoreViolation}
+        />
+      ))}
+      <div
+        className="rounded-[10px] px-[14px] py-[12px]"
+        style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
+      >
+        <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
+        <div className="grid grid-cols-2 gap-x-[16px]">
+          <TimesheetMobileKvRow label="All hours" value={totals.all.toFixed(2)} />
+          <TimesheetMobileKvRow label="Reg" value={totals.reg.toFixed(2)} />
+          <TimesheetMobileKvRow label="OT" value={totals.ot.toFixed(2)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryExpenseCard({ expense }: { expense: SummaryExpense }) {
+  const approved = !!expense.approvedBy;
+  const borderColor = approved ? "#bbe6ca" : "#e0e1e9";
+  const background = approved ? SUMMARY_APPROVED_ROW_BG : "#ffffff";
+
+  return (
+    <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor, background }}>
+      <div
+        className="flex flex-wrap items-center gap-[8px]"
+        style={{ padding: "10px 14px", borderBottom: `1px solid ${approved ? "#bbe6ca" : "#eef0f3"}` }}
+      >
+        <CreditCard size={14} style={{ color: approved ? "#15803d" : "#6a6e79", flexShrink: 0 }} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+            {expense.name}
+          </p>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{expense.date}</p>
+        </div>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#0e416c", fontFamily: OS, ...OS_FVS }}>
+          ${expense.total.toFixed(2)}
+        </p>
+      </div>
+      <div style={{ padding: "10px 14px 12px" }}>
+        <TimesheetMobileKvRow label="Category" value={expense.category} />
+        <TimesheetMobileKvRow label="Vendor" value={expense.vendor} />
+        <TimesheetMobileKvRow label="Dept" value={expense.dept} />
+        <TimesheetMobileKvRow label="Job" value={expense.job} />
+        <TimesheetMobileKvRow label="Phase" value={expense.phase} />
+        <TimesheetMobileKvRow label="Added by" value={expense.addedBy} />
+        {expense.attachments > 0 ? (
+          <div className="flex items-baseline justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+            <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Attachments</p>
+            <span className="inline-flex items-center gap-[4px] text-[#0e416c]" style={{ fontSize: 12, fontWeight: 600, fontFamily: OS }}>
+              <Paperclip size={12} aria-hidden />
+              {expense.attachments}
+            </span>
+          </div>
+        ) : null}
+        {expense.comment?.trim() ? (
+          <TimesheetMobileKvRow label="Comment" value={expense.comment} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SummaryExpenseCardsView({ expenses }: { expenses: SummaryExpense[] }) {
+  const total = expenses.reduce((sum, row) => sum + row.total, 0);
+
+  if (expenses.length === 0) {
+    return (
+      <p className="px-[12px] py-[16px] text-center text-[12px] text-[#6a6e79]" style={{ fontFamily: OS }}>
+        No expenses for this pay period
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+      {expenses.map((expense) => (
+        <SummaryExpenseCard key={expense.id} expense={expense} />
+      ))}
+      <div
+        className="rounded-[10px] px-[14px] py-[12px]"
+        style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
+      >
+        <div className="flex items-baseline justify-between gap-[12px]">
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Total</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+            ${total.toFixed(2)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SummaryViolationRow({
   violation: v,
   employee,
@@ -7351,10 +7751,12 @@ function EmployeeSummarySection({
   title,
   trailing,
   children,
+  viewMode = "table",
 }: {
   title: string;
   trailing?: ReactNode;
   children: ReactNode;
+  viewMode?: SummaryDataViewMode;
 }) {
   return (
     <section className="min-w-0 w-full border-t border-[#e0e1e9]">
@@ -7364,7 +7766,7 @@ function EmployeeSummarySection({
           <div className="flex flex-wrap items-center gap-[8px]">{trailing}</div>
         ) : null}
       </div>
-      <div className="overflow-x-auto">{children}</div>
+      <div className={viewMode === "card" ? "min-w-0" : "overflow-x-auto"}>{children}</div>
     </section>
   );
 }
@@ -7387,7 +7789,17 @@ const EXPENSE_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Comment", title: "Comment" },
 ];
 
-function SummaryExpensesTable({ expenses }: { expenses: SummaryExpense[] }) {
+function SummaryExpensesTable({
+  expenses,
+  viewMode = "table",
+}: {
+  expenses: SummaryExpense[];
+  viewMode?: SummaryDataViewMode;
+}) {
+  if (viewMode === "card") {
+    return <SummaryExpenseCardsView expenses={expenses} />;
+  }
+
   const total = expenses.reduce((sum, row) => sum + row.total, 0);
   const statusMark = (done: boolean) =>
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
@@ -7493,11 +7905,13 @@ function SummaryEntryTable({
   onUpdateEmployee,
   onUpdateEntry,
   onUpdateBreak,
+  viewMode = "table",
 }: {
   employee: SummaryEmployee;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
   onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
+  viewMode?: SummaryDataViewMode;
 }) {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const tableRows = buildSummaryTableRows(employee);
@@ -7510,6 +7924,10 @@ function SummaryEntryTable({
     all: 0,
   };
   totals.all = totals.reg + totals.ot + totals.dt;
+
+  if (viewMode === "card") {
+    return <SummaryEntryCardsView employee={employee} />;
+  }
 
   return (
     <div className="min-w-0 w-full">
@@ -7596,6 +8014,7 @@ function SummaryBreakViolationsTable({
   onRestoreViolation,
   onUpdateEmployee,
   onUpdateViolation,
+  viewMode = "table",
 }: {
   employee: SummaryEmployee;
   canDeleteBreakViolations: boolean;
@@ -7604,6 +8023,7 @@ function SummaryBreakViolationsTable({
   onRestoreViolation: (violationId: string) => void;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+  viewMode?: SummaryDataViewMode;
 }) {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const violationRows = buildBreakViolationRows(employee);
@@ -7617,6 +8037,18 @@ function SummaryBreakViolationsTable({
     all: 0,
   };
   totals.all = totals.reg + totals.ot + totals.dt;
+
+  if (viewMode === "card") {
+    return (
+      <SummaryViolationCardsView
+        employee={employee}
+        canDeleteBreakViolations={canDeleteBreakViolations}
+        onApproveViolation={onApproveViolation}
+        onDeleteViolation={onDeleteViolation}
+        onRestoreViolation={onRestoreViolation}
+      />
+    );
+  }
 
   return (
     <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
@@ -7674,6 +8106,7 @@ function EmployeeSummaryCard({
   onUpdateEntry,
   onUpdateBreak,
   onUpdateViolation,
+  viewMode = "table",
 }: {
   employee: SummaryEmployee;
   canDeleteBreakViolations: boolean;
@@ -7685,6 +8118,7 @@ function EmployeeSummaryCard({
   onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
   onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+  viewMode?: SummaryDataViewMode;
 }) {
   const [attested, setAttested] = useState<Set<number>>(new Set());
   const entryRegTotal = employee.entries.reduce((sum, entry) => sum + entry.reg, 0);
@@ -7717,6 +8151,7 @@ function EmployeeSummaryCard({
       />
       <EmployeeSummarySection
         title="Timesheet Entries"
+        viewMode={viewMode}
         trailing={(
           <>
             <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => toast.message("Refreshing timesheet…")}>
@@ -7730,6 +8165,7 @@ function EmployeeSummaryCard({
       >
         <SummaryEntryTable
           employee={employee}
+          viewMode={viewMode}
           onUpdateEmployee={onUpdateEmployee}
           onUpdateEntry={onUpdateEntry}
           onUpdateBreak={onUpdateBreak}
@@ -7737,6 +8173,7 @@ function EmployeeSummaryCard({
       </EmployeeSummarySection>
       <EmployeeSummarySection
         title="Violations"
+        viewMode={viewMode}
         trailing={violationCount > 0 ? (
           <>
             <ModusWcBadge color="warning" variant="filled" size="sm">{violationCount}</ModusWcBadge>
@@ -7750,6 +8187,7 @@ function EmployeeSummaryCard({
       >
         <SummaryBreakViolationsTable
           employee={employee}
+          viewMode={viewMode}
           canDeleteBreakViolations={canDeleteBreakViolations}
           onApproveViolation={onApproveViolation}
           onDeleteViolation={onDeleteViolation}
@@ -7760,13 +8198,14 @@ function EmployeeSummaryCard({
       </EmployeeSummarySection>
       <EmployeeSummarySection
         title="Expenses"
+        viewMode={viewMode}
         trailing={(
           <span className="text-[12px] font-semibold text-[#252a2e]" style={{ fontFamily: OS }}>
             Total ${expenseTotal.toFixed(2)}
           </span>
         )}
       >
-        <SummaryExpensesTable expenses={employee.expenses} />
+        <SummaryExpensesTable expenses={employee.expenses} viewMode={viewMode} />
       </EmployeeSummarySection>
     </div>
   );
@@ -7774,6 +8213,9 @@ function EmployeeSummaryCard({
 
 function TimesheetSummary() {
   const { canDeleteBreakViolations, viewerLabel } = useViewingRole();
+  const isNarrowViewport = useIsSummaryNarrowViewport();
+  const [viewModeOverride, setViewModeOverride] = useState<SummaryDataViewMode | null>(null);
+  const viewMode: SummaryDataViewMode = viewModeOverride ?? (isNarrowViewport ? "card" : "table");
   const [employees, setEmployees] = useState<SummaryEmployee[]>(SUMMARY_MOCK_EMPLOYEES);
   const [deleteTarget, setDeleteTarget] = useState<{
     empId: string;
@@ -7984,6 +8426,7 @@ function TimesheetSummary() {
             <ModusWcIcon name="print" variant="outlined" size="xs" decorative />
             Print
           </ModusWcButton>
+          <SummaryViewModeToggle value={viewMode} onChange={setViewModeOverride} />
         </div>
       </div>
 
@@ -8018,6 +8461,7 @@ function TimesheetSummary() {
         <EmployeeSummaryCard
           key={emp.id}
           employee={emp}
+          viewMode={viewMode}
           canDeleteBreakViolations={canDeleteBreakViolations}
           onApproveViolation={(violationId) => approveViolation(emp.id, violationId)}
           onDeleteViolation={(violationId, label) => {
