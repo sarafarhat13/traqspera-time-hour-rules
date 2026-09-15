@@ -3400,6 +3400,13 @@ const MOBILE_CARD: React.CSSProperties = {
 const fmtTsHours = (n: number) => (n > 0 ? n.toFixed(2) : "—");
 const fmtTsQty = (n: number) => (n > 0 ? String(n) : "—");
 const fmtTsPerDiem = (n: number) => (n > 0 ? `$${n}` : "—");
+const fmtTsNumber = (n: number) => (n > 0 ? String(n) : "—");
+const fmtTsText = (value?: string | null) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "—";
+};
+const fmtTsYesNo = (value: boolean) => (value ? "Yes" : "—");
+const fmtTsAttachments = (count: number) => (count > 0 ? String(count) : "—");
 
 function TimesheetMobileKvRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
@@ -6072,6 +6079,16 @@ const SUMMARY_MOCK_EMPLOYEES: SummaryEmployee[] = [
         unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "",
         approvedBy: "Luc Peron", secondApprovedBy: "Luc Peron", complete: true, exported: false,
       },
+      {
+        id: "adam-2",
+        date: "Mon, Aug 17",
+        start: "6:30 AM", end: "3:00 PM",
+        dept: "Main Orders", job: "003700 - Job B", phase: "5555 - Phase B",
+        state: "TX", wo: "WO-9012", payRate: "$42.50",
+        reg: 8, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b", comment: "Awaiting approval",
+        complete: false, exported: false,
+      },
     ],
     breaks: [
       {
@@ -6314,6 +6331,8 @@ const SUMMARY_TABLE_COLS = [
 
 const SUMMARY_TABLE_ICON_COL_WIDTH = "2%";
 const SUMMARY_TABLE_COL_WIDTH_OVERRIDES: Partial<Record<(typeof SUMMARY_TABLE_COLS)[number], number>> = {
+  "Approved By": 6,
+  "Second Approved By": 6,
   Job: 11,
   Phase: 9.5,
   Comment: 8,
@@ -6379,8 +6398,8 @@ const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
 ];
 
 const BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES: Record<string, number> = {
-  "Approved By": 4.5,
-  "Second Approved By": 4.5,
+  "Approved By": 6,
+  "Second Approved By": 6,
   Complete: 3.5,
   Exported: 3.5,
   "Type of Violation": 8,
@@ -6455,7 +6474,7 @@ function summaryEntryStripeIndex(tableRows: SummaryTableRow[], idx: number): num
 function summaryRowBackground(row: SummaryTableRow, stripeIdx: number): string {
   if (row.kind === "violation" && row.data.status === "deleted") return "#f7f7f8";
   if (isSummaryRowApproved(row)) return SUMMARY_APPROVED_ROW_BG;
-  if (row.kind === "violation") return "#fffbeb";
+  if (row.kind === "violation") return "#ffffff";
   return stripeIdx % 2 === 0 ? "#ffffff" : "#fafafa";
 }
 
@@ -6506,6 +6525,50 @@ type SummaryRowPatch = Partial<{
   deletedBy: string | undefined;
   deletionComment: string | undefined;
 }>;
+
+const SUMMARY_ROW_APPROVE_PATCH: SummaryRowPatch = {
+  approvedBy: "Luc Peron",
+  secondApprovedBy: "Luc Peron",
+  complete: true,
+};
+
+const SUMMARY_ROW_UNAPPROVE_PATCH: SummaryRowPatch = {
+  approvedBy: undefined,
+  secondApprovedBy: undefined,
+  complete: false,
+};
+
+function SummaryApprovalToggleCell({
+  approved,
+  approver,
+  approveLabel,
+  unapproveLabel,
+  onApprove,
+  onUnapprove,
+}: {
+  approved: boolean;
+  approver?: string;
+  approveLabel: string;
+  unapproveLabel: string;
+  onApprove: () => void;
+  onUnapprove: () => void;
+}) {
+  if (approved) {
+    return (
+      <div className="tq-summary-approval-cell-content">
+        <div className="tq-summary-approval-checkbox-wrap">
+          <StyledCheckbox checked ariaLabel={unapproveLabel} onChange={onUnapprove} />
+        </div>
+        {approver ? <span className="tq-summary-approval-name">{approver}</span> : null}
+      </div>
+    );
+  }
+  return (
+    <div className="tq-summary-approval-checkbox-wrap">
+      <StyledCheckbox checked={false} ariaLabel={approveLabel} onChange={onApprove} />
+    </div>
+  );
+}
 
 function SummaryClickEditTextCell({
   cellId,
@@ -6737,17 +6800,27 @@ function SummaryEditableDataCells({
   const dash = <span style={{ color: "#a3a3a3" }}>—</span>;
   const hoursEditable = editable && hoursMode === "full";
   const breakViolationColumns = columnsMode === "breakViolation";
+  const entryApprovalToggle = editable && rowKind === "entry" && !approvedByCell;
 
   return (
     <>
-      <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+      <td className={`${SUMMARY_TABLE_CELL} tq-summary-approval-cell`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
         {approvedByCell ?? (
-          data.approvedBy ? (
-            <span
-              className={editable ? "inline-flex cursor-text items-center gap-[4px] min-w-0" : "inline-flex items-center gap-[4px] min-w-0"}
+          entryApprovalToggle ? (
+            <SummaryApprovalToggleCell
+              approved={!!data.approvedBy}
+              approver={data.approvedBy}
+              approveLabel="Approve entry"
+              unapproveLabel="Unapprove entry"
+              onApprove={() => onPatch(SUMMARY_ROW_APPROVE_PATCH)}
+              onUnapprove={() => onPatch(SUMMARY_ROW_UNAPPROVE_PATCH)}
+            />
+          ) : data.approvedBy ? (
+            <div
+              className={`tq-summary-approval-cell-content ${editable ? "cursor-text" : ""}`}
               onClick={editable ? () => setActiveCellId(cell("approvedBy")) : undefined}
             >
-              <Check size={12} color="#15803d" />
+              <Check size={12} color="#15803d" className="shrink-0" aria-hidden />
               {activeCellId === cell("approvedBy") ? (
                 <ModusWcTextInput
                   aria-label="Approved by"
@@ -6758,22 +6831,33 @@ function SummaryEditableDataCells({
                   onBlur={() => setActiveCellId(null)}
                 />
               ) : (
-                <span className="text-[10px] break-words">{data.approvedBy}</span>
+                <span className="tq-summary-approval-name">{data.approvedBy}</span>
               )}
-            </span>
+            </div>
           ) : (
-            <StyledCheckbox checked={false} onChange={() => {}} />
+            <div className="tq-summary-approval-checkbox-wrap">
+              <StyledCheckbox checked={false} onChange={() => {}} />
+            </div>
           )
         )}
       </td>
-      <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+      <td className={`${SUMMARY_TABLE_CELL} tq-summary-approval-cell`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
         {secondApprovedByCell ?? (
-          data.secondApprovedBy ? (
-            <span
-              className={editable ? "inline-flex cursor-text items-center gap-[4px] min-w-0" : "inline-flex items-center gap-[4px] min-w-0"}
+          entryApprovalToggle ? (
+            <SummaryApprovalToggleCell
+              approved={!!data.secondApprovedBy}
+              approver={data.secondApprovedBy}
+              approveLabel="Approve entry"
+              unapproveLabel="Unapprove entry"
+              onApprove={() => onPatch(SUMMARY_ROW_APPROVE_PATCH)}
+              onUnapprove={() => onPatch(SUMMARY_ROW_UNAPPROVE_PATCH)}
+            />
+          ) : data.secondApprovedBy ? (
+            <div
+              className={`tq-summary-approval-cell-content ${editable ? "cursor-text" : ""}`}
               onClick={editable ? () => setActiveCellId(cell("secondApprovedBy")) : undefined}
             >
-              <Check size={12} color="#15803d" />
+              <Check size={12} color="#15803d" className="shrink-0" aria-hidden />
               {activeCellId === cell("secondApprovedBy") ? (
                 <ModusWcTextInput
                   aria-label="Second approved by"
@@ -6784,11 +6868,13 @@ function SummaryEditableDataCells({
                   onBlur={() => setActiveCellId(null)}
                 />
               ) : (
-                <span className="text-[10px] break-words">{data.secondApprovedBy}</span>
+                <span className="tq-summary-approval-name">{data.secondApprovedBy}</span>
               )}
-            </span>
+            </div>
           ) : (
-            <StyledCheckbox checked={false} onChange={() => {}} />
+            <div className="tq-summary-approval-checkbox-wrap">
+              <StyledCheckbox checked={false} onChange={() => {}} />
+            </div>
           )
         )}
       </td>
@@ -7289,10 +7375,139 @@ function SummaryViewModeToggle({
   );
 }
 
-function SummaryEntryCard({ entry }: { entry: SummaryTimesheetEntry }) {
-  const approved = !!entry.approvedBy;
-  const borderColor = approved ? "#bbe6ca" : "#e0e1e9";
-  const headerBorder = approved ? "#bbe6ca" : "#eef0f3";
+function SummaryCardApprovalFooter({
+  approvedBy,
+  secondApprovedBy,
+  complete,
+  onApproveFirst,
+  onUnapproveFirst,
+  onApproveSecond,
+  onUnapproveSecond,
+  onComplete,
+  onUncomplete,
+  showComplete = true,
+}: {
+  approvedBy?: string;
+  secondApprovedBy?: string;
+  complete: boolean;
+  onApproveFirst: () => void;
+  onUnapproveFirst: () => void;
+  onApproveSecond: () => void;
+  onUnapproveSecond: () => void;
+  onComplete: () => void;
+  onUncomplete: () => void;
+  showComplete?: boolean;
+}) {
+  const firstDone = !!approvedBy;
+  const secondDone = !!secondApprovedBy;
+  const bothApproved = firstDone && secondDone;
+
+  const approverRow = (
+    label: string,
+    done: boolean,
+    name: string | undefined,
+    onApprove: () => void,
+    onUnapprove: () => void,
+    disabled?: boolean,
+  ) => (
+    <div className="flex flex-wrap items-center justify-between gap-[8px] min-w-0">
+      <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>{label}</p>
+      <div className="flex flex-wrap items-center justify-end gap-[6px] min-w-0">
+        {done && name ? (
+          <>
+            <span
+              className="inline-flex items-center gap-[4px] text-[11px] font-semibold text-[#15803d] min-w-0"
+              style={{ fontFamily: OS, ...OS_FVS }}
+            >
+              <Check size={12} aria-hidden />
+              <span className="break-words">{name}</span>
+            </span>
+            <ModusWcButton color="tertiary" variant="borderless" size="sm" onButtonClick={onUnapprove}>
+              Unapprove
+            </ModusWcButton>
+          </>
+        ) : (
+          <ModusWcButton
+            color="primary"
+            variant="outlined"
+            size="sm"
+            disabled={disabled}
+            onButtonClick={onApprove}
+          >
+            Approve
+          </ModusWcButton>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mt-[10px] pt-[10px] flex flex-col gap-[8px]" style={{ borderTop: "1px dashed #e0e1e9" }}>
+      {approverRow("1st approver", firstDone, approvedBy, onApproveFirst, onUnapproveFirst)}
+      {approverRow(
+        "2nd approver",
+        secondDone,
+        secondApprovedBy,
+        onApproveSecond,
+        onUnapproveSecond,
+        !firstDone,
+      )}
+      {showComplete && bothApproved ? (
+        <div className="flex flex-wrap items-center justify-end gap-[8px] pt-[2px]">
+          {complete ? (
+            <>
+              <span
+                className="inline-flex items-center gap-[4px] text-[11px] font-semibold text-[#15803d]"
+                style={{ fontFamily: OS, ...OS_FVS }}
+              >
+                <Check size={12} aria-hidden />
+                Complete
+              </span>
+              <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={onUncomplete}>
+                Mark incomplete
+              </ModusWcButton>
+            </>
+          ) : (
+            <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={onComplete}>
+              <ModusWcIcon name="check" variant="outlined" size="xs" decorative />
+              Complete
+            </ModusWcButton>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function summaryCardApprovalPatchHandlers(
+  onPatch: (patch: SummaryRowPatch) => void,
+  approverName: string,
+) {
+  return {
+    onApproveFirst: () => onPatch({ approvedBy: approverName }),
+    onUnapproveFirst: () =>
+      onPatch({ approvedBy: undefined, secondApprovedBy: undefined, complete: false }),
+    onApproveSecond: () => onPatch({ secondApprovedBy: approverName }),
+    onUnapproveSecond: () => onPatch({ secondApprovedBy: undefined, complete: false }),
+    onComplete: () => onPatch({ complete: true }),
+    onUncomplete: () => onPatch({ complete: false }),
+  };
+}
+
+function SummaryEntryCard({
+  entry,
+  employee,
+  approverName,
+  onPatchEntry,
+}: {
+  entry: SummaryTimesheetEntry;
+  employee: SummaryEmployee;
+  approverName: string;
+  onPatchEntry: (patch: SummaryRowPatch) => void;
+}) {
+  const approvalHandlers = summaryCardApprovalPatchHandlers(onPatchEntry, approverName);
+  const borderColor = entry.complete ? "#bbe6ca" : "#e0e1e9";
+  const headerBorder = entry.complete ? "#bbe6ca" : "#eef0f3";
 
   return (
     <div
@@ -7300,33 +7515,41 @@ function SummaryEntryCard({ entry }: { entry: SummaryTimesheetEntry }) {
         ...MOBILE_CARD,
         overflow: "hidden",
         borderColor,
-        background: approved ? SUMMARY_APPROVED_ROW_BG : "#ffffff",
+        background: entry.complete ? SUMMARY_APPROVED_ROW_BG : "#ffffff",
       }}
     >
       <div
         className="flex flex-wrap items-center gap-[8px]"
         style={{ padding: "10px 14px", borderBottom: `1px solid ${headerBorder}` }}
       >
-        <Clock size={14} style={{ color: approved ? "#15803d" : "#6a6e79", flexShrink: 0 }} aria-hidden />
+        <Clock size={14} style={{ color: entry.complete ? "#15803d" : "#6a6e79", flexShrink: 0 }} aria-hidden />
         <p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1, minWidth: 0 }}>
           {entry.date}
         </p>
         <p style={{ fontSize: 12, fontWeight: 600, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
           {entry.start} – {entry.end}
         </p>
-        {approved && <Check size={14} color="#15803d" aria-label="Approved" />}
+        {entry.complete && <Check size={14} color="#15803d" aria-label="Complete" />}
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
-        <TimesheetMobileKvRow label="Dept" value={entry.dept} />
-        <TimesheetMobileKvRow label="Job" value={entry.job} />
-        <TimesheetMobileKvRow label="Phase" value={entry.phase} />
-        <TimesheetMobileKvRow label="State" value={entry.state} />
-        <TimesheetMobileKvRow label="WO#" value={entry.wo} />
-        {entry.comment?.trim() ? (
-          <TimesheetMobileKvRow label="Comment" value={entry.comment} />
-        ) : null}
+        <TimesheetMobileKvRow label="Exported" value={fmtTsYesNo(entry.exported)} />
+        <TimesheetMobileKvRow label="Name" value={fmtTsText(employee.name)} />
+        <TimesheetMobileKvRow label="Employee #" value={fmtTsText(employee.employeeNum)} />
+        <TimesheetMobileKvRow label="Date" value={fmtTsText(entry.date)} />
+        <TimesheetMobileKvRow label="Start" value={fmtTsText(entry.start)} />
+        <TimesheetMobileKvRow label="End" value={fmtTsText(entry.end)} />
+        <TimesheetMobileKvRow label="Dept" value={fmtTsText(entry.dept)} />
+        <TimesheetMobileKvRow label="Job" value={fmtTsText(entry.job)} />
+        <TimesheetMobileKvRow label="Phase" value={fmtTsText(entry.phase)} />
+        <TimesheetMobileKvRow label="State" value={fmtTsText(entry.state)} />
+        <TimesheetMobileKvRow label="WO#" value={fmtTsText(entry.wo)} />
+        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(entry.payRate)} />
         <div className="grid grid-cols-2 gap-x-[16px] mt-[4px] pt-[8px]" style={{ borderTop: "1px dashed #e0e1e9" }}>
-          <TimesheetMobileKvRow label="Reg" value={fmtTsHours(entry.reg)} />
+          <TimesheetMobileKvRow
+            label="Reg"
+            value={fmtTsHours(entry.reg)}
+            valueColor={entry.hourAlert && entry.reg > 0 ? "#ab1f26" : undefined}
+          />
           <TimesheetMobileKvRow
             label="OT"
             value={fmtTsHours(entry.ot)}
@@ -7335,14 +7558,38 @@ function SummaryEntryCard({ entry }: { entry: SummaryTimesheetEntry }) {
           <TimesheetMobileKvRow label="DT" value={fmtTsHours(entry.dt)} />
           <TimesheetMobileKvRow label="Travel" value={fmtTsHours(entry.travel)} />
           <TimesheetMobileKvRow label="Qty" value={fmtTsQty(entry.qty)} />
-          <TimesheetMobileKvRow label="Per Diem" value={fmtTsPerDiem(entry.perDiem)} />
+          <TimesheetMobileKvRow label="Per Diem" value={fmtTsNumber(entry.perDiem)} />
+          <TimesheetMobileKvRow label="Per Diem Rate" value={fmtTsNumber(entry.perDiemRate)} />
         </div>
+        <TimesheetMobileKvRow label="Union" value={fmtTsText(entry.unionCode)} />
+        <TimesheetMobileKvRow label="Wage" value={fmtTsText(entry.wageCode)} />
+        <TimesheetMobileKvRow label="Rate Level" value={fmtTsText(entry.rateLevel)} />
+        <TimesheetMobileKvRow label="Comment" value={fmtTsText(entry.comment)} />
+        <TimesheetMobileKvRow label="Complete" value={fmtTsYesNo(entry.complete)} />
+        <SummaryCardApprovalFooter
+          approvedBy={entry.approvedBy}
+          secondApprovedBy={entry.secondApprovedBy}
+          complete={entry.complete}
+          {...approvalHandlers}
+        />
       </div>
     </div>
   );
 }
 
-function SummaryBreakCard({ breakRow }: { breakRow: SummaryBreakRow }) {
+function SummaryBreakCard({
+  breakRow,
+  employee,
+  approverName,
+  onPatchBreak,
+}: {
+  breakRow: SummaryBreakRow;
+  employee: SummaryEmployee;
+  approverName: string;
+  onPatchBreak: (patch: SummaryRowPatch) => void;
+}) {
+  const approvalHandlers = summaryCardApprovalPatchHandlers(onPatchBreak, approverName);
+
   return (
     <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor: "#fde68a", background: "#fffbeb" }}>
       <div className="flex items-center gap-[8px]" style={{ padding: "10px 14px", borderBottom: "1px solid #fde68a" }}>
@@ -7353,21 +7600,48 @@ function SummaryBreakCard({ breakRow }: { breakRow: SummaryBreakRow }) {
         <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>
           Break
         </span>
+        {breakRow.complete && <Check size={14} color="#15803d" aria-label="Complete" />}
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
-        <TimesheetMobileKvRow label="Start" value={breakRow.start} valueColor="#92400e" />
-        <TimesheetMobileKvRow label="End" value={breakRow.end} valueColor="#92400e" />
-        <TimesheetMobileKvRow
-          label="Duration"
-          value={breakRow.duration > 0 ? breakRow.duration.toFixed(2) : "—"}
-          valueColor="#92400e"
+        <TimesheetMobileKvRow label="Exported" value={fmtTsYesNo(breakRow.exported)} />
+        <TimesheetMobileKvRow label="Name" value={fmtTsText(employee.name)} />
+        <TimesheetMobileKvRow label="Employee #" value={fmtTsText(employee.employeeNum)} />
+        <TimesheetMobileKvRow label="Date" value={fmtTsText(breakRow.date)} />
+        <TimesheetMobileKvRow label="Start" value={fmtTsText(breakRow.start)} valueColor="#92400e" />
+        <TimesheetMobileKvRow label="End" value={fmtTsText(breakRow.end)} valueColor="#92400e" />
+        <TimesheetMobileKvRow label="Duration" value={fmtTsHours(breakRow.duration)} valueColor="#92400e" />
+        <TimesheetMobileKvRow label="Dept" value={fmtTsText(breakRow.dept)} />
+        <TimesheetMobileKvRow label="Job" value={fmtTsText(breakRow.job)} />
+        <TimesheetMobileKvRow label="State" value={fmtTsText(breakRow.state)} />
+        <TimesheetMobileKvRow label="WO#" value={fmtTsText(breakRow.wo)} />
+        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(breakRow.payRate)} />
+        <TimesheetMobileKvRow label="Union" value={fmtTsText(breakRow.unionCode)} />
+        <TimesheetMobileKvRow label="Wage" value={fmtTsText(breakRow.wageCode)} />
+        <TimesheetMobileKvRow label="Rate Level" value={fmtTsText(breakRow.rateLevel)} />
+        <TimesheetMobileKvRow label="Comment" value={fmtTsText(breakRow.comment)} />
+        <TimesheetMobileKvRow label="Complete" value={fmtTsYesNo(breakRow.complete)} />
+        <SummaryCardApprovalFooter
+          approvedBy={breakRow.approvedBy}
+          secondApprovedBy={breakRow.secondApprovedBy}
+          complete={breakRow.complete}
+          {...approvalHandlers}
         />
       </div>
     </div>
   );
 }
 
-function SummaryEntryCardsView({ employee }: { employee: SummaryEmployee }) {
+function SummaryEntryCardsView({
+  employee,
+  approverName,
+  onPatchEntry,
+  onPatchBreak,
+}: {
+  employee: SummaryEmployee;
+  approverName: string;
+  onPatchEntry: (entryId: string, patch: SummaryRowPatch) => void;
+  onPatchBreak: (breakId: string, patch: SummaryRowPatch) => void;
+}) {
   const tableRows = buildSummaryTableRows(employee);
   const totals = {
     reg: employee.entries.reduce((s, e) => s + e.reg, 0),
@@ -7387,13 +7661,29 @@ function SummaryEntryCardsView({ employee }: { employee: SummaryEmployee }) {
   }
 
   return (
-    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+    <div className="flex flex-col gap-[10px] p-[12px] bg-white">
       {tableRows.map((row) => {
         if (row.kind === "entry") {
-          return <SummaryEntryCard key={row.data.id} entry={row.data} />;
+          return (
+            <SummaryEntryCard
+              key={row.data.id}
+              entry={row.data}
+              employee={employee}
+              approverName={approverName}
+              onPatchEntry={(patch) => onPatchEntry(row.data.id, patch)}
+            />
+          );
         }
         if (row.kind === "break") {
-          return <SummaryBreakCard key={row.data.id} breakRow={row.data} />;
+          return (
+            <SummaryBreakCard
+              key={row.data.id}
+              breakRow={row.data}
+              employee={employee}
+              approverName={approverName}
+              onPatchBreak={(patch) => onPatchBreak(row.data.id, patch)}
+            />
+          );
         }
         return null;
       })}
@@ -7416,12 +7706,14 @@ function SummaryEntryCardsView({ employee }: { employee: SummaryEmployee }) {
 
 function SummaryViolationCard({
   violation: v,
+  employee,
   canDeleteBreakViolations,
   onApproveViolation,
   onDeleteViolation,
   onRestoreViolation,
 }: {
   violation: SummaryViolation;
+  employee: SummaryEmployee;
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
@@ -7434,7 +7726,7 @@ function SummaryViolationCard({
   const canDelete = canManage && !isDeleted;
   const canRestore = canManage && isDeleted;
   const borderColor = isDeleted ? "#e0e1e9" : isApproved ? "#bbe6ca" : "#fde68a";
-  const background = isDeleted ? "#f7f7f8" : isApproved ? SUMMARY_APPROVED_ROW_BG : "#fffbeb";
+  const background = isDeleted ? "#f7f7f8" : isApproved ? SUMMARY_APPROVED_ROW_BG : "#ffffff";
 
   return (
     <div style={{ ...MOBILE_CARD, overflow: "hidden", borderColor, background, opacity: isDeleted ? 0.92 : 1 }}>
@@ -7456,13 +7748,26 @@ function SummaryViolationCard({
         <ViolationTypeBadge violation={v} />
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
-        <TimesheetMobileKvRow label="Dept" value={v.dept} />
-        <TimesheetMobileKvRow label="Job" value={v.job} />
-        <TimesheetMobileKvRow label="Phase" value={v.phase} />
+        <TimesheetMobileKvRow label="1st approver" value={fmtTsText(v.approvedBy)} />
+        <TimesheetMobileKvRow label="2nd approver" value={fmtTsText(v.secondApprovedBy)} />
+        <TimesheetMobileKvRow label="Complete" value={fmtTsYesNo(v.complete)} />
+        <TimesheetMobileKvRow label="Exported" value={fmtTsYesNo(v.exported)} />
+        <TimesheetMobileKvRow label="Violation type" value={breakViolationDisplayLabel(v)} />
+        <TimesheetMobileKvRow label="Name" value={fmtTsText(employee.name)} />
+        <TimesheetMobileKvRow label="Employee #" value={fmtTsText(employee.employeeNum)} />
+        <TimesheetMobileKvRow label="Date" value={fmtTsText(v.date)} />
+        <TimesheetMobileKvRow label="Dept" value={fmtTsText(v.dept)} />
+        <TimesheetMobileKvRow label="Job" value={fmtTsText(v.job)} />
+        <TimesheetMobileKvRow label="Phase" value={fmtTsText(v.phase)} />
+        <TimesheetMobileKvRow label="State" value={fmtTsText(v.state)} />
+        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(v.payRate)} />
         <TimesheetMobileKvRow label="Reg" value={fmtTsHours(v.reg)} valueColor={v.reg > 0 ? "#ab1f26" : undefined} />
-        {v.comment?.trim() ? <TimesheetMobileKvRow label="Comment" value={v.comment} /> : null}
-        {isDeleted && v.deletedBy ? (
-          <TimesheetMobileKvRow label="Deleted by" value={v.deletedBy} />
+        <TimesheetMobileKvRow label="Union" value={fmtTsText(v.unionCode)} />
+        <TimesheetMobileKvRow label="Wage" value={fmtTsText(v.wageCode)} />
+        <TimesheetMobileKvRow label="Rate Level" value={fmtTsText(v.rateLevel)} />
+        <TimesheetMobileKvRow label="Comment" value={fmtTsText(v.comment)} />
+        {isDeleted ? (
+          <TimesheetMobileKvRow label="Deleted by" value={fmtTsText(v.deletedBy)} />
         ) : null}
         {(!isDeleted && !isApproved) || canDelete || canRestore ? (
           <div className="mt-[10px] flex flex-row flex-wrap items-center justify-end gap-[8px]">
@@ -7526,11 +7831,12 @@ function SummaryViolationCardsView({
   }
 
   return (
-    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+    <div className="flex flex-col gap-[10px] p-[12px] bg-white">
       {violationRows.map((v) => (
         <SummaryViolationCard
           key={`${v.id}-${v.status}`}
           violation={v}
+          employee={employee}
           canDeleteBreakViolations={canDeleteBreakViolations}
           onApproveViolation={onApproveViolation}
           onDeleteViolation={onDeleteViolation}
@@ -7552,7 +7858,16 @@ function SummaryViolationCardsView({
   );
 }
 
-function SummaryExpenseCard({ expense }: { expense: SummaryExpense }) {
+function SummaryExpenseCard({
+  expense,
+  approverName,
+  onPatchExpense,
+}: {
+  expense: SummaryExpense;
+  approverName: string;
+  onPatchExpense: (patch: SummaryRowPatch) => void;
+}) {
+  const approvalHandlers = summaryCardApprovalPatchHandlers(onPatchExpense, approverName);
   const approved = !!expense.approvedBy;
   const borderColor = approved ? "#bbe6ca" : "#e0e1e9";
   const background = approved ? SUMMARY_APPROVED_ROW_BG : "#ffffff";
@@ -7575,30 +7890,43 @@ function SummaryExpenseCard({ expense }: { expense: SummaryExpense }) {
         </p>
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
-        <TimesheetMobileKvRow label="Category" value={expense.category} />
-        <TimesheetMobileKvRow label="Vendor" value={expense.vendor} />
-        <TimesheetMobileKvRow label="Dept" value={expense.dept} />
-        <TimesheetMobileKvRow label="Job" value={expense.job} />
-        <TimesheetMobileKvRow label="Phase" value={expense.phase} />
-        <TimesheetMobileKvRow label="Added by" value={expense.addedBy} />
-        {expense.attachments > 0 ? (
-          <div className="flex items-baseline justify-between gap-[12px]" style={{ marginBottom: 6 }}>
-            <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Attachments</p>
-            <span className="inline-flex items-center gap-[4px] text-[#0e416c]" style={{ fontSize: 12, fontWeight: 600, fontFamily: OS }}>
-              <Paperclip size={12} aria-hidden />
-              {expense.attachments}
-            </span>
-          </div>
-        ) : null}
-        {expense.comment?.trim() ? (
-          <TimesheetMobileKvRow label="Comment" value={expense.comment} />
-        ) : null}
+        <TimesheetMobileKvRow label="Exported" value={fmtTsYesNo(expense.exported)} />
+        <TimesheetMobileKvRow label="Date" value={fmtTsText(expense.date)} />
+        <TimesheetMobileKvRow label="Dept" value={fmtTsText(expense.dept)} />
+        <TimesheetMobileKvRow label="Job" value={fmtTsText(expense.job)} />
+        <TimesheetMobileKvRow label="Phase" value={fmtTsText(expense.phase)} />
+        <TimesheetMobileKvRow label="Name" value={fmtTsText(expense.name)} />
+        <TimesheetMobileKvRow label="Category" value={fmtTsText(expense.category)} />
+        <TimesheetMobileKvRow label="Vendor" value={fmtTsText(expense.vendor)} />
+        <TimesheetMobileKvRow
+          label="Total"
+          value={expense.total > 0 ? `$${expense.total.toFixed(2)}` : "—"}
+          valueColor="#0e416c"
+        />
+        <TimesheetMobileKvRow label="Added by" value={fmtTsText(expense.addedBy)} />
+        <TimesheetMobileKvRow label="Attachments" value={fmtTsAttachments(expense.attachments)} />
+        <TimesheetMobileKvRow label="Comment" value={fmtTsText(expense.comment)} />
+        <SummaryCardApprovalFooter
+          approvedBy={expense.approvedBy}
+          secondApprovedBy={expense.secondApprovedBy}
+          complete={false}
+          showComplete={false}
+          {...approvalHandlers}
+        />
       </div>
     </div>
   );
 }
 
-function SummaryExpenseCardsView({ expenses }: { expenses: SummaryExpense[] }) {
+function SummaryExpenseCardsView({
+  expenses,
+  approverName,
+  onPatchExpense,
+}: {
+  expenses: SummaryExpense[];
+  approverName: string;
+  onPatchExpense: (expenseId: string, patch: SummaryRowPatch) => void;
+}) {
   const total = expenses.reduce((sum, row) => sum + row.total, 0);
 
   if (expenses.length === 0) {
@@ -7610,9 +7938,14 @@ function SummaryExpenseCardsView({ expenses }: { expenses: SummaryExpense[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-[10px] p-[12px]" style={{ background: "#f7f7f8" }}>
+    <div className="flex flex-col gap-[10px] p-[12px] bg-white">
       {expenses.map((expense) => (
-        <SummaryExpenseCard key={expense.id} expense={expense} />
+        <SummaryExpenseCard
+          key={expense.id}
+          expense={expense}
+          approverName={approverName}
+          onPatchExpense={(patch) => onPatchExpense(expense.id, patch)}
+        />
       ))}
       <div
         className="rounded-[10px] px-[14px] py-[12px]"
@@ -7791,13 +8124,27 @@ const EXPENSE_TABLE_HEADERS: { label: string; title: string }[] = [
 
 function SummaryExpensesTable({
   expenses,
+  approverName,
   viewMode = "table",
+  onApproveExpense,
+  onUnapproveExpense,
+  onPatchExpense,
 }: {
   expenses: SummaryExpense[];
+  approverName: string;
   viewMode?: SummaryDataViewMode;
+  onApproveExpense: (expenseId: string) => void;
+  onUnapproveExpense: (expenseId: string) => void;
+  onPatchExpense: (expenseId: string, patch: SummaryRowPatch) => void;
 }) {
   if (viewMode === "card") {
-    return <SummaryExpenseCardsView expenses={expenses} />;
+    return (
+      <SummaryExpenseCardsView
+        expenses={expenses}
+        approverName={approverName}
+        onPatchExpense={onPatchExpense}
+      />
+    );
   }
 
   const total = expenses.reduce((sum, row) => sum + row.total, 0);
@@ -7838,25 +8185,25 @@ function SummaryExpensesTable({
                 borderBottom: row.approvedBy ? "1px solid #bbe6ca" : "1px solid #e0e1e9",
               }}
             >
-              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
-                {row.approvedBy ? (
-                  <span className="inline-flex items-center gap-[4px]">
-                    <Check size={12} color="#15803d" />
-                    <span className="text-[10px] break-words">{row.approvedBy}</span>
-                  </span>
-                ) : (
-                  <StyledCheckbox checked={false} onChange={() => {}} />
-                )}
+              <td className={`${EXPENSE_TABLE_CELL} tq-summary-approval-cell`} style={{ fontFamily: OS }}>
+                <SummaryApprovalToggleCell
+                  approved={!!row.approvedBy}
+                  approver={row.approvedBy}
+                  approveLabel="Approve expense"
+                  unapproveLabel="Unapprove expense"
+                  onApprove={() => onApproveExpense(row.id)}
+                  onUnapprove={() => onUnapproveExpense(row.id)}
+                />
               </td>
-              <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>
-                {row.secondApprovedBy ? (
-                  <span className="inline-flex items-center gap-[4px]">
-                    <Check size={12} color="#15803d" />
-                    <span className="text-[10px] break-words">{row.secondApprovedBy}</span>
-                  </span>
-                ) : (
-                  <StyledCheckbox checked={false} onChange={() => {}} />
-                )}
+              <td className={`${EXPENSE_TABLE_CELL} tq-summary-approval-cell`} style={{ fontFamily: OS }}>
+                <SummaryApprovalToggleCell
+                  approved={!!row.secondApprovedBy}
+                  approver={row.secondApprovedBy}
+                  approveLabel="Approve expense"
+                  unapproveLabel="Unapprove expense"
+                  onApprove={() => onApproveExpense(row.id)}
+                  onUnapprove={() => onUnapproveExpense(row.id)}
+                />
               </td>
               <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{statusMark(row.exported)}</td>
               <td className={EXPENSE_TABLE_CELL} style={{ fontFamily: OS }}>{row.date}</td>
@@ -7902,12 +8249,14 @@ function SummaryExpensesTable({
 
 function SummaryEntryTable({
   employee,
+  approverName,
   onUpdateEmployee,
   onUpdateEntry,
   onUpdateBreak,
   viewMode = "table",
 }: {
   employee: SummaryEmployee;
+  approverName: string;
   onUpdateEmployee: (patch: Partial<Pick<SummaryEmployee, "name" | "employeeNum">>) => void;
   onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
   onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
@@ -7926,7 +8275,14 @@ function SummaryEntryTable({
   totals.all = totals.reg + totals.ot + totals.dt;
 
   if (viewMode === "card") {
-    return <SummaryEntryCardsView employee={employee} />;
+    return (
+      <SummaryEntryCardsView
+        employee={employee}
+        approverName={approverName}
+        onPatchEntry={onUpdateEntry}
+        onPatchBreak={onUpdateBreak}
+      />
+    );
   }
 
   return (
@@ -8097,6 +8453,7 @@ function SummaryBreakViolationsTable({
 
 function EmployeeSummaryCard({
   employee,
+  approverName,
   canDeleteBreakViolations,
   onApproveViolation,
   onDeleteViolation,
@@ -8106,9 +8463,11 @@ function EmployeeSummaryCard({
   onUpdateEntry,
   onUpdateBreak,
   onUpdateViolation,
+  onUpdateExpense,
   viewMode = "table",
 }: {
   employee: SummaryEmployee;
+  approverName: string;
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
@@ -8118,6 +8477,7 @@ function EmployeeSummaryCard({
   onUpdateEntry: (entryId: string, patch: SummaryRowPatch) => void;
   onUpdateBreak: (breakId: string, patch: SummaryRowPatch) => void;
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
+  onUpdateExpense: (expenseId: string, patch: SummaryRowPatch) => void;
   viewMode?: SummaryDataViewMode;
 }) {
   const [attested, setAttested] = useState<Set<number>>(new Set());
@@ -8165,6 +8525,7 @@ function EmployeeSummaryCard({
       >
         <SummaryEntryTable
           employee={employee}
+          approverName={approverName}
           viewMode={viewMode}
           onUpdateEmployee={onUpdateEmployee}
           onUpdateEntry={onUpdateEntry}
@@ -8205,7 +8566,14 @@ function EmployeeSummaryCard({
           </span>
         )}
       >
-        <SummaryExpensesTable expenses={employee.expenses} viewMode={viewMode} />
+        <SummaryExpensesTable
+          expenses={employee.expenses}
+          approverName={approverName}
+          viewMode={viewMode}
+          onApproveExpense={(expenseId) => onUpdateExpense(expenseId, SUMMARY_ROW_APPROVE_PATCH)}
+          onUnapproveExpense={(expenseId) => onUpdateExpense(expenseId, SUMMARY_ROW_UNAPPROVE_PATCH)}
+          onPatchExpense={onUpdateExpense}
+        />
       </EmployeeSummarySection>
     </div>
   );
@@ -8264,6 +8632,21 @@ function TimesheetSummary() {
               ...emp,
               breaks: emp.breaks.map((br) =>
                 br.id === breakId ? { ...br, ...patch } : br,
+              ),
+            },
+      ),
+    );
+  };
+
+  const updateExpense = (empId: string, expenseId: string, patch: SummaryRowPatch) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id !== empId
+          ? emp
+          : {
+              ...emp,
+              expenses: emp.expenses.map((expense) =>
+                expense.id === expenseId ? { ...expense, ...patch } : expense,
               ),
             },
       ),
@@ -8461,6 +8844,7 @@ function TimesheetSummary() {
         <EmployeeSummaryCard
           key={emp.id}
           employee={emp}
+          approverName={viewerLabel}
           viewMode={viewMode}
           canDeleteBreakViolations={canDeleteBreakViolations}
           onApproveViolation={(violationId) => approveViolation(emp.id, violationId)}
@@ -8483,6 +8867,7 @@ function TimesheetSummary() {
           onUpdateEmployee={(patch) => updateEmployeeMeta(emp.id, patch)}
           onUpdateEntry={(entryId, patch) => updateEntry(emp.id, entryId, patch)}
           onUpdateBreak={(breakId, patch) => updateBreak(emp.id, breakId, patch)}
+          onUpdateExpense={(expenseId, patch) => updateExpense(emp.id, expenseId, patch)}
           onUpdateViolation={(violationId, patch) => updateViolation(emp.id, violationId, patch)}
         />
       ))}

@@ -135,3 +135,38 @@ input[type="search"]::-webkit-search-decoration {
 .focus\:border-\[\#006fb0\]:focus { border-color: #006fb0; }
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }
+
+/* Timesheet summary — approver checkbox + name in narrow columns */
+.tq-summary-approval-cell {
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.tq-summary-approval-cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tq-summary-approval-checkbox-wrap {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.tq-summary-approval-checkbox-wrap modus-wc-checkbox {
+  flex: none;
+  max-width: 100%;
+}
+
+.tq-summary-approval-name {
+  display: block;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.35;
+  word-break: break-word;
+}
