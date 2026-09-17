@@ -4089,6 +4089,64 @@ function useClockSession() {
     }, ...prev]);
   };
 
+  type SwitchJobResult = "ok" | "incomplete" | "not_in" | "no_site" | "locating" | "off_site";
+
+  // Ends the current punch and starts a fresh clock-in for the job details on the form.
+  const switchJobSession = (previousJobKey: string, allowOffSite = false): SwitchJobResult => {
+    if (clocked !== "in") return "not_in";
+    if (!crew || !dept || !job || !phase) return "incomplete";
+    const newSite = JOB_SITES[job] as JobSite | undefined;
+    if (!newSite) return "no_site";
+    if (locating) return "locating";
+
+    const newFix = simulateFix(newSite, offSiteSim);
+    const newDist = distanceMeters(newFix, newSite);
+    const newOnSite = newDist <= newSite.radiusMeters;
+    if (!newOnSite && !allowOffSite) return "off_site";
+
+    const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const sessionElapsed = elapsed;
+
+    const prevSite = JOB_SITES[previousJobKey] as JobSite | undefined;
+    const prevFix = prevSite ? simulateFix(prevSite, offSiteSim) : null;
+    const prevDist = prevSite && prevFix ? distanceMeters(prevFix, prevSite) : 0;
+    const prevOnSite = !!prevSite && prevDist <= prevSite.radiusMeters;
+
+    setShowBreakAlert(false);
+    setClockedInOffSite(!newOnSite);
+    setStartTime(new Date());
+    setElapsed(0);
+
+    setTimeline(prev => [
+      {
+        time: t,
+        label: "Clocked In",
+        sub: job,
+        color: newOnSite ? "#0063a3" : "#d97706",
+        location: newOnSite
+          ? `${newSite.name} · ${formatDistance(newDist)} from site center`
+          : `${formatDistance(newDist)} from ${newSite.name}`,
+        flagged: !newOnSite,
+      },
+      {
+        time: t,
+        label: "Clocked Out",
+        sub: `After ${fmt(sessionElapsed)} · Switched job`,
+        color: "#ab1f26",
+        location: prevSite && prevFix
+          ? (prevOnSite
+            ? `${prevSite.name} · ${formatDistance(prevDist)} from site center`
+            : `${formatDistance(prevDist)} from ${prevSite.name}`)
+          : undefined,
+        flagged: prevSite ? !prevOnSite : undefined,
+      },
+      ...prev,
+    ]);
+
+    setShowOffSiteModal(false);
+    return "ok";
+  };
+
   const handleMainBtn = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (clocked === "out") {
@@ -4173,7 +4231,7 @@ function useClockSession() {
     attested, attestDay,
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
-    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal, switchJobSession,
   };
 }
 
@@ -4966,14 +5024,89 @@ function ClockInOutPage() {
     showForm, setShowForm,
     locating, offSiteSim, setOffSiteSim, clockedInOffSite,
     site, fix, siteDistance, onSite,
-    missingDetails, detailsPrompt,
+    missingDetails, detailsPrompt, setDetailsPrompt,
     attested, attestDay,
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
-    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+    handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal, switchJobSession,
   } = session;
 
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+  const [switchJobEditing, setSwitchJobEditing] = useState(false);
+  const [switchJobInlineError, setSwitchJobInlineError] = useState(false);
+  const [switchJobAwaitingOffSite, setSwitchJobAwaitingOffSite] = useState(false);
+  const switchJobSnapshotRef = useRef({ crew: "", dept: "", job: "", phase: "" });
+
+  const jobFieldsLocked = clocked !== "out" && !switchJobEditing;
+
+  useEffect(() => {
+    if (clocked === "out") setSwitchJobEditing(false);
+  }, [clocked]);
+
+  const beginSwitchJob = () => {
+    switchJobSnapshotRef.current = { crew, dept, job, phase };
+    setSwitchJobInlineError(false);
+    setSwitchJobEditing(true);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
+  const cancelSwitchJob = () => {
+    const snap = switchJobSnapshotRef.current;
+    setCrew(snap.crew);
+    setDept(snap.dept);
+    setJob(snap.job);
+    setPhase(snap.phase);
+    setSwitchJobEditing(false);
+    setSwitchJobInlineError(false);
+    setDetailsPrompt(false);
+  };
+
+  const finishSwitchJobUi = () => {
+    setSwitchJobEditing(false);
+    setSwitchJobInlineError(false);
+    setDetailsPrompt(false);
+    setSwitchJobAwaitingOffSite(false);
+  };
+
+  const confirmSwitchJob = () => {
+    const snap = switchJobSnapshotRef.current;
+    if (!crew || !dept || !job || !phase) {
+      setSwitchJobInlineError(true);
+      return;
+    }
+    const result = switchJobSession(snap.job);
+    if (result === "incomplete") {
+      setSwitchJobInlineError(true);
+      return;
+    }
+    if (result === "locating") return;
+    if (result === "off_site") {
+      setSwitchJobAwaitingOffSite(true);
+      setShowOffSiteModal(true);
+      return;
+    }
+    if (result === "ok") finishSwitchJobUi();
+  };
+
+  const confirmOffSitePunch = () => {
+    if (switchJobAwaitingOffSite) {
+      const snap = switchJobSnapshotRef.current;
+      const result = switchJobSession(snap.job, true);
+      if (result === "ok") finishSwitchJobUi();
+      return;
+    }
+    doClockIn();
+  };
+
+  const dismissOffSiteModal = () => {
+    setShowOffSiteModal(false);
+    if (switchJobAwaitingOffSite) {
+      setSwitchJobAwaitingOffSite(false);
+      setSwitchJobEditing(true);
+    }
+  };
 
   // The form sits below the punch button, so pull it into view when we reject.
   const formRef = useRef<HTMLDivElement | null>(null);
@@ -4989,7 +5122,7 @@ function ClockInOutPage() {
   const totalOT  = mockTimesheetEntries.reduce((s, e) => s + e.ot, 0);
   const totalTravel = mockTimesheetEntries.reduce((s, e) => s + e.travel, 0);
 
-  const SelectField = ({ label, value, onChange, options, required, invalid }: {
+  const ClockJobSelectField = ({ label, value, onChange, options, required, invalid }: {
     label: string; value: string; onChange: (v: string) => void; options: string[];
     required?: boolean; invalid?: boolean;
   }) => (
@@ -5000,11 +5133,23 @@ function ClockInOutPage() {
       value={value}
       feedback={invalid ? { level: "error", message: "Required" } : undefined}
       options={[
-        { label: `Select ${label.toLowerCase()}`, value: "", disabled: true },
+        { label: `Select ${label.toLowerCase()}`, value: "", hidden: true },
         ...options.map(o => ({ label: o, value: o })),
       ]}
-      onInputChange={(e) => onChange(e.target.value)}
+      onInputChange={(e) => onChange(readInputString(e as CustomEvent))}
     />
+  );
+
+  const ReadOnlyJobField = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>{label}</p>
+      <p style={{
+        fontSize: 13, fontFamily: OS, ...OS_FVS, lineHeight: 1.4,
+        color: value ? "#252a2e" : "#cbced4",
+      }}>
+        {value || "—"}
+      </p>
+    </div>
   );
 
   const fmtHMS = (s: number) => {
@@ -5098,7 +5243,7 @@ function ClockInOutPage() {
       {/* Off-site clock-in confirmation */}
       {viewMode === "desktop" && showOffSiteModal && site && fix && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
-          onClick={() => setShowOffSiteModal(false)}>
+          onClick={dismissOffSiteModal}>
           <div className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-[32px]"
             style={{ width: 480, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-[12px] mb-[16px]">
@@ -5128,11 +5273,11 @@ function ClockInOutPage() {
 
             <div className="flex justify-end gap-[12px]">
               <ModusWcButton color="primary" variant="outlined" size="md"
-                onButtonClick={() => setShowOffSiteModal(false)}>
+                onButtonClick={dismissOffSiteModal}>
                 Cancel
               </ModusWcButton>
-              <ModusWcButton color="warning" variant="filled" size="md" onButtonClick={doClockIn}>
-                Clock In Anyway
+              <ModusWcButton color="warning" variant="filled" size="md" onButtonClick={confirmOffSitePunch}>
+                {switchJobAwaitingOffSite ? "Switch Job Anyway" : "Clock In Anyway"}
               </ModusWcButton>
             </div>
           </div>
@@ -5222,9 +5367,10 @@ function ClockInOutPage() {
       {viewMode === "mobile" && <MobileClockView session={session} />}
 
       {viewMode === "desktop" && (
-      <div className="flex" style={{ minHeight: 520, overflow: "hidden" }}>
+      <div className="flex" style={{ minHeight: 520, overflow: switchJobEditing ? "visible" : "hidden" }}>
         {/* ── Left panel: concentric circle clock ── */}
-        <div className="flex flex-col items-center justify-start flex-1 pt-[56px] pb-[48px] px-[32px]" style={{ minWidth: 0, overflow: "hidden" }}>
+        <div className="flex flex-col items-center justify-start flex-1 pt-[56px] pb-[48px] px-[32px]"
+          style={{ minWidth: 0, overflow: switchJobEditing ? "visible" : "hidden" }}>
           {/* Clock display */}
           <div className="w-full mb-[24px]" style={{ maxWidth: 420 }}>
             <ClockDisplay elapsed={elapsed} clocked={clocked} />
@@ -5294,7 +5440,7 @@ function ClockInOutPage() {
           {clocked === "in" && (
             <div className="flex items-center gap-[40px] mt-[32px]">
               <button type="button"
-                onClick={() => { setShowForm(v => !v); if (!showForm) { setClocked("out"); setStartTime(null); setElapsed(0); setBreakStart(null); setBreakElapsed(0); } }}
+                onClick={beginSwitchJob}
                 className="flex flex-col items-center gap-[6px]"
                 style={{ background: "transparent", border: "none", cursor: "pointer" }}>
                 <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
@@ -5327,12 +5473,29 @@ function ClockInOutPage() {
             </div>
           )}
 
-          {/* Collapsible job form */}
-          {(showForm || clocked === "out") && (
-            <div ref={formRef} className="mt-[28px] w-full bg-white rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden" style={{ maxWidth: 420 }}>
+          {/* Job form — always visible on desktop; core job fields lock while clocked in until Switch Job */}
+          <div ref={formRef}
+            className={`mt-[28px] w-full bg-white rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] ${switchJobEditing ? "clock-switch-job-editing overflow-visible" : "overflow-hidden"}`}
+            style={{ maxWidth: 420, position: "relative", zIndex: switchJobEditing ? 40 : undefined }}>
               <div className="p-[20px]">
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#0e416c", fontFamily: OS, ...OS_FVS, marginBottom: 14 }}>Job Details</p>
-              {detailsPrompt && (
+              <p style={{ fontSize: 13, fontWeight: 700, color: "#0e416c", fontFamily: OS, ...OS_FVS, marginBottom: 14 }}>
+                {switchJobEditing ? "Switch Job" : "Job Details"}
+              </p>
+              {switchJobEditing && (
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 14, lineHeight: 1.5 }}>
+                  Update crew, department, job, or phase, then confirm. Your current punch will end and a new clock-in session will start with the timer reset.
+                </p>
+              )}
+              {switchJobInlineError && switchJobEditing && (
+                <div className="mb-[14px]">
+                  <ModusWcAlert
+                    variant="error"
+                    alertTitle="Complete job details to switch"
+                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
+                  />
+                </div>
+              )}
+              {detailsPrompt && !jobFieldsLocked && !switchJobEditing && (
                 <div className="mb-[14px]">
                   <ModusWcAlert
                     variant="error"
@@ -5341,17 +5504,32 @@ function ClockInOutPage() {
                   />
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-[12px]">
-                <SelectField label="Crew" value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
-                  required invalid={detailsPrompt && !crew} />
-                <SelectField label="Department" value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
-                  required invalid={detailsPrompt && !dept} />
-                <div className="col-span-2">
-                  <SelectField label="Job" value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
-                    required invalid={detailsPrompt && !job} />
-                </div>
-                <SelectField label="Phase" value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
-                  required invalid={detailsPrompt && !phase} />
+              <div key={switchJobEditing ? "switch-job-fields" : "job-fields"} className="grid grid-cols-2 gap-[12px] relative" style={{ zIndex: 50 }}>
+                {jobFieldsLocked ? (
+                  <>
+                    <ReadOnlyJobField label="Crew" value={crew} />
+                    <ReadOnlyJobField label="Department" value={dept} />
+                    <div className="col-span-2">
+                      <ReadOnlyJobField label="Job" value={job} />
+                    </div>
+                    <div className="col-span-2">
+                      <ReadOnlyJobField label="Phase" value={phase} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ClockJobSelectField label="Crew" value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !crew} />
+                    <ClockJobSelectField label="Department" value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !dept} />
+                    <div className="col-span-2">
+                      <ClockJobSelectField label="Job" value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
+                        required invalid={(detailsPrompt || switchJobInlineError) && !job} />
+                    </div>
+                    <ClockJobSelectField label="Phase" value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !phase} />
+                  </>
+                )}
                 <ModusWcNumberInput
                   label="Travel"
                   size="sm"
@@ -5386,9 +5564,19 @@ function ClockInOutPage() {
                   />
                 </div>
               </div>
+              {switchJobEditing && (
+                <div className="flex justify-end gap-[12px] mt-[16px] pt-[16px]" style={{ borderTop: "1px solid #eef0f3" }}>
+                  <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={cancelSwitchJob}>
+                    Cancel
+                  </ModusWcButton>
+                  <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={confirmSwitchJob}>
+                    Confirm
+                  </ModusWcButton>
+                </div>
+              )}
               </div>
 
-              {/* Site — the geofence belongs to the selected job, so it lives here */}
+              {/* Site strip only when clocked out — hidden during inline switch so it does not cover open selects */}
               {clocked === "out" && (
                 <div className="px-[20px] py-[14px]" style={{
                   borderTop: "1px solid #eef0f3",
@@ -5457,10 +5645,15 @@ function ClockInOutPage() {
                 </div>
               )}
             </div>
-          )}
 
           {/* Timesheet table — inside left panel, below circle/form */}
-          <div className="w-full mt-[32px] rounded-[8px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
+          <div className="w-full mt-[32px] rounded-[8px] overflow-hidden"
+            style={{
+              border: "1px solid #e0e1e9",
+              pointerEvents: switchJobEditing ? "none" : undefined,
+              position: "relative",
+              zIndex: switchJobEditing ? 0 : undefined,
+            }}>
             <div className="px-[16px] py-[12px]" style={{ background: "#0e416c" }}>
               <p style={{ fontSize: 14, fontWeight: 700, color: "#ffffff", fontFamily: OS, ...OS_FVS }}>
                 Timesheet for Pay Period August 1 – August 7, 2026

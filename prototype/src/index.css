@@ -170,3 +170,13 @@ input[type="search"]::-webkit-search-decoration {
   line-height: 1.35;
   word-break: break-word;
 }
+
+/* Clock In — inline Switch Job: open select panels stack above the timesheet */
+.clock-switch-job-editing modus-wc-select {
+  position: relative;
+  z-index: 1;
+}
+
+.clock-switch-job-editing modus-wc-select:focus-within {
+  z-index: 100;
+}
