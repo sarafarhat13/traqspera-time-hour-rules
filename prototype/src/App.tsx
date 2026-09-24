@@ -3156,18 +3156,221 @@ function attestationCanSubmit(questions: AttestationQuestion[], answers: Attesta
   });
 }
 
-function AttestationModal({ day, onClose, onSubmit }: {
+type AttestationAuditEntry = {
+  id: string;
+  submissionId: string;
+  question: string;
+  answer: string;
+  comment: string;
+  submittedBy: string;
+  submittedAt: string;
+};
+
+function buildAttestationAuditEntries(
+  questions: AttestationQuestion[],
+  answers: AttestationAnswerState,
+  submittedBy: string,
+): AttestationAuditEntry[] {
+  const submissionId = `sub-${Date.now()}`;
+  const submittedAt = new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  return questions.map((q) => {
+    const entry = answers[q.id] ?? { answer: null, comment: "" };
+    const answerLabel =
+      entry.answer === "yes" ? "Yes" : entry.answer === "no" ? "No" : "—";
+    return {
+      id: `${submissionId}-${q.id}`,
+      submissionId,
+      question: q.question,
+      answer: answerLabel,
+      comment: entry.comment.trim() || "—",
+      submittedBy,
+      submittedAt,
+    };
+  });
+}
+
+function mockAttestationAuditSubmission(
+  submissionId: string,
+  submittedAt: string,
+  submittedBy: string,
+  responses: { questionId: string; answer: "Yes" | "No"; comment?: string }[],
+  questions: AttestationQuestion[],
+): AttestationAuditEntry[] {
+  return responses.map(({ questionId, answer, comment }) => {
+    const q = questions.find((item) => item.id === questionId);
+    return {
+      id: `${submissionId}-${questionId}`,
+      submissionId,
+      question: q?.question ?? questionId,
+      answer,
+      comment: comment?.trim() || "—",
+      submittedBy,
+      submittedAt,
+    };
+  });
+}
+
+type SummaryAttestationSeed = {
+  attestedDates: number[];
+  auditByDate: Record<number, AttestationAuditEntry[]>;
+};
+
+function seedSummaryEmployeeAttestation(employeeId: string): SummaryAttestationSeed {
+  const questions = defaultAttestationQuestions();
+
+  const fullSubmission = (
+    submissionId: string,
+    submittedAt: string,
+    submittedBy: string,
+    answers: { questionId: string; answer: "Yes" | "No"; comment?: string }[],
+  ) => mockAttestationAuditSubmission(submissionId, submittedAt, submittedBy, answers, questions);
+
+  if (employeeId === "emp-adam") {
+    return {
+      attestedDates: [15],
+      auditByDate: {
+        15: fullSubmission("seed-adam-15", "Sat, Aug 15, 2026, 4:18 PM", "Adam Hazey", [
+          { questionId: "aq_breaks", answer: "Yes" },
+          { questionId: "aq_injury", answer: "No" },
+          { questionId: "aq_missed_meal", answer: "Yes" },
+        ]),
+      },
+    };
+  }
+
+  if (employeeId === "emp-connor") {
+    const day17First = fullSubmission("seed-connor-17-a", "Mon, Aug 17, 2026, 3:05 PM", "Connor McDavid", [
+      { questionId: "aq_breaks", answer: "No", comment: "Missed afternoon break — worked through deadline." },
+      { questionId: "aq_injury", answer: "No" },
+      { questionId: "aq_missed_meal", answer: "Yes" },
+    ]);
+    const day17Correction = fullSubmission("seed-connor-17-b", "Mon, Aug 17, 2026, 5:42 PM", "Luc Peron", [
+      { questionId: "aq_breaks", answer: "Yes", comment: "Supervisor correction: 30 min break taken 12:30–1:00 PM." },
+      { questionId: "aq_injury", answer: "No" },
+      { questionId: "aq_missed_meal", answer: "Yes" },
+    ]);
+    return {
+      attestedDates: [15, 17],
+      auditByDate: {
+        15: fullSubmission("seed-connor-15", "Sat, Aug 15, 2026, 6:12 PM", "Connor McDavid", [
+          { questionId: "aq_breaks", answer: "Yes" },
+          { questionId: "aq_injury", answer: "No" },
+          { questionId: "aq_missed_meal", answer: "No", comment: "Meal taken late after 6 PM due to outage work." },
+        ]),
+        17: [...day17Correction, ...day17First],
+      },
+    };
+  }
+
+  return { attestedDates: [], auditByDate: {} };
+}
+
+function attestationAnswersToPreviewRows(
+  questions: AttestationQuestion[],
+  answers: AttestationAnswerState,
+  submittedBy: string,
+): AttestationAuditEntry[] {
+  return questions.map((q) => {
+    const entry = answers[q.id] ?? { answer: null, comment: "" };
+    const answerLabel =
+      entry.answer === "yes" ? "Yes" : entry.answer === "no" ? "No" : "—";
+    return {
+      id: `preview-${q.id}`,
+      submissionId: "preview",
+      question: q.question,
+      answer: answerLabel,
+      comment: entry.comment.trim() || "—",
+      submittedBy,
+      submittedAt: "In progress",
+    };
+  });
+}
+
+function AttestationAuditTrailTable({ rows }: { rows: AttestationAuditEntry[] }) {
+  if (rows.length === 0) {
+    return (
+      <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS, textAlign: "center", padding: "24px 0" }}>
+        No attestation answers recorded yet for this date.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-[6px] overflow-hidden border border-[#e0e1e9]">
+      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+        <thead>
+          <tr style={{ background: "#f1f1f6", borderBottom: "1px solid #e0e1e9" }}>
+            {["Question", "Answer", "Comments", "Submitted by", "Submitted at"].map((h) => (
+              <th
+                key={h}
+                className="px-[10px] py-[8px] text-left text-[11px] font-semibold text-[#464b52]"
+                style={{ fontFamily: OS, ...OS_FVS }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr
+              key={row.id}
+              style={{
+                background: row.submissionId === "preview" ? "#fffbf0" : idx % 2 === 0 ? "#ffffff" : "#fafafa",
+                borderBottom: "1px solid #e0e1e9",
+              }}
+            >
+              <td className="px-[10px] py-[8px] text-[11px] text-[#252a2e] align-top break-words" style={{ fontFamily: OS }}>
+                {row.question}
+              </td>
+              <td className="px-[10px] py-[8px] text-[11px] font-semibold text-[#252a2e] align-top whitespace-nowrap" style={{ fontFamily: OS }}>
+                {row.answer}
+              </td>
+              <td className="px-[10px] py-[8px] text-[11px] text-[#464b52] align-top break-words" style={{ fontFamily: OS }}>
+                {row.comment}
+              </td>
+              <td className="px-[10px] py-[8px] text-[11px] text-[#464b52] align-top whitespace-nowrap" style={{ fontFamily: OS }}>
+                {row.submittedBy}
+              </td>
+              <td className="px-[10px] py-[8px] text-[11px] text-[#6a6e79] align-top whitespace-nowrap" style={{ fontFamily: OS }}>
+                {row.submittedAt}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const ATTESTATION_MODAL_TABS = [
+  { label: "Attestation Form", icon: "clipboard" },
+  { label: "Audit Trail", icon: "history" },
+] as const;
+
+function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, auditEntries = [], submittedBy = "Employee" }: {
   day: { label: string; date: number };
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (entries?: AttestationAuditEntry[]) => void;
+  showAuditTrail?: boolean;
+  auditEntries?: AttestationAuditEntry[];
+  submittedBy?: string;
 }) {
   const { questions } = useAttestationConfig();
   const [answers, setAnswers] = useState<AttestationAnswerState>(() =>
     Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
   );
+  const [modalTabIndex, setModalTabIndex] = useState(0);
 
   const dateStr = `Tue 2026/07/${day.date}`;
   const canSubmit = attestationCanSubmit(questions, answers);
+  const hasInProgressAnswers = questions.some((q) => answers[q.id]?.answer);
+  const previewRows = showAuditTrail
+    ? attestationAnswersToPreviewRows(questions, answers, submittedBy)
+    : [];
+  const auditTableRows = showAuditTrail
+    ? [...(hasInProgressAnswers ? previewRows : []), ...auditEntries]
+    : [];
 
   const setAnswer = (id: string, answer: AttestationAnswer) => {
     setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], answer } }));
@@ -3189,11 +3392,86 @@ function AttestationModal({ day, onClose, onSubmit }: {
     </button>
   );
 
+  const formBody = (
+    <>
+      <ModusWcSelect
+        aria-label="Attestation date"
+        value={dateStr}
+        options={[{ label: dateStr, value: dateStr }]}
+      />
+
+      <div>
+        <div className="flex items-center gap-[8px] mb-[10px]">
+          <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full" style={{ background: "#0063a3" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff", fontFamily: OS }}>i</span>
+          </div>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1 }}>Summary</p>
+          <div className="flex h-[24px] w-[24px] items-center justify-center rounded-full" style={{ background: "#6a6e79" }}>
+            <ChevronDown size={13} style={{ color: "#ffffff" }} />
+          </div>
+        </div>
+        <div className="rounded-[6px] px-[16px] py-[14px]" style={{ background: "#dcedf9" }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>TOTAL</p>
+          <div className="flex items-center">
+            {[["REG","0.04"],["OT","0.00"],["DT","0.00"],["TVL","11.00"],["QUA","2.00"],["PD","0.00"]].map(([k, v], i) => (
+              <div key={k} className="flex-1 flex flex-col items-center" style={{ borderLeft: i > 0 ? "1px solid #a8c8e8" : undefined }}>
+                <p style={{ fontSize: 10, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 2 }}>{k}</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{v}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {questions.map((q) => {
+        const entry = answers[q.id] ?? { answer: null, comment: "" };
+        const commentNeeded = attestationCommentRequired(q, entry.answer);
+        return (
+          <div key={q.id}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
+              {q.question} <span style={{ color: "#ab1f26" }}>*</span>
+            </p>
+            <div className="flex flex-col rounded-[6px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
+              <RadioRow label="Yes" selected={entry.answer === "yes"} onSelect={() => setAnswer(q.id, "yes")} />
+              <div style={{ height: 1, background: "#e0e1e9" }} />
+              <RadioRow label="No" selected={entry.answer === "no"} onSelect={() => setAnswer(q.id, "no")} />
+            </div>
+            <div className="mt-[10px]">
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
+                Additional Comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
+              </p>
+              <ModusWcTextInput
+                aria-label={`Additional comments for: ${q.question}`}
+                value={entry.comment}
+                required={commentNeeded}
+                feedback={commentNeeded && !entry.comment.trim() ? { level: "error", message: "A comment is required." } : undefined}
+                onInputChange={(e) => setComment(q.id, readInputString(e))}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    const entries = showAuditTrail
+      ? buildAttestationAuditEntries(questions, answers, submittedBy)
+      : undefined;
+    onSubmit(entries);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 200, background: "rgba(0,0,0,0.45)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-white rounded-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.18)] flex flex-col"
-        style={{ width: 520, maxHeight: "90vh", overflow: "hidden" }}>
+        style={
+          showAuditTrail
+            ? { width: 720, height: "min(720px, 90vh)", maxHeight: "90vh", overflow: "hidden" }
+            : { width: 520, maxHeight: "90vh", overflow: "hidden" }
+        }>
         {/* Header */}
         <div className="flex items-center justify-between px-[24px] py-[20px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
           <p style={{ fontSize: 24, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Hello Adam!</p>
@@ -3204,64 +3482,43 @@ function AttestationModal({ day, onClose, onSubmit }: {
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-[24px] py-[20px] flex flex-col gap-[20px]">
-          <ModusWcSelect
-            aria-label="Attestation date"
-            value={dateStr}
-            options={[{ label: dateStr, value: dateStr }]}
-          />
-
-          <div>
-            <div className="flex items-center gap-[8px] mb-[10px]">
-              <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full" style={{ background: "#0063a3" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff", fontFamily: OS }}>i</span>
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, flex: 1 }}>Summary</p>
-              <div className="flex h-[24px] w-[24px] items-center justify-center rounded-full" style={{ background: "#6a6e79" }}>
-                <ChevronDown size={13} style={{ color: "#ffffff" }} />
-              </div>
-            </div>
-            <div className="rounded-[6px] px-[16px] py-[14px]" style={{ background: "#dcedf9" }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>TOTAL</p>
-              <div className="flex items-center">
-                {[["REG","0.04"],["OT","0.00"],["DT","0.00"],["TVL","11.00"],["QUA","2.00"],["PD","0.00"]].map(([k, v], i) => (
-                  <div key={k} className="flex-1 flex flex-col items-center" style={{ borderLeft: i > 0 ? "1px solid #a8c8e8" : undefined }}>
-                    <p style={{ fontSize: 10, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 2 }}>{k}</p>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{v}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {showAuditTrail && (
+          <div className="px-[24px] pt-[16px] shrink-0">
+            <ModusWcTabs
+              aria-label="Attestation modal sections"
+              size="md"
+              tabStyle="boxed"
+              activeTabIndex={modalTabIndex}
+              tabs={[...ATTESTATION_MODAL_TABS]}
+              onTabChange={(e) => setModalTabIndex(e.detail.newTab)}
+            />
           </div>
+        )}
 
-          {questions.map((q) => {
-            const entry = answers[q.id] ?? { answer: null, comment: "" };
-            const commentNeeded = attestationCommentRequired(q, entry.answer);
-            return (
-              <div key={q.id}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
-                  {q.question} <span style={{ color: "#ab1f26" }}>*</span>
-                </p>
-                <div className="flex flex-col rounded-[6px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
-                  <RadioRow label="Yes" selected={entry.answer === "yes"} onSelect={() => setAnswer(q.id, "yes")} />
-                  <div style={{ height: 1, background: "#e0e1e9" }} />
-                  <RadioRow label="No" selected={entry.answer === "no"} onSelect={() => setAnswer(q.id, "no")} />
-                </div>
-                <div className="mt-[10px]">
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
-                    Additional Comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
-                  </p>
-                  <ModusWcTextInput
-                    aria-label={`Additional comments for: ${q.question}`}
-                    value={entry.comment}
-                    required={commentNeeded}
-                    feedback={commentNeeded && !entry.comment.trim() ? { level: "error", message: "A comment is required." } : undefined}
-                    onInputChange={(e) => setComment(q.id, e.target.value)}
-                  />
-                </div>
+        <div className="overflow-y-auto flex-1 px-[24px] py-[20px] min-h-0">
+          {showAuditTrail ? (
+            <>
+              <div
+                className="flex flex-col gap-[20px]"
+                hidden={modalTabIndex !== 0}
+                aria-hidden={modalTabIndex !== 0}
+              >
+                {formBody}
               </div>
-            );
-          })}
+              <div
+                className="flex flex-col gap-[12px]"
+                hidden={modalTabIndex !== 1}
+                aria-hidden={modalTabIndex !== 1}
+              >
+                <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                  All attestation question responses for {dateStr}, including in-progress answers and prior submissions.
+                </p>
+                <AttestationAuditTrailTable rows={auditTableRows} />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-[20px]">{formBody}</div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-[10px] px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
@@ -3271,7 +3528,7 @@ function AttestationModal({ day, onClose, onSubmit }: {
             Cancel
           </button>
           <button type="button"
-            onClick={() => { if (canSubmit) { onSubmit(); onClose(); } }}
+            onClick={handleSubmit}
             disabled={!canSubmit}
             className="px-[20px] py-[9px] rounded-[6px] font-semibold transition-colors"
             style={{
@@ -3292,10 +3549,20 @@ function AttestationModal({ day, onClose, onSubmit }: {
 }
 
 // ─── Attestation Panel ────────────────────────────────────────────────────────
-function AttestationPanel({ days, attested, onAttest }: {
+function AttestationPanel({
+  days,
+  attested,
+  onAttest,
+  showAuditTrail = false,
+  auditByDate = {},
+  submittedBy = "Employee",
+}: {
   days: { label: string; date: number }[];
   attested: Set<number>;
-  onAttest: (date: number) => void;
+  onAttest: (date: number, auditEntries?: AttestationAuditEntry[]) => void;
+  showAuditTrail?: boolean;
+  auditByDate?: Record<number, AttestationAuditEntry[]>;
+  submittedBy?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeDay, setActiveDay] = useState<{ label: string; date: number } | null>(null);
@@ -3354,9 +3621,12 @@ function AttestationPanel({ days, attested, onAttest }: {
       {activeDay && (
         <AttestationModal
           day={activeDay}
+          showAuditTrail={showAuditTrail}
+          auditEntries={auditByDate[activeDay.date] ?? []}
+          submittedBy={submittedBy}
           onClose={() => setActiveDay(null)}
-          onSubmit={() => {
-            onAttest(activeDay.date);
+          onSubmit={(entries) => {
+            onAttest(activeDay.date, entries);
             setActiveDay(null);
           }}
         />
@@ -8673,7 +8943,11 @@ function EmployeeSummaryCard({
   onUpdateExpense: (expenseId: string, patch: SummaryRowPatch) => void;
   viewMode?: SummaryDataViewMode;
 }) {
-  const [attested, setAttested] = useState<Set<number>>(new Set());
+  const attestationSeed = seedSummaryEmployeeAttestation(employee.id);
+  const [attested, setAttested] = useState<Set<number>>(() => new Set(attestationSeed.attestedDates));
+  const [auditByDate, setAuditByDate] = useState<Record<number, AttestationAuditEntry[]>>(
+    () => attestationSeed.auditByDate,
+  );
   const entryRegTotal = employee.entries.reduce((sum, entry) => sum + entry.reg, 0);
   const expenseTotal = employee.expenses.reduce((sum, row) => sum + row.total, 0);
   const violationCount = buildBreakViolationRows(employee).length;
@@ -8700,7 +8974,18 @@ function EmployeeSummaryCard({
       <AttestationPanel
         days={employee.attestationDays}
         attested={attested}
-        onAttest={(date) => setAttested((prev) => new Set([...prev, date]))}
+        showAuditTrail
+        auditByDate={auditByDate}
+        submittedBy={approverName}
+        onAttest={(date, entries) => {
+          setAttested((prev) => new Set([...prev, date]));
+          if (entries?.length) {
+            setAuditByDate((prev) => ({
+              ...prev,
+              [date]: [...(prev[date] ?? []), ...entries],
+            }));
+          }
+        }}
       />
       <EmployeeSummarySection
         title="Timesheet Entries"
