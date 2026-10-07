@@ -136,6 +136,19 @@ input[type="search"]::-webkit-search-decoration {
 .hover\:border-\[\#b8d9f0\]:hover { border-color: #b8d9f0; }
 .hover\:border-\[\#f0d080\]:hover { border-color: #f0d080; }
 
+/* Timesheet summary — cell hover (distinct from zebra #fafafa and totals/header #f1f1f6) */
+.tq-summary-data-table {
+  --tq-summary-cell-hover: var(--modus-wc-color-base-200, #e0e1e9);
+}
+
+.tq-summary-data-table tbody tr:not(.tq-summary-totals-row) td {
+  transition: background-color 0.12s ease;
+}
+
+.tq-summary-data-table tbody tr:not(.tq-summary-totals-row):hover td {
+  background-color: var(--tq-summary-cell-hover);
+}
+
 /* Timesheet summary — approver checkbox + name in narrow columns */
 .tq-summary-approval-cell {
   overflow: hidden;

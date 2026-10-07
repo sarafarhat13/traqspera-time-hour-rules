@@ -3166,13 +3166,30 @@ type AttestationAuditEntry = {
   submittedAt: string;
 };
 
+/** Compact timestamp for audit table cells (avoids weekday + clipping in fixed layout). */
+function formatAttestationAuditSubmittedAt(label: string): string {
+  if (label === "In progress") return label;
+  const withoutWeekday = label.replace(/^[A-Za-z]{3},\s+/, "");
+  return withoutWeekday.replace(/,\s*(\d{1,2}:\d{2}\s*[AP]M)$/i, " · $1");
+}
+
+function attestationAuditSubmittedAtNow(): string {
+  return new Date().toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).replace(/,\s*(\d{1,2}:\d{2}\s*[AP]M)$/i, " · $1");
+}
+
 function buildAttestationAuditEntries(
   questions: AttestationQuestion[],
   answers: AttestationAnswerState,
   submittedBy: string,
 ): AttestationAuditEntry[] {
   const submissionId = `sub-${Date.now()}`;
-  const submittedAt = new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  const submittedAt = attestationAuditSubmittedAtNow();
   return questions.map((q) => {
     const entry = answers[q.id] ?? { answer: null, comment: "" };
     const answerLabel =
@@ -3229,7 +3246,7 @@ function seedSummaryEmployeeAttestation(employeeId: string): SummaryAttestationS
     return {
       attestedDates: [15],
       auditByDate: {
-        15: fullSubmission("seed-adam-15", "Sat, Aug 15, 2026, 4:18 PM", "Adam Hazey", [
+        15: fullSubmission("seed-adam-15", "Aug 15, 2026 · 4:18 PM", "Adam Hazey", [
           { questionId: "aq_breaks", answer: "Yes" },
           { questionId: "aq_injury", answer: "No" },
           { questionId: "aq_missed_meal", answer: "Yes" },
@@ -3239,12 +3256,12 @@ function seedSummaryEmployeeAttestation(employeeId: string): SummaryAttestationS
   }
 
   if (employeeId === "emp-connor") {
-    const day17First = fullSubmission("seed-connor-17-a", "Mon, Aug 17, 2026, 3:05 PM", "Connor McDavid", [
+    const day17First = fullSubmission("seed-connor-17-a", "Aug 17, 2026 · 3:05 PM", "Connor McDavid", [
       { questionId: "aq_breaks", answer: "No", comment: "Missed afternoon break — worked through deadline." },
       { questionId: "aq_injury", answer: "No" },
       { questionId: "aq_missed_meal", answer: "Yes" },
     ]);
-    const day17Correction = fullSubmission("seed-connor-17-b", "Mon, Aug 17, 2026, 5:42 PM", "Luc Peron", [
+    const day17Correction = fullSubmission("seed-connor-17-b", "Aug 17, 2026 · 5:42 PM", "Luc Peron", [
       { questionId: "aq_breaks", answer: "Yes", comment: "Supervisor correction: 30 min break taken 12:30–1:00 PM." },
       { questionId: "aq_injury", answer: "No" },
       { questionId: "aq_missed_meal", answer: "Yes" },
@@ -3252,7 +3269,7 @@ function seedSummaryEmployeeAttestation(employeeId: string): SummaryAttestationS
     return {
       attestedDates: [15, 17],
       auditByDate: {
-        15: fullSubmission("seed-connor-15", "Sat, Aug 15, 2026, 6:12 PM", "Connor McDavid", [
+        15: fullSubmission("seed-connor-15", "Aug 15, 2026 · 6:12 PM", "Connor McDavid", [
           { questionId: "aq_breaks", answer: "Yes" },
           { questionId: "aq_injury", answer: "No" },
           { questionId: "aq_missed_meal", answer: "No", comment: "Meal taken late after 6 PM due to outage work." },
@@ -3295,18 +3312,31 @@ function AttestationAuditTrailTable({ rows }: { rows: AttestationAuditEntry[] })
     );
   }
 
+  const headers: { label: string; width: string }[] = [
+    { label: "Question", width: "26%" },
+    { label: "Answer", width: "9%" },
+    { label: "Comments", width: "28%" },
+    { label: "Submitted by", width: "17%" },
+    { label: "Submitted at", width: "20%" },
+  ];
+
   return (
-    <div className="rounded-[6px] overflow-hidden border border-[#e0e1e9]">
-      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+    <div className="rounded-[6px] border border-[#e0e1e9] overflow-x-auto">
+      <table className="w-full min-w-[640px] border-collapse" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          {headers.map((h) => (
+            <col key={h.label} style={{ width: h.width }} />
+          ))}
+        </colgroup>
         <thead>
           <tr style={{ background: "#f1f1f6", borderBottom: "1px solid #e0e1e9" }}>
-            {["Question", "Answer", "Comments", "Submitted by", "Submitted at"].map((h) => (
+            {headers.map((h) => (
               <th
-                key={h}
+                key={h.label}
                 className="px-[10px] py-[8px] text-left text-[11px] font-semibold text-[#464b52]"
                 style={{ fontFamily: OS, ...OS_FVS }}
               >
-                {h}
+                {h.label}
               </th>
             ))}
           </tr>
@@ -3329,11 +3359,14 @@ function AttestationAuditTrailTable({ rows }: { rows: AttestationAuditEntry[] })
               <td className="px-[10px] py-[8px] text-[11px] text-[#464b52] align-top break-words" style={{ fontFamily: OS }}>
                 {row.comment}
               </td>
-              <td className="px-[10px] py-[8px] text-[11px] text-[#464b52] align-top whitespace-nowrap" style={{ fontFamily: OS }}>
+              <td className="px-[10px] py-[8px] text-[11px] text-[#464b52] align-top break-words" style={{ fontFamily: OS }}>
                 {row.submittedBy}
               </td>
-              <td className="px-[10px] py-[8px] text-[11px] text-[#6a6e79] align-top whitespace-nowrap" style={{ fontFamily: OS }}>
-                {row.submittedAt}
+              <td
+                className="px-[10px] py-[8px] text-[11px] text-[#6a6e79] align-top break-words leading-snug tabular-nums"
+                style={{ fontFamily: OS, wordBreak: "break-word" }}
+              >
+                {formatAttestationAuditSubmittedAt(row.submittedAt)}
               </td>
             </tr>
           ))}
@@ -6786,10 +6819,19 @@ function ViolationRemoveModal({
   );
 }
 
+function parseSummaryPayRate(payRate: string): number {
+  const n = parseFloat(payRate.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function summaryViolationAmount(v: Pick<SummaryViolation, "payRate" | "reg">): number {
+  return parseSummaryPayRate(v.payRate) * (v.reg || 0);
+}
+
 const SUMMARY_TABLE_COLS = [
   "Approved By", "Second Approved By", "Complete", "Exported",
   "Name", "Employee #", "Date", "Start", "End", "Department", "Job", "Phase", "State", "WO#",
-  "Pay Rate", "Reg", "OT", "DT", "Travel", "Quantity", "Per Diem", "Per Diem Rate", "Union Code", "Wage Code", "Rate Level", "Comment",
+  "OT", "DT", "Travel", "Quantity", "Per Diem", "Per Diem Rate", "Union Code", "Wage Code", "Rate Level", "Comment",
 ] as const;
 
 const SUMMARY_TABLE_ICON_COL_WIDTH = "2%";
@@ -6825,8 +6867,6 @@ const SUMMARY_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Phase", title: "Phase" },
   { label: "St", title: "State" },
   { label: "WO#", title: "WO#" },
-  { label: "Pay Rt", title: "Pay Rate" },
-  { label: "Reg", title: "Reg" },
   { label: "OT", title: "OT" },
   { label: "DT", title: "DT" },
   { label: "Trvl", title: "Travel" },
@@ -6852,8 +6892,7 @@ const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Job", title: "Job" },
   { label: "Phase", title: "Phase" },
   { label: "St", title: "State" },
-  { label: "Pay Rt", title: "Pay Rate" },
-  { label: "Reg", title: "Reg" },
+  { label: "Amount", title: "Amount" },
   { label: "Union", title: "Union Code" },
   { label: "Wage", title: "Wage Code" },
   { label: "Rate", title: "Rate Level" },
@@ -6867,8 +6906,7 @@ const BREAK_VIOLATION_TABLE_COL_WIDTH_OVERRIDES: Record<string, number> = {
   Exported: 3.5,
   "Type of Violation": 8,
   State: 3,
-  "Pay Rate": 4.5,
-  Reg: 3.5,
+  Amount: 5,
   Job: 10,
   Phase: 8.5,
   Comment: 7,
@@ -7491,25 +7529,13 @@ function SummaryEditableDataCells({
           onSave={(v) => onPatch({ wo: v })}
         />
       )}
-      <SummaryClickEditTextCell
-        cellId={cell("payRate")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.payRate}
-        ariaLabel="Pay rate"
-        editable={editable}
-        onSave={(v) => onPatch({ payRate: v })}
-      />
-      <SummaryClickEditNumberCell
-        cellId={cell("reg")}
-        activeCellId={activeCellId}
-        setActiveCellId={setActiveCellId}
-        value={data.reg ?? 0}
-        ariaLabel="Regular hours"
-        editable={hoursEditable}
-        display={hoursMode === "dash" ? dash : hourCell(data.reg ?? 0, hourAlert, deleted)}
-        onSave={(v) => onPatch({ reg: v })}
-      />
+      {breakViolationColumns ? (
+        <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }}>
+          <span style={{ color: deleted ? "#6a6e79" : "#252a2e", textDecoration: deleted ? "line-through" : "none" }}>
+            ${summaryViolationAmount({ payRate: data.payRate, reg: data.reg ?? 0 }).toFixed(2)}
+          </span>
+        </td>
+      ) : null}
       {!breakViolationColumns && (
         <>
           <SummaryClickEditNumberCell
@@ -7765,7 +7791,7 @@ function SummaryBreakDataCells({
         className="text-center"
         onSave={(v) => onPatch({ end: v })}
       />
-      <BreakLineSegment rowBackground={rowBackground} colSpan={6} label="Break" />
+      <BreakLineSegment rowBackground={rowBackground} colSpan={5} label="Break" />
       <td className={`${BREAK_ROW_CELL} text-center`} style={{ fontFamily: OS, border: "none" }}>
         {data.duration > 0 ? (
           <span style={{ color: "#d97706", fontWeight: 600 }}>
@@ -7773,7 +7799,7 @@ function SummaryBreakDataCells({
           </span>
         ) : null}
       </td>
-      <BreakLineSegment rowBackground={rowBackground} colSpan={10} />
+      <BreakLineSegment rowBackground={rowBackground} colSpan={9} />
     </>
   );
 }
@@ -8006,13 +8032,7 @@ function SummaryEntryCard({
         <TimesheetMobileKvRow label="Phase" value={fmtTsText(entry.phase)} />
         <TimesheetMobileKvRow label="State" value={fmtTsText(entry.state)} />
         <TimesheetMobileKvRow label="WO#" value={fmtTsText(entry.wo)} />
-        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(entry.payRate)} />
         <div className="grid grid-cols-2 gap-x-[16px] mt-[4px] pt-[8px]" style={{ borderTop: "1px dashed #e0e1e9" }}>
-          <TimesheetMobileKvRow
-            label="Reg"
-            value={fmtTsHours(entry.reg)}
-            valueColor={entry.hourAlert && entry.reg > 0 ? "#ab1f26" : undefined}
-          />
           <TimesheetMobileKvRow
             label="OT"
             value={fmtTsHours(entry.ot)}
@@ -8077,7 +8097,6 @@ function SummaryBreakCard({
         <TimesheetMobileKvRow label="Job" value={fmtTsText(breakRow.job)} />
         <TimesheetMobileKvRow label="State" value={fmtTsText(breakRow.state)} />
         <TimesheetMobileKvRow label="WO#" value={fmtTsText(breakRow.wo)} />
-        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(breakRow.payRate)} />
         <TimesheetMobileKvRow label="Union" value={fmtTsText(breakRow.unionCode)} />
         <TimesheetMobileKvRow label="Wage" value={fmtTsText(breakRow.wageCode)} />
         <TimesheetMobileKvRow label="Rate Level" value={fmtTsText(breakRow.rateLevel)} />
@@ -8157,7 +8176,6 @@ function SummaryEntryCardsView({
         <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
         <div className="grid grid-cols-2 gap-x-[16px]">
           <TimesheetMobileKvRow label="All hours" value={totals.all.toFixed(2)} />
-          <TimesheetMobileKvRow label="Reg" value={totals.reg.toFixed(2)} />
           <TimesheetMobileKvRow label="OT" value={totals.ot.toFixed(2)} />
           <TimesheetMobileKvRow label="DT" value={totals.dt.toFixed(2)} />
           <TimesheetMobileKvRow label="Travel" value={totals.travel.toFixed(2)} />
@@ -8223,8 +8241,11 @@ function SummaryViolationCard({
         <TimesheetMobileKvRow label="Job" value={fmtTsText(v.job)} />
         <TimesheetMobileKvRow label="Phase" value={fmtTsText(v.phase)} />
         <TimesheetMobileKvRow label="State" value={fmtTsText(v.state)} />
-        <TimesheetMobileKvRow label="Pay Rate" value={fmtTsText(v.payRate)} />
-        <TimesheetMobileKvRow label="Reg" value={fmtTsHours(v.reg)} valueColor={v.reg > 0 ? "#ab1f26" : undefined} />
+        <TimesheetMobileKvRow
+          label="Amount"
+          value={`$${summaryViolationAmount(v).toFixed(2)}`}
+          valueColor={summaryViolationAmount(v) > 0 ? "#0e416c" : undefined}
+        />
         <TimesheetMobileKvRow label="Union" value={fmtTsText(v.unionCode)} />
         <TimesheetMobileKvRow label="Wage" value={fmtTsText(v.wageCode)} />
         <TimesheetMobileKvRow label="Rate Level" value={fmtTsText(v.rateLevel)} />
@@ -8278,12 +8299,7 @@ function SummaryViolationCardsView({
 }) {
   const violationRows = buildBreakViolationRows(employee);
   const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totals = {
-    reg: activeViolations.reduce((s, v) => s + v.reg, 0),
-    ot: activeViolations.reduce((s, v) => s + v.ot, 0),
-    all: 0,
-  };
-  totals.all = totals.reg + totals.ot;
+  const totalAmount = activeViolations.reduce((s, v) => s + summaryViolationAmount(v), 0);
 
   if (violationRows.length === 0) {
     return (
@@ -8311,11 +8327,7 @@ function SummaryViolationCardsView({
         style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
       >
         <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
-        <div className="grid grid-cols-2 gap-x-[16px]">
-          <TimesheetMobileKvRow label="All hours" value={totals.all.toFixed(2)} />
-          <TimesheetMobileKvRow label="Reg" value={totals.reg.toFixed(2)} />
-          <TimesheetMobileKvRow label="OT" value={totals.ot.toFixed(2)} />
-        </div>
+        <TimesheetMobileKvRow label="Amount" value={`$${totalAmount.toFixed(2)}`} valueColor="#0e416c" />
       </div>
     </div>
   );
@@ -8615,7 +8627,7 @@ function SummaryExpensesTable({
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
 
   return (
-    <table className="w-full min-w-[960px] border-collapse" style={{ tableLayout: "fixed" }}>
+    <table className="tq-summary-data-table w-full min-w-[960px] border-collapse" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr style={{ background: TABLE_HEADER_BG, borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}>
           {EXPENSE_TABLE_HEADERS.map((h) => (
@@ -8696,7 +8708,7 @@ function SummaryExpensesTable({
             </tr>
           ))
         )}
-        <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+        <tr className="tq-summary-totals-row" style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
           <td colSpan={10} className={`${EXPENSE_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
             Total
           </td>
@@ -8750,7 +8762,7 @@ function SummaryEntryTable({
 
   return (
     <div className="min-w-0 w-full">
-      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+      <table className="tq-summary-data-table w-full border-collapse" style={{ tableLayout: "fixed" }}>
         <SummaryTableColgroup />
         <thead>
           <SummaryTableHeaderRow />
@@ -8808,16 +8820,16 @@ function SummaryEntryTable({
 
             return null;
           })}
-          <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
-            <td colSpan={15} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+          <tr className="tq-summary-totals-row" style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+            <td className={SUMMARY_TABLE_CELL} />
+            <td colSpan={14} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
               Totals
             </td>
             <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
-            <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
             <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.ot.toFixed(2)}</td>
             <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.dt.toFixed(2)}</td>
             <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.travel.toFixed(2)}</td>
-            <td colSpan={7} />
+            <td colSpan={6} />
           </tr>
         </tbody>
       </table>
@@ -8848,14 +8860,7 @@ function SummaryBreakViolationsTable({
   const violationRows = buildBreakViolationRows(employee);
 
   const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totals = {
-    reg: activeViolations.reduce((s, v) => s + v.reg, 0),
-    ot: activeViolations.reduce((s, v) => s + v.ot, 0),
-    dt: activeViolations.reduce((s, v) => s + v.dt, 0),
-    travel: activeViolations.reduce((s, v) => s + v.travel, 0),
-    all: 0,
-  };
-  totals.all = totals.reg + totals.ot + totals.dt;
+  const totalAmount = activeViolations.reduce((s, v) => s + summaryViolationAmount(v), 0);
 
   if (viewMode === "card") {
     return (
@@ -8870,7 +8875,7 @@ function SummaryBreakViolationsTable({
   }
 
   return (
-    <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+    <table className="tq-summary-data-table w-full border-collapse" style={{ tableLayout: "fixed" }}>
       <SummaryBreakViolationTableColgroup />
       <thead>
         <SummaryBreakViolationTableHeaderRow />
@@ -8900,13 +8905,15 @@ function SummaryBreakViolationsTable({
             />
           ))
         )}
-        <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+        <tr className="tq-summary-totals-row" style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
+          <td className={SUMMARY_TABLE_CELL} />
           <td colSpan={13} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
             Totals
           </td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.all.toFixed(2)}</td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>{totals.reg.toFixed(2)}</td>
-          <td colSpan={5} />
+          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>
+            ${totalAmount.toFixed(2)}
+          </td>
+          <td colSpan={4} />
         </tr>
       </tbody>
     </table>
