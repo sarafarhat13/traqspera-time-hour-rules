@@ -141,11 +141,15 @@ input[type="search"]::-webkit-search-decoration {
   --tq-summary-cell-hover: var(--modus-wc-color-base-200, #e0e1e9);
 }
 
-.tq-summary-data-table tbody tr:not(.tq-summary-totals-row) td {
-  transition: background-color 0.12s ease;
+.tq-summary-data-table tbody tr:not(.tq-summary-totals-row) > td {
+  background-color: transparent;
 }
 
-.tq-summary-data-table tbody tr:not(.tq-summary-totals-row):hover td {
+.tq-summary-data-table tbody tr.tq-summary-row-hover {
+  background-color: var(--tq-summary-cell-hover) !important;
+}
+
+.tq-summary-data-table tbody tr.tq-summary-row-hover > td {
   background-color: var(--tq-summary-cell-hover);
 }
 

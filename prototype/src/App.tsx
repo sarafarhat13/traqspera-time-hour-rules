@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { toast, Toaster } from "sonner";
 import {
   ModusWcAlert,
@@ -6986,6 +6986,44 @@ function summaryRowBorder(row: SummaryTableRow): string {
   return "1px solid #e0e1e9";
 }
 
+function summaryTableHoverClass(rowKey: string, hoveredRowKey: string | null): string {
+  return hoveredRowKey === rowKey ? "tq-summary-row-hover" : "";
+}
+
+function summaryTableClearHoverRow(
+  rowKey: string,
+  setHoveredRowKey: Dispatch<SetStateAction<string | null>>,
+  e: React.PointerEvent<HTMLTableRowElement>,
+) {
+  const rel = e.relatedTarget;
+  if (rel instanceof Node && e.currentTarget.contains(rel)) return;
+  setHoveredRowKey((k) => (k === rowKey ? null : k));
+}
+
+function summaryTableHoverRowProps(
+  rowKey: string,
+  hoveredRowKey: string | null,
+  setHoveredRowKey: Dispatch<SetStateAction<string | null>>,
+) {
+  return {
+    className: summaryTableHoverClass(rowKey, hoveredRowKey),
+    onPointerEnter: () => setHoveredRowKey(rowKey),
+    onPointerLeave: (e: React.PointerEvent<HTMLTableRowElement>) =>
+      summaryTableClearHoverRow(rowKey, setHoveredRowKey, e),
+  };
+}
+
+function summaryTableHoverSurfaceProps(setHoveredRowKey: Dispatch<SetStateAction<string | null>>) {
+  return {
+    onPointerLeave: (e: React.PointerEvent<HTMLTableElement>) => {
+      const rel = e.relatedTarget;
+      if (rel instanceof Node && e.currentTarget.contains(rel)) return;
+      setHoveredRowKey(null);
+    },
+    onScroll: () => setHoveredRowKey(null),
+  };
+}
+
 function readSummaryInputString(e: CustomEvent | { target?: { value?: string } }): string {
   return String(
     (e as CustomEvent<{ target?: { value?: string } }>).detail?.target?.value
@@ -8449,12 +8487,16 @@ function SummaryViolationRow({
   onRestoreViolation,
   onUpdateEmployee,
   onUpdateViolation,
+  hoveredRowKey,
+  setHoveredRowKey,
 }: {
   violation: SummaryViolation;
   employee: SummaryEmployee;
   stripeIdx: number;
   activeCellId: string | null;
   setActiveCellId: (id: string | null) => void;
+  hoveredRowKey: string | null;
+  setHoveredRowKey: Dispatch<SetStateAction<string | null>>;
   canDeleteBreakViolations: boolean;
   onApproveViolation: (violationId: string) => void;
   onDeleteViolation: (violationId: string, label: string) => void;
@@ -8472,9 +8514,12 @@ function SummaryViolationRow({
   const statusMark = (done: boolean) =>
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
 
+  const hoverRowKey = `${v.id}-${v.status}`;
+
   return (
     <tr
       key={v.id}
+      {...summaryTableHoverRowProps(hoverRowKey, hoveredRowKey, setHoveredRowKey)}
       style={{
         background: summaryRowBackground(row, stripeIdx),
         borderBottom: summaryRowBorder(row),
@@ -8612,6 +8657,8 @@ function SummaryExpensesTable({
   onUnapproveExpense: (expenseId: string) => void;
   onPatchExpense: (expenseId: string, patch: SummaryRowPatch) => void;
 }) {
+  const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
+
   if (viewMode === "card") {
     return (
       <SummaryExpenseCardsView
@@ -8627,7 +8674,11 @@ function SummaryExpensesTable({
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
 
   return (
-    <table className="tq-summary-data-table w-full min-w-[960px] border-collapse" style={{ tableLayout: "fixed" }}>
+    <table
+      className="tq-summary-data-table w-full min-w-[960px] border-collapse"
+      style={{ tableLayout: "fixed" }}
+      {...summaryTableHoverSurfaceProps(setHoveredRowKey)}
+    >
       <thead>
         <tr style={{ background: TABLE_HEADER_BG, borderBottom: `2px solid ${TABLE_HEADER_BORDER}` }}>
           {EXPENSE_TABLE_HEADERS.map((h) => (
@@ -8655,6 +8706,7 @@ function SummaryExpensesTable({
           expenses.map((row, idx) => (
             <tr
               key={row.id}
+              {...summaryTableHoverRowProps(row.id, hoveredRowKey, setHoveredRowKey)}
               style={{
                 background: row.approvedBy ? SUMMARY_APPROVED_ROW_BG : idx % 2 === 0 ? "#ffffff" : "#fafafa",
                 borderBottom: row.approvedBy ? "1px solid #bbe6ca" : "1px solid #e0e1e9",
@@ -8738,6 +8790,7 @@ function SummaryEntryTable({
   viewMode?: SummaryDataViewMode;
 }) {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
   const tableRows = buildSummaryTableRows(employee);
 
   const totals = {
@@ -8762,7 +8815,11 @@ function SummaryEntryTable({
 
   return (
     <div className="min-w-0 w-full">
-      <table className="tq-summary-data-table w-full border-collapse" style={{ tableLayout: "fixed" }}>
+      <table
+        className="tq-summary-data-table w-full border-collapse"
+        style={{ tableLayout: "fixed" }}
+        {...summaryTableHoverSurfaceProps(setHoveredRowKey)}
+      >
         <SummaryTableColgroup />
         <thead>
           <SummaryTableHeaderRow />
@@ -8773,7 +8830,11 @@ function SummaryEntryTable({
             if (row.kind === "entry") {
               const entry = row.data;
               return (
-                <tr key={entry.id} style={{ background: summaryRowBackground(row, stripeIdx), borderBottom: summaryRowBorder(row) }}>
+                <tr
+                  key={entry.id}
+                  {...summaryTableHoverRowProps(entry.id, hoveredRowKey, setHoveredRowKey)}
+                  style={{ background: summaryRowBackground(row, stripeIdx), borderBottom: summaryRowBorder(row) }}
+                >
                   <td className={`${SUMMARY_TABLE_CELL} text-center`}>
                     <div className="inline-flex items-center justify-center" aria-label="Work entry">
                       <Clock size={13} color="#6a6e79" aria-hidden />
@@ -8800,7 +8861,13 @@ function SummaryEntryTable({
               const br = row.data;
               const rowBg = summaryRowBackground(row, stripeIdx);
               return (
-                <tr key={br.id} className="summary-break-row" style={{ background: rowBg, borderBottom: "1px solid #e0e1e9" }}>
+                <tr
+                  key={br.id}
+                  className={`summary-break-row ${summaryTableHoverClass(br.id, hoveredRowKey)}`.trim()}
+                  onPointerEnter={() => setHoveredRowKey(br.id)}
+                  onPointerLeave={(e) => summaryTableClearHoverRow(br.id, setHoveredRowKey, e)}
+                  style={{ background: rowBg, borderBottom: "1px solid #e0e1e9" }}
+                >
                   <td className={BREAK_ROW_CELL} style={{ border: "none" }}>
                     <div className="relative min-h-[24px]">
                       <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-[#252a2e]" aria-hidden />
@@ -8857,6 +8924,7 @@ function SummaryBreakViolationsTable({
   viewMode?: SummaryDataViewMode;
 }) {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
   const violationRows = buildBreakViolationRows(employee);
 
   const activeViolations = violationRows.filter((v) => v.status !== "deleted");
@@ -8875,7 +8943,11 @@ function SummaryBreakViolationsTable({
   }
 
   return (
-    <table className="tq-summary-data-table w-full border-collapse" style={{ tableLayout: "fixed" }}>
+    <table
+      className="tq-summary-data-table w-full border-collapse"
+      style={{ tableLayout: "fixed" }}
+      {...summaryTableHoverSurfaceProps(setHoveredRowKey)}
+    >
       <SummaryBreakViolationTableColgroup />
       <thead>
         <SummaryBreakViolationTableHeaderRow />
@@ -8902,6 +8974,8 @@ function SummaryBreakViolationsTable({
               onRestoreViolation={onRestoreViolation}
               onUpdateEmployee={onUpdateEmployee}
               onUpdateViolation={onUpdateViolation}
+              hoveredRowKey={hoveredRowKey}
+              setHoveredRowKey={setHoveredRowKey}
             />
           ))
         )}
