@@ -140,7 +140,7 @@ Expected: in each sheet there is a visible gap between the stacked primary and s
 Expected: it shows **0/4** with Tue 22, Wed 23, Thu 24, and Mon 28 marked incomplete.
 2. Click a date, answer the questions, and submit.
 
-Expected: **Submit** is refused until the breaks question is answered *and* its required comment is filled. After submitting, that date turns green and the counter increments.
+Expected: **Submit** is refused until the breaks question is answered, at least one enabled rest break is selected when the answer is **No** (when rest break premiums are active), and any required comment is filled. After submitting, that date turns green and the counter increments; the audit trail records which rest breaks were missed.
 
 **TC-4.2 — Attesting on mobile**
 1. In **Mobile**, scroll to the **Daily Attestation** card and tap a date.
@@ -203,6 +203,11 @@ Expected: the relevant inputs swap and the summary text under each card matches 
 2. Open the **Premiums** tab and switch a violation's pay type to **Flat Dollar Amount**.
 
 Expected: the rate input adapts to the chosen pay type.
+3. On the **Breaks** tab under **Violation Penalties**, configure **Rest breaks** 1–4 (enable/disable and **hrs into shift**), then disable the **Missed Rest Break** violation row.
+
+Expected: rest break toggles and trigger inputs lock when **Missed Rest Break** is off or premiums are inactive. Re-enable the violation and attest **No** on the breaks question (Clock In and Out or Timesheet Summary).
+
+Expected: only enabled rest breaks appear in the multi-select; **Submit** requires at least one selection. On **Timesheet Summary**, Connor McDavid shows separate violation rows with badges **Missed Rest Break 1** and **Missed Rest Break 2**.
 
 ---
 

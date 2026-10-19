@@ -435,9 +435,16 @@ function RuleSetForm({
     onChange({ ...data, days });
   };
 
-  const mp = mealPenaltyState;
+  const mp = withMealPenaltyRestBreaks(mealPenaltyState);
   const setMp = <K extends keyof MealPenaltyState>(key: K, val: MealPenaltyState[K]) =>
-    onMealPenaltyChange({ ...mp, [key]: val });
+    onMealPenaltyChange(withMealPenaltyRestBreaks({ ...mp, [key]: val }));
+
+  const updateRestBreak = (index: number, patch: Partial<RestBreakSlotConfig>) => {
+    const next = mp.restBreaks.map((slot, i) => (i === index ? { ...slot, ...patch } : slot));
+    setMp("restBreaks", next);
+  };
+
+  const restBreakConfigDisabled = !isMissedRestBreakPenaltyActive(mp);
 
   const updateViolation = (id: string, patch: Partial<ViolationRule>) => {
     const next = (mp.violations ?? defaultViolations()).map((r) =>
@@ -779,10 +786,68 @@ function RuleSetForm({
                         ) : (
                           <span className="font-semibold text-[#252a2e]">Attestation Questions</span>
                         )}
-                        {" "}and mapped to Missed Rest Break for this penalty to apply.
+                        {" "}and mapped to Missed Rest Break for this penalty to apply. When an employee answers No, they will identify which configured rest breaks were missed.
                       </p>
                     </div>
                     <ViolationRulesTable violations={breakViolationRules()} onUpdate={updateViolation} />
+                    <div className="pt-[12px] pb-[4px]">
+                      <p className="text-[12px] font-semibold text-[#252a2e] mb-[6px]">Rest breaks</p>
+                      <div className="flex flex-col gap-[5px]">
+                        <p className="text-[11px] text-[#6a6e79] leading-[16px] m-0">
+                          Configure up to four rest breaks per shift. Applies only when Missed Rest Break is enabled above.
+                        </p>
+                        <div className={`rounded-[6px] border border-[#e0e1e9] min-w-0 ${restBreakConfigDisabled ? "opacity-50" : ""}`}>
+                        <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
+                          <colgroup>
+                            <col style={{ width: "12%" }} />
+                            <col style={{ width: "28%" }} />
+                            <col style={{ width: "60%" }} />
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-[#f5f5f8]">
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[6px] text-center text-[11px] font-semibold text-[#6a6e79]">
+                                On
+                              </th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[6px] text-left text-[11px] font-semibold text-[#6a6e79]">
+                                Rest break
+                              </th>
+                              <th className="border-b border-[#e0e1e9] px-[8px] py-[6px] text-left text-[11px] font-semibold text-[#6a6e79]">
+                                Break must begin after
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mp.restBreaks.map((slot, index) => (
+                              <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#fafafa]"}>
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[6px] text-center align-middle">
+                                  <Toggle
+                                    enabled={slot.enabled}
+                                    onChange={(val) => updateRestBreak(index, { enabled: val })}
+                                    ariaLabel={`Rest Break ${index + 1} enabled`}
+                                    disabled={restBreakConfigDisabled}
+                                  />
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[6px] align-middle text-[12px] font-semibold text-[#252a2e]">
+                                  Rest Break {index + 1}
+                                </td>
+                                <td className="border-b border-[#e0e1e9] px-[8px] py-[6px] align-middle">
+                                  <NumberInput
+                                    value={slot.triggerHours}
+                                    onChange={(v) => updateRestBreak(index, { triggerHours: v })}
+                                    step={0.5}
+                                    min={0}
+                                    suffix="hrs into shift"
+                                    width={72}
+                                    disabled={restBreakConfigDisabled || !slot.enabled}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex items-end gap-[32px] pt-[14px] pb-[4px]">
                       <div>
                         <FieldLabel>Daily Stacking Cap</FieldLabel>
@@ -1766,6 +1831,13 @@ const ON_DUTY_ROSTER: OnDutyEmployee[] = [
   { id: "e18", name: "Aisha Rahman",      title: "Weighbridge Clerk",  department: "3500 - Admin",      costCenter: "CC-300" },
 ];
 
+type RestBreakSlotConfig = {
+  enabled: boolean;
+  triggerHours: number;
+};
+
+type RestBreakSlotIndex = 1 | 2 | 3 | 4;
+
 type MealPenaltyState = {
   breakType: BreakType;
   meal1Enabled: boolean; meal1Trigger: number; meal1TriggerEnd: number; meal1Duration: number; meal1Schedule: ScheduleType;
@@ -1779,6 +1851,7 @@ type MealPenaltyState = {
   penaltiesEnabled: boolean;
   breakStackingCap: number;
   mealStackingCap: number;
+  restBreaks: RestBreakSlotConfig[];
   violations: ViolationRule[];
   jobCostOverride: JobCostOverrideConfig;
 };
@@ -1841,6 +1914,45 @@ const defaultViolations = (): ViolationRule[] => [
 
 const BREAK_VIOLATION_RULE_IDS = new Set(["missed_break_attestation"]);
 const MEAL_VIOLATION_RULE_IDS = new Set(["missed_meal", "late_meal", "short_meal"]);
+
+const defaultRestBreaks = (): RestBreakSlotConfig[] => [
+  { enabled: true, triggerHours: 2 },
+  { enabled: true, triggerHours: 4 },
+  { enabled: true, triggerHours: 6 },
+  { enabled: true, triggerHours: 8 },
+];
+
+function withMealPenaltyRestBreaks(mp: MealPenaltyState): MealPenaltyState {
+  const base = defaultRestBreaks();
+  const current = mp.restBreaks ?? [];
+  const restBreaks = base.map((slot, i) => ({ ...slot, ...current[i] }));
+  return { ...mp, restBreaks };
+}
+
+function getMissedRestBreakRule(mp: MealPenaltyState): ViolationRule {
+  const normalized = withMealPenaltyRestBreaks(mp);
+  const rule = (normalized.violations ?? defaultViolations()).find((v) => v.id === "missed_break_attestation");
+  return withViolationDefaults(rule ?? defaultViolations()[0]);
+}
+
+function isMissedRestBreakPenaltyActive(mp: MealPenaltyState): boolean {
+  const normalized = withMealPenaltyRestBreaks(mp);
+  const rule = getMissedRestBreakRule(normalized);
+  return normalized.breakType === "premium" && normalized.penaltiesEnabled && rule.enabled;
+}
+
+type EffectiveRestBreakSlot = { slot: RestBreakSlotIndex; triggerHours: number };
+
+function effectiveRestBreakSlots(mp: MealPenaltyState): EffectiveRestBreakSlot[] {
+  if (!isMissedRestBreakPenaltyActive(mp)) return [];
+  const breaks = withMealPenaltyRestBreaks(mp).restBreaks;
+  return breaks
+    .map((config, i) => ({
+      slot: (i + 1) as RestBreakSlotIndex,
+      triggerHours: config.triggerHours,
+    }))
+    .filter((_, i) => breaks[i].enabled);
+}
 
 function ViolationRulesTable({
   violations,
@@ -2177,7 +2289,9 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 2.0, violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
+  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 2.0,
+  restBreaks: defaultRestBreaks(),
+  violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
 });
 
 function CardShell({ title, badge: _badge, badgeColor: _badgeColor = "blue", action, children }: {
@@ -3137,7 +3251,44 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
 }
 
 // ─── Attestation Modal ────────────────────────────────────────────────────────
-type AttestationAnswerState = Record<string, { answer: AttestationAnswer | null; comment: string }>;
+type AttestationAnswerEntry = {
+  answer: AttestationAnswer | null;
+  comment: string;
+  missedRestBreakSlots?: RestBreakSlotIndex[];
+};
+
+type AttestationAnswerState = Record<string, AttestationAnswerEntry>;
+
+function attestationRestBreakSelectionRequired(
+  questions: AttestationQuestion[],
+  answers: AttestationAnswerState,
+  mp: MealPenaltyState,
+): boolean {
+  const q = questions.find((item) => item.id === "aq_breaks");
+  if (!q) return false;
+  const entry = answers[q.id];
+  if (entry?.answer !== "no") return false;
+  if (effectiveRestBreakSlots(mp).length === 0) return false;
+  if (!isMissedRestBreakPenaltyActive(mp)) return false;
+  return true;
+}
+
+function attestationMissedRestBreaksValid(
+  questions: AttestationQuestion[],
+  answers: AttestationAnswerState,
+  mp: MealPenaltyState,
+): boolean {
+  if (!attestationRestBreakSelectionRequired(questions, answers, mp)) return true;
+  const entry = answers["aq_breaks"];
+  const selected = entry?.missedRestBreakSlots ?? [];
+  const allowed = new Set(effectiveRestBreakSlots(mp).map((s) => s.slot));
+  return selected.length >= 1 && selected.every((n) => allowed.has(n));
+}
+
+function formatMissedRestBreakAuditSuffix(slots: RestBreakSlotIndex[]): string {
+  const sorted = [...slots].sort((a, b) => a - b);
+  return `Missed: ${sorted.map((n) => `Rest Break ${n}`).join(", ")}`;
+}
 
 function attestationCommentRequired(q: AttestationQuestion, answer: AttestationAnswer | null): boolean {
   if (!answer) return false;
@@ -3146,14 +3297,21 @@ function attestationCommentRequired(q: AttestationQuestion, answer: AttestationA
   return false;
 }
 
-function attestationCanSubmit(questions: AttestationQuestion[], answers: AttestationAnswerState): boolean {
+function attestationCanSubmit(
+  questions: AttestationQuestion[],
+  answers: AttestationAnswerState,
+  mp?: MealPenaltyState,
+): boolean {
   if (questions.length === 0) return false;
-  return questions.every((q) => {
+  const baseValid = questions.every((q) => {
     const entry = answers[q.id];
     if (!entry?.answer) return false;
     if (attestationCommentRequired(q, entry.answer) && !entry.comment.trim()) return false;
     return true;
   });
+  if (!baseValid) return false;
+  if (mp && !attestationMissedRestBreaksValid(questions, answers, mp)) return false;
+  return true;
 }
 
 type AttestationAuditEntry = {
@@ -3183,6 +3341,19 @@ function attestationAuditSubmittedAtNow(): string {
   }).replace(/,\s*(\d{1,2}:\d{2}\s*[AP]M)$/i, " · $1");
 }
 
+function attestationAuditCommentForQuestion(q: AttestationQuestion, entry: AttestationAnswerEntry): string {
+  let comment = entry.comment.trim();
+  if (
+    q.id === "aq_breaks"
+    && entry.answer === "no"
+    && entry.missedRestBreakSlots?.length
+  ) {
+    const suffix = formatMissedRestBreakAuditSuffix(entry.missedRestBreakSlots);
+    comment = comment ? `${comment} (${suffix})` : suffix;
+  }
+  return comment || "—";
+}
+
 function buildAttestationAuditEntries(
   questions: AttestationQuestion[],
   answers: AttestationAnswerState,
@@ -3199,11 +3370,61 @@ function buildAttestationAuditEntries(
       submissionId,
       question: q.question,
       answer: answerLabel,
-      comment: entry.comment.trim() || "—",
+      comment: attestationAuditCommentForQuestion(q, entry),
       submittedBy,
       submittedAt,
     };
   });
+}
+
+function RestBreakMissedSelector({
+  slots,
+  selected,
+  onChange,
+}: {
+  slots: EffectiveRestBreakSlot[];
+  selected: RestBreakSlotIndex[];
+  onChange: (next: RestBreakSlotIndex[]) => void;
+}) {
+  const toggle = (slot: RestBreakSlotIndex) => {
+    const set = new Set(selected);
+    if (set.has(slot)) set.delete(slot);
+    else set.add(slot);
+    onChange([...set].sort((a, b) => a - b));
+  };
+
+  return (
+    <div className="mt-[12px] rounded-[6px] border border-[#e0e1e9] bg-[#fafafa] px-[14px] py-[12px]">
+      <p className="text-[12px] font-semibold text-[#252a2e] mb-[4px]">
+        Which rest breaks did you miss? <span className="text-[#ab1f26]">*</span>
+      </p>
+      <p className="text-[11px] text-[#6a6e79] mb-[10px]">Select all that apply.</p>
+      <div className="flex flex-col gap-[8px]">
+        {slots.map(({ slot, triggerHours }) => {
+          const checked = selected.includes(slot);
+          return (
+            <label
+              key={slot}
+              className="flex items-start gap-[10px] cursor-pointer rounded-[6px] border border-[#e0e1e9] bg-white px-[12px] py-[10px]"
+            >
+              <ModusWcCheckbox
+                value={checked}
+                onInputChange={() => toggle(slot)}
+                aria-label={`Rest Break ${slot}`}
+              />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-[#252a2e]">Rest Break {slot}</span>
+                <span className="block text-[11px] text-[#6a6e79]">Due after {triggerHours} hrs into shift</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {selected.length === 0 && (
+        <p className="text-[11px] text-[#ab1f26] mt-[8px]">Select at least one rest break.</p>
+      )}
+    </div>
+  );
 }
 
 function mockAttestationAuditSubmission(
@@ -3296,7 +3517,7 @@ function attestationAnswersToPreviewRows(
       submissionId: "preview",
       question: q.question,
       answer: answerLabel,
-      comment: entry.comment.trim() || "—",
+      comment: attestationAuditCommentForQuestion(q, entry),
       submittedBy,
       submittedAt: "In progress",
     };
@@ -3390,13 +3611,16 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
   submittedBy?: string;
 }) {
   const { questions } = useAttestationConfig();
+  const { companyMealPenalty } = useMealPenaltyConfig();
+  const mealPenalty = withMealPenaltyRestBreaks(companyMealPenalty);
   const [answers, setAnswers] = useState<AttestationAnswerState>(() =>
     Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
   );
   const [modalTabIndex, setModalTabIndex] = useState(0);
 
   const dateStr = `Tue 2026/07/${day.date}`;
-  const canSubmit = attestationCanSubmit(questions, answers);
+  const canSubmit = attestationCanSubmit(questions, answers, mealPenalty);
+  const restBreakSlots = effectiveRestBreakSlots(mealPenalty);
   const hasInProgressAnswers = questions.some((q) => answers[q.id]?.answer);
   const previewRows = showAuditTrail
     ? attestationAnswersToPreviewRows(questions, answers, submittedBy)
@@ -3406,11 +3630,31 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
     : [];
 
   const setAnswer = (id: string, answer: AttestationAnswer) => {
-    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], answer } }));
+    setAnswers((prev) => {
+      const prevEntry = prev[id] ?? { answer: null, comment: "" };
+      const missedRestBreakSlots =
+        id === "aq_breaks" && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+      return {
+        ...prev,
+        [id]: {
+          ...prevEntry,
+          answer,
+          ...(id === "aq_breaks" && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
+          ...(id === "aq_breaks" && answer === "no" ? { missedRestBreakSlots } : {}),
+        },
+      };
+    });
   };
 
   const setComment = (id: string, comment: string) => {
     setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
+  };
+
+  const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+    setAnswers((prev) => ({
+      ...prev,
+      aq_breaks: { ...(prev.aq_breaks ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+    }));
   };
 
   const RadioRow = ({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) => (
@@ -3459,6 +3703,11 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
       {questions.map((q) => {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
+        const showRestBreakPicker =
+          q.id === "aq_breaks"
+          && entry.answer === "no"
+          && restBreakSlots.length > 0
+          && isMissedRestBreakPenaltyActive(mealPenalty);
         return (
           <div key={q.id}>
             <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 10 }}>
@@ -3469,6 +3718,13 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
               <div style={{ height: 1, background: "#e0e1e9" }} />
               <RadioRow label="No" selected={entry.answer === "no"} onSelect={() => setAnswer(q.id, "no")} />
             </div>
+            {showRestBreakPicker && (
+              <RestBreakMissedSelector
+                slots={restBreakSlots}
+                selected={entry.missedRestBreakSlots ?? []}
+                onChange={setMissedRestBreakSlots}
+              />
+            )}
             <div className="mt-[10px]">
               <p style={{ fontSize: 13, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 4 }}>
                 Additional Comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
@@ -4611,10 +4867,13 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
   onSubmit: () => void;
 }) {
   const { questions } = useAttestationConfig();
+  const { companyMealPenalty } = useMealPenaltyConfig();
+  const mealPenalty = withMealPenaltyRestBreaks(companyMealPenalty);
   const [answers, setAnswers] = useState<AttestationAnswerState>(() =>
     Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
   );
-  const canSubmit = attestationCanSubmit(questions, answers);
+  const canSubmit = attestationCanSubmit(questions, answers, mealPenalty);
+  const restBreakSlots = effectiveRestBreakSlots(mealPenalty);
 
   const YesNo = ({ value, onSelect }: { value: "yes" | "no" | null; onSelect: (v: "yes" | "no") => void }) => (
     <div className="flex gap-[8px]">
@@ -4634,11 +4893,31 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
   );
 
   const setAnswer = (id: string, answer: AttestationAnswer) => {
-    setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], answer } }));
+    setAnswers((prev) => {
+      const prevEntry = prev[id] ?? { answer: null, comment: "" };
+      const missedRestBreakSlots =
+        id === "aq_breaks" && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+      return {
+        ...prev,
+        [id]: {
+          ...prevEntry,
+          answer,
+          ...(id === "aq_breaks" && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
+          ...(id === "aq_breaks" && answer === "no" ? { missedRestBreakSlots } : {}),
+        },
+      };
+    });
   };
 
   const setComment = (id: string, comment: string) => {
     setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
+  };
+
+  const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+    setAnswers((prev) => ({
+      ...prev,
+      aq_breaks: { ...(prev.aq_breaks ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+    }));
   };
 
   return (
@@ -4663,12 +4942,24 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
       {questions.map((q) => {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
+        const showRestBreakPicker =
+          q.id === "aq_breaks"
+          && entry.answer === "no"
+          && restBreakSlots.length > 0
+          && isMissedRestBreakPenaltyActive(mealPenalty);
         return (
           <div key={q.id} style={{ marginBottom: 18 }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 8 }}>
               {q.question} <span style={{ color: "#ab1f26" }}>*</span>
             </p>
             <YesNo value={entry.answer} onSelect={(v) => setAnswer(q.id, v)} />
+            {showRestBreakPicker && (
+              <RestBreakMissedSelector
+                slots={restBreakSlots}
+                selected={entry.missedRestBreakSlots ?? []}
+                onChange={setMissedRestBreakSlots}
+              />
+            )}
             <div style={{ marginTop: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 5 }}>
                 Additional comments {commentNeeded && <span style={{ color: "#ab1f26" }}>*</span>}
@@ -6433,6 +6724,7 @@ type SummaryViolation = {
   complete: boolean;
   exported: boolean;
   status: ViolationRowStatus;
+  restBreakSlot?: RestBreakSlotIndex;
   deletionComment?: string;
   deletedBy?: string;
 };
@@ -6527,11 +6819,13 @@ const violationFromEntry = (
   label: string,
   entry: SummaryTimesheetEntry,
   hours = 1.0,
+  restBreakSlot?: RestBreakSlotIndex,
 ): SummaryViolation => ({
   id,
   parentEntryId,
   violationTypeId,
   label,
+  restBreakSlot,
   date: entry.date,
   start: "—",
   end: "—",
@@ -6713,8 +7007,12 @@ const BREAK_VIOLATION_IDS = new Set([
 
 const isBreakViolation = (v: SummaryViolation) => BREAK_VIOLATION_IDS.has(v.violationTypeId);
 
-const breakViolationDisplayLabel = (v: SummaryViolation) =>
-  defaultViolations().find((rule) => rule.id === v.violationTypeId)?.label ?? v.label;
+const breakViolationDisplayLabel = (v: SummaryViolation) => {
+  if (v.violationTypeId === "missed_break_attestation" && v.restBreakSlot) {
+    return `Missed Rest Break ${v.restBreakSlot}`;
+  }
+  return defaultViolations().find((rule) => rule.id === v.violationTypeId)?.label ?? v.label;
+};
 
 function ViolationTypeBadge({ violation }: { violation: SummaryViolation }) {
   const isDeleted = violation.status === "deleted";
@@ -6733,7 +7031,24 @@ function ViolationTypeBadge({ violation }: { violation: SummaryViolation }) {
 const connorEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-connor")!;
 connorEmp.violations = [
   violationFromEntry("viol-connor-1-meal", "connor-1", "missed_meal", "Missed Meal", connorEmp.entries[0]),
-  violationFromEntry("viol-connor-1-rest", "connor-1", "missed_break_attestation", "Missed Rest Break", connorEmp.entries[0]),
+  violationFromEntry(
+    "viol-connor-1-rest-1",
+    "connor-1",
+    "missed_break_attestation",
+    "Missed Rest Break 1",
+    connorEmp.entries[0],
+    1.0,
+    1,
+  ),
+  violationFromEntry(
+    "viol-connor-1-rest-2",
+    "connor-1",
+    "missed_break_attestation",
+    "Missed Rest Break 2",
+    connorEmp.entries[0],
+    1.0,
+    2,
+  ),
   violationFromEntry("viol-connor-2-meal", "connor-2", "missed_meal", "Missed Meal", connorEmp.entries[1]),
   violationFromEntry("viol-connor-3-late", "connor-3", "late_meal", "Late Meal", connorEmp.entries[2]),
   {
@@ -6741,8 +7056,10 @@ connorEmp.violations = [
       "viol-connor-deleted-break",
       "connor-2",
       "missed_break_attestation",
-      "Missed break",
+      "Missed Rest Break 3",
       connorEmp.entries[1],
+      1.0,
+      3,
     ),
     status: "deleted",
     approvedBy: undefined,
