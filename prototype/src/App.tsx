@@ -427,8 +427,13 @@ function RuleSetForm({
   onMealPenaltyChange: (next: MealPenaltyState) => void;
   onOpenAttestationQuestions?: () => void;
 }) {
+  const { questions: attestationQuestions, setQuestions: setAttestationQuestions } = useAttestationConfig();
   const [activeTab, setActiveTab] = useState<RuleSetTab>("daily");
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  const mapViolationAttestationQuestion = (violationId: string, questionId: string) => {
+    setAttestationQuestions((prev) => mapAttestationQuestionToViolation(prev, violationId, questionId));
+  };
 
   const updateDay = (idx: number, field: keyof DayRow, val: number) => {
     const days = data.days.map((d, i) => i === idx ? { ...d, [field]: val } : d);
@@ -789,7 +794,12 @@ function RuleSetForm({
                         {" "}and mapped to Missed Rest Break for this penalty to apply. When an employee answers No, they will identify which configured rest breaks were missed.
                       </p>
                     </div>
-                    <ViolationRulesTable violations={breakViolationRules()} onUpdate={updateViolation} />
+                    <ViolationRulesTable
+                      violations={breakViolationRules()}
+                      onUpdate={updateViolation}
+                      attestationQuestions={attestationQuestions}
+                      onMapAttestationQuestion={mapViolationAttestationQuestion}
+                    />
                     <div className="pt-[12px] pb-[4px]">
                       <p className="text-[12px] font-semibold text-[#252a2e] mb-[6px]">Rest breaks</p>
                       <div className="flex flex-col gap-[5px]">
@@ -1914,6 +1924,50 @@ const defaultViolations = (): ViolationRule[] => [
 
 const BREAK_VIOLATION_RULE_IDS = new Set(["missed_break_attestation"]);
 const MEAL_VIOLATION_RULE_IDS = new Set(["missed_meal", "late_meal", "short_meal"]);
+const MISSED_REST_BREAK_VIOLATION_ID = "missed_break_attestation";
+
+function isRestBreakAttestationQuestion(q: AttestationQuestion): boolean {
+  return q.violationId === MISSED_REST_BREAK_VIOLATION_ID;
+}
+
+function attestationQuestionIdForViolation(questions: AttestationQuestion[], violationId: string): string {
+  return questions.find((q) => q.violationId === violationId)?.id ?? "";
+}
+
+function mapAttestationQuestionToViolation(
+  questions: AttestationQuestion[],
+  violationId: string,
+  questionId: string,
+): AttestationQuestion[] {
+  return questions.map((q) => {
+    if (questionId && q.id === questionId) {
+      return { ...q, violationId };
+    }
+    if (q.violationId === violationId) {
+      return { ...q, violationId: "" };
+    }
+    return q;
+  });
+}
+
+function attestationQuestionSelectOptions(questions: AttestationQuestion[]): { value: string; label: string }[] {
+  return questions
+    .filter((q) => q.question.trim())
+    .map((q) => {
+      const text = q.question.trim();
+      const label = text.length > 52 ? `${text.slice(0, 52)}…` : text;
+      return { value: q.id, label };
+    });
+}
+
+function restBreakAttestationQuestion(questions: AttestationQuestion[]): AttestationQuestion | undefined {
+  return questions.find(isRestBreakAttestationQuestion);
+}
+
+function isRestBreakAttestationQuestionId(questions: AttestationQuestion[], questionId: string): boolean {
+  const q = questions.find((item) => item.id === questionId);
+  return q ? isRestBreakAttestationQuestion(q) : false;
+}
 
 const defaultRestBreaks = (): RestBreakSlotConfig[] => [
   { enabled: true, triggerHours: 2 },
@@ -1957,23 +2011,36 @@ function effectiveRestBreakSlots(mp: MealPenaltyState): EffectiveRestBreakSlot[]
 function ViolationRulesTable({
   violations,
   onUpdate,
+  attestationQuestions,
+  onMapAttestationQuestion,
 }: {
   violations: ViolationRule[];
   onUpdate: (id: string, patch: Partial<ViolationRule>) => void;
+  attestationQuestions?: AttestationQuestion[];
+  onMapAttestationQuestion?: (violationId: string, questionId: string) => void;
 }) {
+  const showAttestationColumn = Boolean(attestationQuestions && onMapAttestationQuestion);
+  const attestationOptions = attestationQuestions ? attestationQuestionSelectOptions(attestationQuestions) : [];
+
   return (
     <div className="rounded-[6px] border border-[#e0e1e9] min-w-0">
       <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
         <colgroup>
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "42%" }} />
-          <col style={{ width: "30%" }} />
-          <col style={{ width: "20%" }} />
+          <col style={{ width: showAttestationColumn ? "7%" : "8%" }} />
+          <col style={{ width: showAttestationColumn ? "22%" : "42%" }} />
+          {showAttestationColumn ? <col style={{ width: "31%" }} /> : null}
+          <col style={{ width: showAttestationColumn ? "22%" : "30%" }} />
+          <col style={{ width: showAttestationColumn ? "18%" : "20%" }} />
         </colgroup>
         <thead>
           <tr className="bg-[#f5f5f8]">
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]" />
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Violation Type</th>
+            {showAttestationColumn ? (
+              <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">
+                Attestation question
+              </th>
+            ) : null}
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-left text-[12px] font-semibold text-[#6a6e79]">Pay Type</th>
             <th className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center text-[12px] font-semibold text-[#6a6e79]">Penalty Amount</th>
           </tr>
@@ -1982,6 +2049,10 @@ function ViolationRulesTable({
           {violations.map((raw, idx) => {
             const v = withViolationDefaults(raw);
             const rowFieldsDisabled = !v.enabled;
+            const showAttestationCell = showAttestationColumn && BREAK_VIOLATION_RULE_IDS.has(v.id);
+            const mappedQuestionId = attestationQuestions
+              ? attestationQuestionIdForViolation(attestationQuestions, v.id)
+              : "";
 
             return (
               <tr
@@ -2009,6 +2080,22 @@ function ViolationRulesTable({
                     </button>
                   </ModusWcTooltip>
                 </td>
+                {showAttestationColumn ? (
+                  <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
+                    {showAttestationCell ? (
+                      <SelectField
+                        value={mappedQuestionId}
+                        onChange={(questionId) => onMapAttestationQuestion?.(v.id, questionId)}
+                        disabled={rowFieldsDisabled}
+                        placeholder="Select question"
+                        customClass="w-full min-w-0"
+                        options={attestationOptions}
+                      />
+                    ) : (
+                      <span className="text-[11px] text-[#a3a3a3]">—</span>
+                    )}
+                  </td>
+                ) : null}
                 <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] min-w-0">
                   <div className="min-w-0">
                     <SelectField value={v.payType} onChange={(val) => onUpdate(v.id, { payType: val as PayType })}
@@ -2073,7 +2160,7 @@ const defaultAttestationQuestions = (): AttestationQuestion[] => [
     requireComment: false,
     requireCommentOnInvalid: true,
     safetyRelated: false,
-    violationId: "",
+    violationId: MISSED_REST_BREAK_VIOLATION_ID,
     persisted: true,
   },
   {
@@ -2432,8 +2519,28 @@ function TimesheetSettings() {
   const violationOptions = getConfiguredPenaltyViolationOptions(companyMealPenalty);
   const penaltyViolationSelectable = penaltyViolationMappingAvailable(companyMealPenalty);
 
+  useEffect(() => {
+    setDraftQuestions((draft) =>
+      draft.map((dq) => {
+        const live = questions.find((q) => q.id === dq.id);
+        if (!live || live.violationId === dq.violationId) return dq;
+        return { ...dq, violationId: live.violationId };
+      }),
+    );
+  }, [questions]);
+
   const updateQuestion = (id: string, patch: Partial<AttestationQuestion>) => {
-    setDraftQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+    setDraftQuestions((prev) => {
+      let next = prev.map((q) => (q.id === id ? { ...q, ...patch } : q));
+      if (patch.violationId !== undefined) {
+        if (patch.violationId) {
+          next = mapAttestationQuestionToViolation(next, patch.violationId, id);
+        } else {
+          next = next.map((q) => (q.id === id ? { ...q, violationId: "" } : q));
+        }
+      }
+      return next;
+    });
   };
 
   const addQuestion = () => {
@@ -3264,7 +3371,7 @@ function attestationRestBreakSelectionRequired(
   answers: AttestationAnswerState,
   mp: MealPenaltyState,
 ): boolean {
-  const q = questions.find((item) => item.id === "aq_breaks");
+  const q = restBreakAttestationQuestion(questions);
   if (!q) return false;
   const entry = answers[q.id];
   if (entry?.answer !== "no") return false;
@@ -3279,7 +3386,9 @@ function attestationMissedRestBreaksValid(
   mp: MealPenaltyState,
 ): boolean {
   if (!attestationRestBreakSelectionRequired(questions, answers, mp)) return true;
-  const entry = answers["aq_breaks"];
+  const restQ = restBreakAttestationQuestion(questions);
+  if (!restQ) return true;
+  const entry = answers[restQ.id];
   const selected = entry?.missedRestBreakSlots ?? [];
   const allowed = new Set(effectiveRestBreakSlots(mp).map((s) => s.slot));
   return selected.length >= 1 && selected.every((n) => allowed.has(n));
@@ -3344,7 +3453,7 @@ function attestationAuditSubmittedAtNow(): string {
 function attestationAuditCommentForQuestion(q: AttestationQuestion, entry: AttestationAnswerEntry): string {
   let comment = entry.comment.trim();
   if (
-    q.id === "aq_breaks"
+    isRestBreakAttestationQuestion(q)
     && entry.answer === "no"
     && entry.missedRestBreakSlots?.length
   ) {
@@ -3630,17 +3739,18 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
     : [];
 
   const setAnswer = (id: string, answer: AttestationAnswer) => {
+    const isRestBreakQ = isRestBreakAttestationQuestionId(questions, id);
     setAnswers((prev) => {
       const prevEntry = prev[id] ?? { answer: null, comment: "" };
       const missedRestBreakSlots =
-        id === "aq_breaks" && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
       return {
         ...prev,
         [id]: {
           ...prevEntry,
           answer,
-          ...(id === "aq_breaks" && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
-          ...(id === "aq_breaks" && answer === "no" ? { missedRestBreakSlots } : {}),
+          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
+          ...(isRestBreakQ && answer === "no" ? { missedRestBreakSlots } : {}),
         },
       };
     });
@@ -3651,9 +3761,11 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
   };
 
   const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+    const restQId = restBreakAttestationQuestion(questions)?.id;
+    if (!restQId) return;
     setAnswers((prev) => ({
       ...prev,
-      aq_breaks: { ...(prev.aq_breaks ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
     }));
   };
 
@@ -3704,7 +3816,7 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
         const showRestBreakPicker =
-          q.id === "aq_breaks"
+          isRestBreakAttestationQuestion(q)
           && entry.answer === "no"
           && restBreakSlots.length > 0
           && isMissedRestBreakPenaltyActive(mealPenalty);
@@ -4893,17 +5005,18 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
   );
 
   const setAnswer = (id: string, answer: AttestationAnswer) => {
+    const isRestBreakQ = isRestBreakAttestationQuestionId(questions, id);
     setAnswers((prev) => {
       const prevEntry = prev[id] ?? { answer: null, comment: "" };
       const missedRestBreakSlots =
-        id === "aq_breaks" && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
       return {
         ...prev,
         [id]: {
           ...prevEntry,
           answer,
-          ...(id === "aq_breaks" && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
-          ...(id === "aq_breaks" && answer === "no" ? { missedRestBreakSlots } : {}),
+          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
+          ...(isRestBreakQ && answer === "no" ? { missedRestBreakSlots } : {}),
         },
       };
     });
@@ -4914,9 +5027,11 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
   };
 
   const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+    const restQId = restBreakAttestationQuestion(questions)?.id;
+    if (!restQId) return;
     setAnswers((prev) => ({
       ...prev,
-      aq_breaks: { ...(prev.aq_breaks ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
     }));
   };
 
@@ -4943,7 +5058,7 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
         const showRestBreakPicker =
-          q.id === "aq_breaks"
+          isRestBreakAttestationQuestion(q)
           && entry.answer === "no"
           && restBreakSlots.length > 0
           && isMissedRestBreakPenaltyActive(mealPenalty);
