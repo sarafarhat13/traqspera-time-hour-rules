@@ -791,7 +791,7 @@ function RuleSetForm({
                         ) : (
                           <span className="font-semibold text-[#252a2e]">Attestation Questions</span>
                         )}
-                        {" "}and mapped to Missed Rest Break for this penalty to apply. When an employee answers No, they will identify which configured rest breaks were missed.
+                        {" "}and mapped to Missed Rest Break for this penalty to apply. When an employee answers No, they will select the job and phase they were on when the break was missed.
                       </p>
                     </div>
                     <ViolationRulesTable
@@ -1618,6 +1618,24 @@ const parsePhaseKey = (key: string): PhaseCatalogEntry => {
   return { job, phase };
 };
 
+function jobPhaseSelectOptions(): { value: string; label: string }[] {
+  return PHASE_CATALOG.map(({ job, phase }) => ({
+    value: phaseKeyFor(job.code, phase.code),
+    label: `${job.code} - ${job.name} · ${phase.code} - ${phase.name}`,
+  }));
+}
+
+function isValidJobPhaseKey(key: string): boolean {
+  if (!key.includes("|")) return false;
+  const { job, phase } = parsePhaseKey(key);
+  return job.phases.some((p) => p.code === phase.code);
+}
+
+function formatAttestationMissedBreakJobPhase(key: string): string {
+  const { job, phase } = parsePhaseKey(key);
+  return `${job.code} · ${phase.code} — ${job.name}, ${phase.name}`;
+}
+
 function ExclusionPicker({ kind, existing, onClose, onAdd }: {
   kind: ExclusionKind;
   existing: ExclusionItem[];
@@ -1867,6 +1885,7 @@ type MealPenaltyState = {
 };
 
 type PayType = "regular" | "overtime" | "double_time" | "flat";
+type PenaltyAmountUnit = "hours" | "dollars";
 
 type JobCostOverrideMode = "employee_job" | "department_job_phase" | "phase_only";
 
@@ -1883,7 +1902,9 @@ type ViolationRule = {
   description: string;
   enabled: boolean;
   payType: PayType;
+  /** Numeric penalty; meaning depends on {@link penaltyAmountUnit}. */
   hoursRate: number;
+  penaltyAmountUnit?: PenaltyAmountUnit;
   maxPenalty: number;
 };
 
@@ -1910,9 +1931,14 @@ const withJobCostOverrideDefaults = (row?: Partial<JobCostOverrideConfig>): JobC
   phaseCode: row?.phaseCode ?? JOB_CATALOG[0].phases[0].code,
 });
 
+function defaultPenaltyAmountUnit(payType: PayType): PenaltyAmountUnit {
+  return payType === "flat" ? "dollars" : "hours";
+}
+
 const withViolationDefaults = (v: ViolationRule): ViolationRule => ({
   ...v,
   description: v.description ?? VIOLATION_DESCRIPTIONS[v.id] ?? "",
+  penaltyAmountUnit: v.penaltyAmountUnit ?? defaultPenaltyAmountUnit(v.payType),
 });
 
 const defaultViolations = (): ViolationRule[] => [
@@ -2008,6 +2034,65 @@ function effectiveRestBreakSlots(mp: MealPenaltyState): EffectiveRestBreakSlot[]
     .filter((_, i) => breaks[i].enabled);
 }
 
+function PenaltyAmountUnitToggle({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: PenaltyAmountUnit;
+  onChange: (v: PenaltyAmountUnit) => void;
+  disabled?: boolean;
+}) {
+  const isHours = value === "hours";
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Penalty amount unit"
+      className={`relative inline-grid grid-cols-2 shrink-0 rounded-[6px] border border-[#d4d6dd] bg-[#eef0f4] p-[3px] ${disabled ? "opacity-60 pointer-events-none" : ""}`}
+      style={{ minWidth: 88, fontFamily: "var(--modus-wc-font-family), sans-serif" }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-[4px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.14)] transition-[left] duration-200 ease-out"
+        style={{
+          width: "calc(50% - 3px)",
+          left: isHours ? 3 : "calc(50%)",
+        }}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isHours}
+        onClick={() => onChange("hours")}
+        className="relative z-[1] rounded-[4px] px-[8px] py-[5px] text-[12px] font-semibold transition-colors duration-200"
+        style={{
+          color: isHours ? "#0063a3" : "#6a6e79",
+          background: "transparent",
+          border: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
+      >
+        hrs
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!isHours}
+        onClick={() => onChange("dollars")}
+        className="relative z-[1] rounded-[4px] px-[8px] py-[5px] text-[12px] font-semibold transition-colors duration-200"
+        style={{
+          color: !isHours ? "#0063a3" : "#6a6e79",
+          background: "transparent",
+          border: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
+      >
+        $
+      </button>
+    </div>
+  );
+}
+
 function ViolationRulesTable({
   violations,
   onUpdate,
@@ -2029,8 +2114,8 @@ function ViolationRulesTable({
           <col style={{ width: showAttestationColumn ? "7%" : "8%" }} />
           <col style={{ width: showAttestationColumn ? "22%" : "42%" }} />
           {showAttestationColumn ? <col style={{ width: "31%" }} /> : null}
-          <col style={{ width: showAttestationColumn ? "22%" : "30%" }} />
-          <col style={{ width: showAttestationColumn ? "18%" : "20%" }} />
+          <col style={{ width: showAttestationColumn ? "20%" : "28%" }} />
+          <col style={{ width: showAttestationColumn ? "22%" : "24%" }} />
         </colgroup>
         <thead>
           <tr className="bg-[#f5f5f8]">
@@ -2048,6 +2133,7 @@ function ViolationRulesTable({
         <tbody>
           {violations.map((raw, idx) => {
             const v = withViolationDefaults(raw);
+            const penaltyUnit = v.penaltyAmountUnit ?? defaultPenaltyAmountUnit(v.payType);
             const rowFieldsDisabled = !v.enabled;
             const showAttestationCell = showAttestationColumn && BREAK_VIOLATION_RULE_IDS.has(v.id);
             const mappedQuestionId = attestationQuestions
@@ -2110,10 +2196,20 @@ function ViolationRulesTable({
                   </div>
                 </td>
                 <td className="border-b border-[#e0e1e9] px-[8px] py-[8px] text-center min-w-0">
-                  <div className="flex justify-center min-w-0">
-                    <NumberInput value={v.hoursRate} onChange={(val) => onUpdate(v.id, { hoursRate: val })}
+                  <div className="flex items-center justify-center gap-[6px] min-w-0 mx-auto w-fit max-w-full">
+                    <NumberInput
+                      value={v.hoursRate}
+                      onChange={(val) => onUpdate(v.id, { hoursRate: val })}
                       disabled={rowFieldsDisabled}
-                      step={0.25} min={0} width={72} suffix={v.payType === "flat" ? "$" : "hr(s)"} />
+                      step={penaltyUnit === "dollars" ? 0.01 : 0.25}
+                      min={0}
+                      width={68}
+                    />
+                    <PenaltyAmountUnitToggle
+                      value={penaltyUnit}
+                      onChange={(unit) => onUpdate(v.id, { penaltyAmountUnit: unit })}
+                      disabled={rowFieldsDisabled}
+                    />
                   </div>
                 </td>
               </tr>
@@ -3361,7 +3457,8 @@ function OnDutyEmployeeModal({ selected, initialFilter, onApply, onClose }: {
 type AttestationAnswerEntry = {
   answer: AttestationAnswer | null;
   comment: string;
-  missedRestBreakSlots?: RestBreakSlotIndex[];
+  /** `jobCode|phaseCode` from {@link phaseKeyFor} when rest break attestation answer is No. */
+  missedRestBreakJobPhase?: string;
 };
 
 type AttestationAnswerState = Record<string, AttestationAnswerEntry>;
@@ -3375,7 +3472,6 @@ function attestationRestBreakSelectionRequired(
   if (!q) return false;
   const entry = answers[q.id];
   if (entry?.answer !== "no") return false;
-  if (effectiveRestBreakSlots(mp).length === 0) return false;
   if (!isMissedRestBreakPenaltyActive(mp)) return false;
   return true;
 }
@@ -3389,14 +3485,8 @@ function attestationMissedRestBreaksValid(
   const restQ = restBreakAttestationQuestion(questions);
   if (!restQ) return true;
   const entry = answers[restQ.id];
-  const selected = entry?.missedRestBreakSlots ?? [];
-  const allowed = new Set(effectiveRestBreakSlots(mp).map((s) => s.slot));
-  return selected.length >= 1 && selected.every((n) => allowed.has(n));
-}
-
-function formatMissedRestBreakAuditSuffix(slots: RestBreakSlotIndex[]): string {
-  const sorted = [...slots].sort((a, b) => a - b);
-  return `Missed: ${sorted.map((n) => `Rest Break ${n}`).join(", ")}`;
+  const key = entry?.missedRestBreakJobPhase?.trim() ?? "";
+  return key.length > 0 && isValidJobPhaseKey(key);
 }
 
 function attestationCommentRequired(q: AttestationQuestion, answer: AttestationAnswer | null): boolean {
@@ -3455,9 +3545,9 @@ function attestationAuditCommentForQuestion(q: AttestationQuestion, entry: Attes
   if (
     isRestBreakAttestationQuestion(q)
     && entry.answer === "no"
-    && entry.missedRestBreakSlots?.length
+    && entry.missedRestBreakJobPhase
   ) {
-    const suffix = formatMissedRestBreakAuditSuffix(entry.missedRestBreakSlots);
+    const suffix = `Job/phase: ${formatAttestationMissedBreakJobPhase(entry.missedRestBreakJobPhase)}`;
     comment = comment ? `${comment} (${suffix})` : suffix;
   }
   return comment || "—";
@@ -3486,51 +3576,32 @@ function buildAttestationAuditEntries(
   });
 }
 
-function RestBreakMissedSelector({
-  slots,
-  selected,
+function RestBreakJobPhaseSelector({
+  value,
   onChange,
 }: {
-  slots: EffectiveRestBreakSlot[];
-  selected: RestBreakSlotIndex[];
-  onChange: (next: RestBreakSlotIndex[]) => void;
+  value: string;
+  onChange: (jobPhaseKey: string) => void;
 }) {
-  const toggle = (slot: RestBreakSlotIndex) => {
-    const set = new Set(selected);
-    if (set.has(slot)) set.delete(slot);
-    else set.add(slot);
-    onChange([...set].sort((a, b) => a - b));
-  };
+  const options = jobPhaseSelectOptions();
 
   return (
     <div className="mt-[12px] rounded-[6px] border border-[#e0e1e9] bg-[#fafafa] px-[14px] py-[12px]">
       <p className="text-[12px] font-semibold text-[#252a2e] mb-[4px]">
-        Which rest breaks did you miss? <span className="text-[#ab1f26]">*</span>
+        Which job and phase were you on? <span className="text-[#ab1f26]">*</span>
       </p>
-      <p className="text-[11px] text-[#6a6e79] mb-[10px]">Select all that apply.</p>
-      <div className="flex flex-col gap-[8px]">
-        {slots.map(({ slot, triggerHours }) => {
-          const checked = selected.includes(slot);
-          return (
-            <label
-              key={slot}
-              className="flex items-start gap-[10px] cursor-pointer rounded-[6px] border border-[#e0e1e9] bg-white px-[12px] py-[10px]"
-            >
-              <ModusWcCheckbox
-                value={checked}
-                onInputChange={() => toggle(slot)}
-                aria-label={`Rest Break ${slot}`}
-              />
-              <span className="min-w-0">
-                <span className="block text-[12px] font-semibold text-[#252a2e]">Rest Break {slot}</span>
-                <span className="block text-[11px] text-[#6a6e79]">Due after {triggerHours} hrs into shift</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
-      {selected.length === 0 && (
-        <p className="text-[11px] text-[#ab1f26] mt-[8px]">Select at least one rest break.</p>
+      <p className="text-[11px] text-[#6a6e79] mb-[10px]">
+        Select the job and phase you were working when you missed your rest break.
+      </p>
+      <SelectField
+        value={value}
+        onChange={onChange}
+        placeholder="Select job and phase"
+        customClass="w-full min-w-0"
+        options={options}
+      />
+      {!value && (
+        <p className="text-[11px] text-[#ab1f26] mt-[8px]">Select a job and phase to continue.</p>
       )}
     </div>
   );
@@ -3729,7 +3800,6 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
 
   const dateStr = `Tue 2026/07/${day.date}`;
   const canSubmit = attestationCanSubmit(questions, answers, mealPenalty);
-  const restBreakSlots = effectiveRestBreakSlots(mealPenalty);
   const hasInProgressAnswers = questions.some((q) => answers[q.id]?.answer);
   const previewRows = showAuditTrail
     ? attestationAnswersToPreviewRows(questions, answers, submittedBy)
@@ -3742,15 +3812,15 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
     const isRestBreakQ = isRestBreakAttestationQuestionId(questions, id);
     setAnswers((prev) => {
       const prevEntry = prev[id] ?? { answer: null, comment: "" };
-      const missedRestBreakSlots =
-        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+      const missedRestBreakJobPhase =
+        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakJobPhase ?? "" : undefined;
       return {
         ...prev,
         [id]: {
           ...prevEntry,
           answer,
-          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
-          ...(isRestBreakQ && answer === "no" ? { missedRestBreakSlots } : {}),
+          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakJobPhase: undefined } : {}),
+          ...(isRestBreakQ && answer === "no" ? { missedRestBreakJobPhase } : {}),
         },
       };
     });
@@ -3760,12 +3830,12 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
     setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
   };
 
-  const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+  const setMissedRestBreakJobPhase = (jobPhaseKey: string) => {
     const restQId = restBreakAttestationQuestion(questions)?.id;
     if (!restQId) return;
     setAnswers((prev) => ({
       ...prev,
-      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakJobPhase: jobPhaseKey },
     }));
   };
 
@@ -3815,10 +3885,9 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
       {questions.map((q) => {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
-        const showRestBreakPicker =
+        const showRestBreakJobPhase =
           isRestBreakAttestationQuestion(q)
           && entry.answer === "no"
-          && restBreakSlots.length > 0
           && isMissedRestBreakPenaltyActive(mealPenalty);
         return (
           <div key={q.id}>
@@ -3830,11 +3899,10 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
               <div style={{ height: 1, background: "#e0e1e9" }} />
               <RadioRow label="No" selected={entry.answer === "no"} onSelect={() => setAnswer(q.id, "no")} />
             </div>
-            {showRestBreakPicker && (
-              <RestBreakMissedSelector
-                slots={restBreakSlots}
-                selected={entry.missedRestBreakSlots ?? []}
-                onChange={setMissedRestBreakSlots}
+            {showRestBreakJobPhase && (
+              <RestBreakJobPhaseSelector
+                value={entry.missedRestBreakJobPhase ?? ""}
+                onChange={setMissedRestBreakJobPhase}
               />
             )}
             <div className="mt-[10px]">
@@ -4985,7 +5053,6 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
     Object.fromEntries(questions.map((q) => [q.id, { answer: null, comment: "" }]))
   );
   const canSubmit = attestationCanSubmit(questions, answers, mealPenalty);
-  const restBreakSlots = effectiveRestBreakSlots(mealPenalty);
 
   const YesNo = ({ value, onSelect }: { value: "yes" | "no" | null; onSelect: (v: "yes" | "no") => void }) => (
     <div className="flex gap-[8px]">
@@ -5008,15 +5075,15 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
     const isRestBreakQ = isRestBreakAttestationQuestionId(questions, id);
     setAnswers((prev) => {
       const prevEntry = prev[id] ?? { answer: null, comment: "" };
-      const missedRestBreakSlots =
-        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakSlots ?? [] : undefined;
+      const missedRestBreakJobPhase =
+        isRestBreakQ && answer === "no" ? prevEntry.missedRestBreakJobPhase ?? "" : undefined;
       return {
         ...prev,
         [id]: {
           ...prevEntry,
           answer,
-          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakSlots: undefined } : {}),
-          ...(isRestBreakQ && answer === "no" ? { missedRestBreakSlots } : {}),
+          ...(isRestBreakQ && answer === "yes" ? { missedRestBreakJobPhase: undefined } : {}),
+          ...(isRestBreakQ && answer === "no" ? { missedRestBreakJobPhase } : {}),
         },
       };
     });
@@ -5026,12 +5093,12 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
     setAnswers((prev) => ({ ...prev, [id]: { ...prev[id], comment } }));
   };
 
-  const setMissedRestBreakSlots = (slots: RestBreakSlotIndex[]) => {
+  const setMissedRestBreakJobPhase = (jobPhaseKey: string) => {
     const restQId = restBreakAttestationQuestion(questions)?.id;
     if (!restQId) return;
     setAnswers((prev) => ({
       ...prev,
-      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakSlots: slots },
+      [restQId]: { ...(prev[restQId] ?? { answer: null, comment: "" }), missedRestBreakJobPhase: jobPhaseKey },
     }));
   };
 
@@ -5057,10 +5124,9 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
       {questions.map((q) => {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
-        const showRestBreakPicker =
+        const showRestBreakJobPhase =
           isRestBreakAttestationQuestion(q)
           && entry.answer === "no"
-          && restBreakSlots.length > 0
           && isMissedRestBreakPenaltyActive(mealPenalty);
         return (
           <div key={q.id} style={{ marginBottom: 18 }}>
@@ -5068,11 +5134,10 @@ function MobileAttestationSheet({ day, onClose, onSubmit }: {
               {q.question} <span style={{ color: "#ab1f26" }}>*</span>
             </p>
             <YesNo value={entry.answer} onSelect={(v) => setAnswer(q.id, v)} />
-            {showRestBreakPicker && (
-              <RestBreakMissedSelector
-                slots={restBreakSlots}
-                selected={entry.missedRestBreakSlots ?? []}
-                onChange={setMissedRestBreakSlots}
+            {showRestBreakJobPhase && (
+              <RestBreakJobPhaseSelector
+                value={entry.missedRestBreakJobPhase ?? ""}
+                onChange={setMissedRestBreakJobPhase}
               />
             )}
             <div style={{ marginTop: 10 }}>
@@ -7129,17 +7194,67 @@ const breakViolationDisplayLabel = (v: SummaryViolation) => {
   return defaultViolations().find((rule) => rule.id === v.violationTypeId)?.label ?? v.label;
 };
 
-function ViolationTypeBadge({ violation }: { violation: SummaryViolation }) {
+function violationRuleForSummary(v: SummaryViolation, mp: MealPenaltyState): ViolationRule {
+  const configured = (mp.violations ?? defaultViolations()).map(withViolationDefaults);
+  const match = configured.find((rule) => rule.id === v.violationTypeId);
+  if (match) return match;
+  const fallback = defaultViolations().find((rule) => rule.id === v.violationTypeId);
+  return withViolationDefaults(
+    fallback ?? {
+      id: v.violationTypeId,
+      label: v.label,
+      description: "",
+      enabled: true,
+      payType: "regular",
+      hoursRate: v.reg ?? 1,
+      maxPenalty: 1,
+    },
+  );
+}
+
+function summaryViolationPenaltyUnit(v: SummaryViolation, mp: MealPenaltyState): PenaltyAmountUnit {
+  const rule = violationRuleForSummary(v, mp);
+  return rule.penaltyAmountUnit ?? defaultPenaltyAmountUnit(rule.payType);
+}
+
+function summaryViolationPenaltyUnitTag(unit: PenaltyAmountUnit): string {
+  return unit === "dollars" ? "$" : "hr";
+}
+
+function summaryViolationDisplayAmount(v: SummaryViolation, mp: MealPenaltyState): number {
+  const rule = violationRuleForSummary(v, mp);
+  const unit = summaryViolationPenaltyUnit(v, mp);
+  if (unit === "dollars") {
+    return rule.hoursRate;
+  }
+  return v.reg ?? rule.hoursRate;
+}
+
+function ViolationPenaltyUnitBadge({ unit }: { unit: PenaltyAmountUnit }) {
+  return (
+    <ModusWcBadge color="default" variant="filled" size="sm" customClass="shrink-0">
+      {summaryViolationPenaltyUnitTag(unit)}
+    </ModusWcBadge>
+  );
+}
+
+function ViolationTypeCell({ violation }: { violation: SummaryViolation }) {
+  const { companyMealPenalty } = useMealPenaltyConfig();
   const isDeleted = violation.status === "deleted";
+  const unit = summaryViolationPenaltyUnit(violation, companyMealPenalty);
 
   return (
-    <ModusWcBadge
-      color="secondary"
-      variant={isDeleted ? "outlined" : "filled"}
-      size="sm"
-    >
-      {isDeleted ? "Deleted" : breakViolationDisplayLabel(violation)}
-    </ModusWcBadge>
+    <div className="flex flex-wrap items-center gap-[6px] min-w-0">
+      <ModusWcBadge
+        color="secondary"
+        variant={isDeleted ? "outlined" : "filled"}
+        size="sm"
+        customClass="min-w-0 max-w-full"
+      >
+        {isDeleted ? "Deleted" : breakViolationDisplayLabel(violation)}
+      </ModusWcBadge>
+      {!isDeleted ? <ViolationPenaltyUnitBadge unit={unit} /> : null}
+    </div>
   );
 }
 
@@ -7316,7 +7431,6 @@ const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "2nd Appr.", title: "Second Approved By" },
   { label: "Complete", title: "Complete" },
   { label: "Exported", title: "Exported" },
-  { label: "Violation Type", title: "Type of Violation" },
   { label: "Name", title: "Name" },
   { label: "Emp #", title: "Employee #" },
   { label: "Date", title: "Date" },
@@ -7324,6 +7438,7 @@ const BREAK_VIOLATION_TABLE_HEADERS: { label: string; title: string }[] = [
   { label: "Job", title: "Job" },
   { label: "Phase", title: "Phase" },
   { label: "St", title: "State" },
+  { label: "Violation Type", title: "Type of Violation" },
   { label: "Amount", title: "Amount" },
   { label: "Union", title: "Union Code" },
   { label: "Wage", title: "Wage Code" },
@@ -7719,7 +7834,8 @@ function SummaryEditableDataCells({
   secondApprovedByCell,
   completeCell,
   exportedCell,
-  afterExportedCell,
+  beforeAmountCell,
+  breakViolationAmount,
   columnsMode = "full",
 }: {
   rowKind: SummaryTableRow["kind"];
@@ -7741,7 +7857,8 @@ function SummaryEditableDataCells({
   secondApprovedByCell?: ReactNode;
   completeCell?: ReactNode;
   exportedCell?: ReactNode;
-  afterExportedCell?: ReactNode;
+  beforeAmountCell?: ReactNode;
+  breakViolationAmount?: number;
   columnsMode?: "full" | "breakViolation";
 }) {
   const cell = (field: string) => summaryCellId(rowKind, rowId, field);
@@ -7863,11 +7980,6 @@ function SummaryEditableDataCells({
       >
         {exportedCell ?? statusMark(data.exported)}
       </td>
-      {afterExportedCell ? (
-        <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
-          {afterExportedCell}
-        </td>
-      ) : null}
       <SummaryClickEditTextCell
         cellId={cell("name")}
         activeCellId={activeCellId}
@@ -7999,10 +8111,18 @@ function SummaryEditableDataCells({
           onSave={(v) => onPatch({ wo: v })}
         />
       )}
-      {breakViolationColumns ? (
+      {breakViolationColumns && beforeAmountCell ? (
+        <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
+          {beforeAmountCell}
+        </td>
+      ) : null}
+      {breakViolationColumns && breakViolationAmount !== undefined ? (
         <td className={SUMMARY_TABLE_CELL} style={{ fontFamily: OS }}>
-          <span style={{ color: deleted ? "#6a6e79" : "#252a2e", textDecoration: deleted ? "line-through" : "none" }}>
-            ${summaryViolationAmount({ payRate: data.payRate, reg: data.reg ?? 0 }).toFixed(2)}
+          <span
+            className="tabular-nums"
+            style={{ color: deleted ? "#6a6e79" : "#252a2e", textDecoration: deleted ? "line-through" : "none" }}
+          >
+            {breakViolationAmount.toFixed(2)}
           </span>
         </td>
       ) : null}
@@ -8670,9 +8790,11 @@ function SummaryViolationCard({
   onDeleteViolation: (violationId: string, label: string) => void;
   onRestoreViolation: (violationId: string) => void;
 }) {
+  const { companyMealPenalty } = useMealPenaltyConfig();
   const isDeleted = v.status === "deleted";
   const isApproved = v.status === "approved" || !!v.approvedBy;
   const breakViolation = isBreakViolation(v);
+  const violationAmount = summaryViolationDisplayAmount(v, companyMealPenalty);
   const canManage = canDeleteBreakViolations && breakViolation;
   const canDelete = canManage && !isDeleted;
   const canRestore = canManage && isDeleted;
@@ -8696,14 +8818,13 @@ function SummaryViolationCard({
           </p>
           <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{v.date}</p>
         </div>
-        <ViolationTypeBadge violation={v} />
+        <ViolationTypeCell violation={v} />
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
         <TimesheetMobileKvRow label="1st approver" value={fmtTsText(v.approvedBy)} />
         <TimesheetMobileKvRow label="2nd approver" value={fmtTsText(v.secondApprovedBy)} />
         <TimesheetMobileKvRow label="Complete" value={fmtTsYesNo(v.complete)} />
         <TimesheetMobileKvRow label="Exported" value={fmtTsYesNo(v.exported)} />
-        <TimesheetMobileKvRow label="Violation type" value={breakViolationDisplayLabel(v)} />
         <TimesheetMobileKvRow label="Name" value={fmtTsText(employee.name)} />
         <TimesheetMobileKvRow label="Employee #" value={fmtTsText(employee.employeeNum)} />
         <TimesheetMobileKvRow label="Date" value={fmtTsText(v.date)} />
@@ -8711,10 +8832,14 @@ function SummaryViolationCard({
         <TimesheetMobileKvRow label="Job" value={fmtTsText(v.job)} />
         <TimesheetMobileKvRow label="Phase" value={fmtTsText(v.phase)} />
         <TimesheetMobileKvRow label="State" value={fmtTsText(v.state)} />
+        <div className="flex items-center justify-between gap-[12px]" style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, flexShrink: 0 }}>Violation type</p>
+          <ViolationTypeCell violation={v} />
+        </div>
         <TimesheetMobileKvRow
           label="Amount"
-          value={`$${summaryViolationAmount(v).toFixed(2)}`}
-          valueColor={summaryViolationAmount(v) > 0 ? "#0e416c" : undefined}
+          value={violationAmount.toFixed(2)}
+          valueColor={violationAmount > 0 ? "#0e416c" : undefined}
         />
         <TimesheetMobileKvRow label="Union" value={fmtTsText(v.unionCode)} />
         <TimesheetMobileKvRow label="Wage" value={fmtTsText(v.wageCode)} />
@@ -8767,9 +8892,13 @@ function SummaryViolationCardsView({
   onDeleteViolation: (violationId: string, label: string) => void;
   onRestoreViolation: (violationId: string) => void;
 }) {
+  const { companyMealPenalty } = useMealPenaltyConfig();
   const violationRows = buildBreakViolationRows(employee);
   const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totalAmount = activeViolations.reduce((s, v) => s + summaryViolationAmount(v), 0);
+  const totalAmount = activeViolations.reduce(
+    (s, v) => s + summaryViolationDisplayAmount(v, companyMealPenalty),
+    0,
+  );
 
   if (violationRows.length === 0) {
     return (
@@ -8797,7 +8926,7 @@ function SummaryViolationCardsView({
         style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}
       >
         <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
-        <TimesheetMobileKvRow label="Amount" value={`$${totalAmount.toFixed(2)}`} valueColor="#0e416c" />
+        <TimesheetMobileKvRow label="Amount" value={totalAmount.toFixed(2)} valueColor="#0e416c" />
       </div>
     </div>
   );
@@ -8943,6 +9072,8 @@ function SummaryViolationRow({
   const canManage = canDeleteBreakViolations && breakViolation;
   const canDelete = canManage && !isDeleted;
   const canRestore = canManage && isDeleted;
+  const { companyMealPenalty } = useMealPenaltyConfig();
+  const violationAmount = summaryViolationDisplayAmount(v, companyMealPenalty);
   const statusMark = (done: boolean) =>
     done ? <Check size={12} color="#15803d" /> : <span style={{ color: "#a3a3a3" }}>—</span>;
 
@@ -8999,7 +9130,8 @@ function SummaryViolationRow({
         )}
         completeCell={statusMark(isApproved && !isDeleted)}
         exportedCell={statusMark(v.exported)}
-        afterExportedCell={<ViolationTypeBadge violation={v} />}
+        beforeAmountCell={<ViolationTypeCell violation={v} />}
+        breakViolationAmount={violationAmount}
       />
       <td className={`${SUMMARY_TABLE_ACTIONS_CELL} text-center`} style={{ fontFamily: OS }} onClick={(e) => e.stopPropagation()}>
         {canDelete ? (
@@ -9355,12 +9487,16 @@ function SummaryBreakViolationsTable({
   onUpdateViolation: (violationId: string, patch: SummaryRowPatch) => void;
   viewMode?: SummaryDataViewMode;
 }) {
+  const { companyMealPenalty } = useMealPenaltyConfig();
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
   const violationRows = buildBreakViolationRows(employee);
 
   const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totalAmount = activeViolations.reduce((s, v) => s + summaryViolationAmount(v), 0);
+  const totalAmount = activeViolations.reduce(
+    (s, v) => s + summaryViolationDisplayAmount(v, companyMealPenalty),
+    0,
+  );
 
   if (viewMode === "card") {
     return (
@@ -9416,8 +9552,8 @@ function SummaryBreakViolationsTable({
           <td colSpan={13} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
             Totals
           </td>
-          <td className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS }}>
-            ${totalAmount.toFixed(2)}
+          <td className={`${SUMMARY_TABLE_CELL} font-bold tabular-nums`} style={{ fontFamily: OS }}>
+            {totalAmount.toFixed(2)}
           </td>
           <td colSpan={4} />
         </tr>
