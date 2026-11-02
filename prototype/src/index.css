@@ -153,6 +153,21 @@ input[type="search"]::-webkit-search-decoration {
   background-color: var(--tq-summary-cell-hover);
 }
 
+/*
+  Modus pins badge height, max-height, and line-height to a single line, so long
+  violation labels that wrap in narrow columns overflow the pill vertically.
+*/
+modus-wc-badge .modus-wc-badge.tq-violation-type-badge {
+  height: auto;
+  max-height: none;
+  min-height: 1.25rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  line-height: 1.3;
+  justify-content: flex-start;
+  text-align: left;
+}
+
 /* Timesheet summary — approver checkbox + name in narrow columns */
 .tq-summary-approval-cell {
   overflow: hidden;

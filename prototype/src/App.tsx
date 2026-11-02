@@ -7348,7 +7348,7 @@ function ViolationTypeCell({ violation }: { violation: SummaryViolation }) {
         color="secondary"
         variant={isDeleted ? "outlined" : "filled"}
         size="sm"
-        customClass="min-w-0 max-w-full"
+        customClass="tq-violation-type-badge min-w-0 max-w-full"
       >
         {isDeleted ? "Deleted" : breakViolationDisplayLabel(violation)}
       </ModusWcBadge>
