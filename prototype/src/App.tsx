@@ -2472,7 +2472,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 2.0,
+  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 1.0,
   restBreaks: defaultRestBreaks(),
   violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
 });
@@ -7176,6 +7176,75 @@ const SUMMARY_MOCK_EMPLOYEES: SummaryEmployee[] = [
     ],
     violations: [],
   },
+  {
+    id: "emp-maria",
+    name: "Maria Lopez",
+    employeeNum: "118",
+    initials: "ML",
+    attestationDays: [{ label: "Wed", date: 19 }],
+    entries: [
+      {
+        id: "maria-1",
+        date: "Wed, Aug 19",
+        start: "7:00 AM", end: "3:00 PM",
+        dept: "Main Orders", job: "004120 - Fresno Substation", phase: "6010 - Trenching",
+        state: "CA", wo: "WO-9301", payRate: "$36.00",
+        reg: 8, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b",
+        comment: "TC1: 8 hr shift, no meal punched, no waiver on file",
+        complete: false, exported: false,
+      },
+    ],
+    breaks: [],
+    expenses: [],
+    violations: [],
+  },
+  {
+    id: "emp-david",
+    name: "David Chen",
+    employeeNum: "204",
+    initials: "DC",
+    attestationDays: [{ label: "Thu", date: 20 }],
+    entries: [
+      {
+        id: "david-1",
+        date: "Thu, Aug 20",
+        start: "6:00 AM", end: "6:00 PM",
+        dept: "Main Orders", job: "004120 - Fresno Substation", phase: "6010 - Trenching",
+        state: "CA", wo: "WO-9301", payRate: "$38.00",
+        reg: 8, ot: 4, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b",
+        comment: "TC2: 12 hr shift, both meal periods missed",
+        complete: false, exported: false, hourAlert: true,
+      },
+    ],
+    breaks: [],
+    expenses: [],
+    violations: [],
+  },
+  {
+    id: "emp-priya",
+    name: "Priya Patel",
+    employeeNum: "317",
+    initials: "PP",
+    attestationDays: [{ label: "Fri", date: 21 }],
+    entries: [
+      {
+        id: "priya-1",
+        date: "Fri, Aug 21",
+        start: "7:00 AM", end: "3:00 PM",
+        dept: "Main Orders", job: "004120 - Fresno Substation", phase: "6010 - Trenching",
+        state: "CA", wo: "WO-9301", payRate: "$34.00",
+        reg: 8, ot: 0, dt: 0, travel: 0, qty: 0, perDiem: 0, perDiemRate: 0,
+        unionCode: "UA-12", wageCode: "E1", rateLevel: "5b",
+        comment: "TC3: 8 hr shift, 1 meal and 1 rest break missed",
+        complete: false, exported: false,
+      },
+    ],
+    breaks: [],
+    expenses: [],
+    violations: [],
+  },
 ];
 
 const BREAK_VIOLATION_IDS = new Set([
@@ -7228,6 +7297,36 @@ function summaryViolationDisplayAmount(v: SummaryViolation, mp: MealPenaltyState
     return rule.hoursRate;
   }
   return v.reg ?? rule.hoursRate;
+}
+
+/** Sums active violation amounts, applying the meal / rest break daily stacking caps (hour-based premiums only). */
+function summaryViolationsTotal(
+  violations: SummaryViolation[],
+  mp: MealPenaltyState,
+): { total: number; uncapped: number } {
+  const hourBuckets = new Map<string, { sum: number; cap: number }>();
+  let total = 0;
+  let uncapped = 0;
+  for (const v of violations) {
+    if (v.status === "deleted") continue;
+    const amount = summaryViolationDisplayAmount(v, mp);
+    uncapped += amount;
+    const isMeal = MEAL_VIOLATION_RULE_IDS.has(v.violationTypeId);
+    const isRest = BREAK_VIOLATION_RULE_IDS.has(v.violationTypeId);
+    if (summaryViolationPenaltyUnit(v, mp) !== "hours" || (!isMeal && !isRest)) {
+      total += amount;
+      continue;
+    }
+    const key = `${v.date}|${isMeal ? "meal" : "rest"}`;
+    const bucket = hourBuckets.get(key) ?? {
+      sum: 0,
+      cap: (isMeal ? mp.mealStackingCap : mp.breakStackingCap) ?? Number.POSITIVE_INFINITY,
+    };
+    bucket.sum += amount;
+    hourBuckets.set(key, bucket);
+  }
+  for (const { sum, cap } of hourBuckets.values()) total += Math.min(sum, cap);
+  return { total, uncapped };
 }
 
 function ViolationPenaltyUnitBadge({ unit }: { unit: PenaltyAmountUnit }) {
@@ -7296,6 +7395,48 @@ connorEmp.violations = [
     secondApprovedBy: undefined,
     complete: false,
   },
+];
+
+const withComment = (v: SummaryViolation, comment: string): SummaryViolation => ({ ...v, comment });
+
+const mariaEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-maria")!;
+mariaEmp.violations = [
+  withComment(
+    violationFromEntry("viol-maria-1-meal", "maria-1", "missed_meal", "Missed Meal", mariaEmp.entries[0]),
+    "TC1: 1 hr meal premium at regular rate",
+  ),
+];
+
+const davidEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-david")!;
+davidEmp.violations = [
+  withComment(
+    violationFromEntry("viol-david-1-meal-1", "david-1", "missed_meal", "Missed Meal", davidEmp.entries[0]),
+    "TC2: 1st meal missed",
+  ),
+  withComment(
+    violationFromEntry("viol-david-1-meal-2", "david-1", "missed_meal", "Missed Meal", davidEmp.entries[0]),
+    "TC2: 2nd meal missed, total capped at 1 hr meal premium per day",
+  ),
+];
+
+const priyaEmp = SUMMARY_MOCK_EMPLOYEES.find((e) => e.id === "emp-priya")!;
+priyaEmp.violations = [
+  withComment(
+    violationFromEntry("viol-priya-1-meal", "priya-1", "missed_meal", "Missed Meal", priyaEmp.entries[0]),
+    "TC3: 1 hr meal premium (2 hr total with rest break)",
+  ),
+  withComment(
+    violationFromEntry(
+      "viol-priya-1-rest-1",
+      "priya-1",
+      "missed_break_attestation",
+      "Missed Rest Break 1",
+      priyaEmp.entries[0],
+      1.0,
+      1,
+    ),
+    "TC3: 1 hr rest break premium (2 hr total with meal)",
+  ),
 ];
 
 function ViolationRemoveModal({
@@ -8894,11 +9035,7 @@ function SummaryViolationCardsView({
 }) {
   const { companyMealPenalty } = useMealPenaltyConfig();
   const violationRows = buildBreakViolationRows(employee);
-  const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totalAmount = activeViolations.reduce(
-    (s, v) => s + summaryViolationDisplayAmount(v, companyMealPenalty),
-    0,
-  );
+  const { total: totalAmount, uncapped: uncappedAmount } = summaryViolationsTotal(violationRows, companyMealPenalty);
 
   if (violationRows.length === 0) {
     return (
@@ -8927,6 +9064,11 @@ function SummaryViolationCardsView({
       >
         <p className="text-[11px] font-bold text-[#252a2e] mb-[8px]" style={{ fontFamily: OS }}>Totals</p>
         <TimesheetMobileKvRow label="Amount" value={totalAmount.toFixed(2)} valueColor="#0e416c" />
+        {uncappedAmount > totalAmount ? (
+          <p className="mt-[6px] text-[11px] text-[#6a6e79]" style={{ fontFamily: OS }}>
+            Daily stacking cap applied ({uncappedAmount.toFixed(2)} before cap)
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -9492,11 +9634,7 @@ function SummaryBreakViolationsTable({
   const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
   const violationRows = buildBreakViolationRows(employee);
 
-  const activeViolations = violationRows.filter((v) => v.status !== "deleted");
-  const totalAmount = activeViolations.reduce(
-    (s, v) => s + summaryViolationDisplayAmount(v, companyMealPenalty),
-    0,
-  );
+  const { total: totalAmount, uncapped: uncappedAmount } = summaryViolationsTotal(violationRows, companyMealPenalty);
 
   if (viewMode === "card") {
     return (
@@ -9549,13 +9687,18 @@ function SummaryBreakViolationsTable({
         )}
         <tr className="tq-summary-totals-row" style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
           <td className={SUMMARY_TABLE_CELL} />
-          <td colSpan={13} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
+          <td colSpan={12} className={`${SUMMARY_TABLE_CELL} font-bold`} style={{ fontFamily: OS, color: "#252a2e" }}>
             Totals
+            {uncappedAmount > totalAmount ? (
+              <span className="ml-[8px] font-normal text-[#6a6e79]">
+                Daily stacking cap applied ({uncappedAmount.toFixed(2)} before cap)
+              </span>
+            ) : null}
           </td>
           <td className={`${SUMMARY_TABLE_CELL} font-bold tabular-nums`} style={{ fontFamily: OS }}>
             {totalAmount.toFixed(2)}
           </td>
-          <td colSpan={4} />
+          <td colSpan={5} />
         </tr>
       </tbody>
     </table>
