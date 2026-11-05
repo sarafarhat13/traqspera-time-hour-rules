@@ -168,6 +168,17 @@ modus-wc-badge .modus-wc-badge.tq-violation-type-badge {
   text-align: left;
 }
 
+modus-wc-collapse .tq-rest-breaks-collapse .modus-wc-title-main-row {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+modus-wc-collapse .tq-rest-breaks-collapse .modus-wc-collapse-description {
+  font-size: 11px;
+  line-height: 16px;
+}
+
 /* Timesheet summary — approver checkbox + name in narrow columns */
 .tq-summary-approval-cell {
   overflow: hidden;

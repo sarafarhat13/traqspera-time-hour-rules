@@ -805,6 +805,7 @@ function RuleSetForm({
                     <div className="pt-[12px] pb-[4px]">
                       <ModusWcCollapse
                         collapseId="rest-breaks-config"
+                        customClass="tq-rest-breaks-collapse"
                         expanded={restBreaksExpanded}
                         options={{
                           title: "Rest breaks",
