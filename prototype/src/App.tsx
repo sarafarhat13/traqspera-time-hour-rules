@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { toast, Toaster } from "sonner";
 import {
+  ModusWcAccordion,
   ModusWcAlert,
   ModusWcAutocomplete,
   ModusWcBadge,
@@ -803,16 +804,20 @@ function RuleSetForm({
                       onMapAttestationQuestion={mapViolationAttestationQuestion}
                     />
                     <div className="pt-[12px] pb-[4px]">
+                      <ModusWcAccordion
+                        aria-label="Rest breaks configuration"
+                        onExpandedChange={(e: CustomEvent<{ expanded: boolean; index: number }>) => setRestBreaksExpanded(e.detail.expanded)}
+                      >
                       <ModusWcCollapse
                         collapseId="rest-breaks-config"
                         customClass="tq-rest-breaks-collapse"
+                        bordered
                         expanded={restBreaksExpanded}
                         options={{
                           title: "Rest breaks",
                           description: "Configure up to four rest breaks per shift. Applies only when Missed Rest Break is enabled above.",
                           size: "sm",
                         }}
-                        onExpandedChange={(e: CustomEvent<{ expanded: boolean }>) => setRestBreaksExpanded(e.detail.expanded)}
                       >
                         <div slot="content" className="pt-[6px]">
                         <div className={`rounded-[6px] border border-[#e0e1e9] min-w-0 ${restBreakConfigDisabled ? "opacity-50" : ""}`}>
@@ -867,6 +872,7 @@ function RuleSetForm({
                         </div>
                         </div>
                       </ModusWcCollapse>
+                      </ModusWcAccordion>
                     </div>
                     <div className="flex items-end gap-[32px] pt-[14px] pb-[4px]">
                       <div>
