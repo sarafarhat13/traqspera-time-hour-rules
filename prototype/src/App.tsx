@@ -451,7 +451,7 @@ function RuleSetForm({
   };
 
   const restBreakConfigDisabled = !isMissedRestBreakPenaltyActive(mp);
-  const [restBreaksExpanded, setRestBreaksExpanded] = useState(true);
+  const [restBreaksExpanded, setRestBreaksExpanded] = useState(false);
 
   const updateViolation = (id: string, patch: Partial<ViolationRule>) => {
     const next = (mp.violations ?? defaultViolations()).map((r) =>
@@ -2482,7 +2482,7 @@ const defaultMealPenalty = (): MealPenaltyState => ({
   freeMealPrompt: "Was this meal provided free of charge by the employer?",
   onDutyMealEnabled: true, onDutyRequireAgreement: true, onDutyNoAgreementAction: "flag_and_pay",
   onDutyEmployees: ["e01", "e02", "e03", "e05", "e06", "e09", "e12"],
-  penaltiesEnabled: true, breakStackingCap: 2.0, mealStackingCap: 1.0,
+  penaltiesEnabled: true, breakStackingCap: 1.0, mealStackingCap: 1.0,
   restBreaks: defaultRestBreaks(),
   violations: defaultViolations(), jobCostOverride: defaultJobCostOverride(),
 });
