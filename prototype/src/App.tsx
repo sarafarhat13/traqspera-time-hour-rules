@@ -6,6 +6,7 @@ import {
   ModusWcBadge,
   ModusWcButton,
   ModusWcCheckbox,
+  ModusWcCollapse,
   ModusWcIcon,
   ModusWcNumberInput,
   ModusWcPagination,
@@ -450,6 +451,7 @@ function RuleSetForm({
   };
 
   const restBreakConfigDisabled = !isMissedRestBreakPenaltyActive(mp);
+  const [restBreaksExpanded, setRestBreaksExpanded] = useState(true);
 
   const updateViolation = (id: string, patch: Partial<ViolationRule>) => {
     const next = (mp.violations ?? defaultViolations()).map((r) =>
@@ -801,11 +803,17 @@ function RuleSetForm({
                       onMapAttestationQuestion={mapViolationAttestationQuestion}
                     />
                     <div className="pt-[12px] pb-[4px]">
-                      <p className="text-[12px] font-semibold text-[#252a2e] mb-[6px]">Rest breaks</p>
-                      <div className="flex flex-col gap-[5px]">
-                        <p className="text-[11px] text-[#6a6e79] leading-[16px] m-0">
-                          Configure up to four rest breaks per shift. Applies only when Missed Rest Break is enabled above.
-                        </p>
+                      <ModusWcCollapse
+                        collapseId="rest-breaks-config"
+                        expanded={restBreaksExpanded}
+                        options={{
+                          title: "Rest breaks",
+                          description: "Configure up to four rest breaks per shift. Applies only when Missed Rest Break is enabled above.",
+                          size: "sm",
+                        }}
+                        onExpandedChange={(e: CustomEvent<{ expanded: boolean }>) => setRestBreaksExpanded(e.detail.expanded)}
+                      >
+                        <div slot="content" className="pt-[6px]">
                         <div className={`rounded-[6px] border border-[#e0e1e9] min-w-0 ${restBreakConfigDisabled ? "opacity-50" : ""}`}>
                         <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
                           <colgroup>
@@ -856,7 +864,8 @@ function RuleSetForm({
                           </tbody>
                         </table>
                         </div>
-                      </div>
+                        </div>
+                      </ModusWcCollapse>
                     </div>
                     <div className="flex items-end gap-[32px] pt-[14px] pb-[4px]">
                       <div>
