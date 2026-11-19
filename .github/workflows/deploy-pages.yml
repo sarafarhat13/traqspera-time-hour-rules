@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - cursor/modus-form-controls
+      - timesheet-redesign
     paths:
       - 'prototype/**'
       - '.github/workflows/deploy-pages.yml'
@@ -23,6 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # main and cursor/modus-form-controls own the site root; every other branch
+      # gets its own preview folder so it can't overwrite them.
+      - name: Choose deploy folder
+        run: |
+          case "$GITHUB_REF_NAME" in
+            main|cursor/modus-form-controls) echo "PAGES_SUBDIR=" >> "$GITHUB_ENV" ;;
+            *) echo "PAGES_SUBDIR=preview/${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV" ;;
+          esac
 
       - uses: actions/setup-node@v4
         with:
@@ -48,9 +58,12 @@ jobs:
           cd /tmp/ghp
           git switch -c gh-pages --track origin/gh-pages 2>/dev/null || git switch gh-pages
           cd "$GITHUB_WORKSPACE"
+          target="/tmp/ghp/${PAGES_SUBDIR:+$PAGES_SUBDIR/}"
+          mkdir -p "$target"
           # --checksum because index.html often keeps its size and mtime while the
           # asset hashes inside it change, which plain rsync would skip.
-          rsync -a --checksum --delete --exclude '.git' --exclude '.nojekyll' prototype/dist/ /tmp/ghp/
+          # Root deploys exclude preview/ so --delete leaves branch previews alone.
+          rsync -a --checksum --delete --exclude '.git' --exclude '.nojekyll' --exclude '/preview' prototype/dist/ "$target"
           touch /tmp/ghp/.nojekyll
           cd /tmp/ghp
           git add -A
@@ -58,5 +71,6 @@ jobs:
             echo "Build output is unchanged; nothing to deploy."
             exit 0
           fi
-          git commit -m "Deploy ${GITHUB_SHA:0:7}: $(git -C "$GITHUB_WORKSPACE" log -1 --pretty=%s)"
+          git commit -m "Deploy ${GITHUB_SHA:0:7}${PAGES_SUBDIR:+ to $PAGES_SUBDIR}: $(git -C "$GITHUB_WORKSPACE" log -1 --pretty=%s)"
           git push origin gh-pages
+          echo "Deployed to https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/${PAGES_SUBDIR:+$PAGES_SUBDIR/}"

@@ -214,12 +214,59 @@ modus-wc-collapse .tq-rest-breaks-collapse .modus-wc-collapse-description {
   word-break: break-word;
 }
 
-/* Clock In — inline Switch Job: open select panels stack above the timesheet */
-.clock-switch-job-editing modus-wc-select {
-  position: relative;
-  z-index: 1;
+/* Clock In job details modal — only the fields scroll, header and actions stay pinned */
+.clock-job-modal .modus-wc-modal-box {
+  overflow: hidden;
+  width: 92vw;
+  max-width: 640px;
 }
 
-.clock-switch-job-editing modus-wc-select:focus-within {
-  z-index: 100;
+.clock-job-modal .modus-wc-modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
+
+.clock-job-modal .modus-wc-modal-action {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--modus-wc-color-base-200);
+}
+
+/* Pay-period arrows sit on the navy timesheet header, so they need light ink. */
+.clock-out-modal .modus-wc-modal-box { width: 92vw; max-width: 440px; }
+.timesheet-entry-modal .modus-wc-modal-box { width: 92vw; max-width: 460px; }
+
+/* Pay-period table: one modus-wc-table, with days marked by the first row of each day. */
+table.timesheet-table { min-width: 720px; table-layout: fixed; }
+/* The page draws its own empty state below the header. */
+table.timesheet-table tr:has(> .no-data-message) { display: none; }
+table.timesheet-table thead th:nth-child(7),
+table.timesheet-table thead th:nth-child(8) { text-align: right; }
+.timesheet-table td { vertical-align: top; font-size: 12px; color: var(--modus-wc-color-base-content, #252a2e); }
+.timesheet-table tbody tr { cursor: pointer; }
+.timesheet-table tbody tr:has([data-day-start]) td { border-top: 2px solid #cbced4; }
+.timesheet-table tbody tr:first-child td { border-top: none; }
+.timesheet-table tbody tr:has([data-live]) td { background: #f0f7fc; }
+.timesheet-table .ts-day { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.timesheet-table .ts-day-head { display: flex; align-items: center; gap: 2px; margin-left: -6px; }
+.timesheet-table .ts-day-head > modus-wc-icon { padding: 0 6px; }
+
+/* Day attestation status: green check when signed, amber dot while pending. */
+.ts-attested { color: var(--modus-wc-color-base-content-low-contrast, #6a6e79); }
+.attest-done-icon { color: var(--modus-wc-color-success, #1e8a44); }
+.ts-pending-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: var(--modus-wc-color-warning, #f59e0b); }
+.timesheet-table .ts-day-title { font-size: 13px; font-weight: 700; }
+.pay-period-menu-tag { font-weight: 400; color: var(--modus-wc-color-base-content-low-contrast, #6a6e79); }
+.timesheet-table .ts-muted { font-size: 11px; color: var(--modus-wc-color-base-content-low-contrast, #6a6e79); }
+.timesheet-table .ts-type { display: flex; justify-content: center; }
+.timesheet-table .ts-time { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.timesheet-table .ts-flag { color: #b45309; }
+.timesheet-table .ts-wrap { overflow-wrap: break-word; }
+.timesheet-table .ts-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
+.timesheet-table .ts-strong { font-weight: 700; }
+/* Weekly hours bar: amber when close to the overtime limit, red once it is reached. */
+modus-wc-progress .modus-wc-progress.week-ot-progress { height: 0.5rem; }
+modus-wc-progress .modus-wc-progress.week-ot-progress--over::-webkit-progress-value { background-color: var(--modus-wc-color-error, #dc2626); }
+modus-wc-progress .modus-wc-progress.week-ot-progress--over::-moz-progress-bar { background-color: var(--modus-wc-color-error, #dc2626); }

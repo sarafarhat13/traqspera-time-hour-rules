@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, createContext, useContext, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { toast, Toaster } from "sonner";
 import {
   ModusWcAccordion,
@@ -8,16 +9,22 @@ import {
   ModusWcButton,
   ModusWcCheckbox,
   ModusWcCollapse,
+  ModusWcDropdownMenu,
   ModusWcIcon,
+  ModusWcMenuItem,
+  ModusWcModal,
   ModusWcNumberInput,
   ModusWcPagination,
+  ModusWcProgress,
   ModusWcRadio,
   ModusWcSelect,
   ModusWcSwitch,
+  ModusWcTable,
   ModusWcTabs,
   ModusWcTextInput,
   ModusWcTextarea,
   ModusWcTimeInput,
+  ModusWcToast,
   ModusWcTooltip,
 } from "@trimble-oss/moduswebcomponents-react";
 import {
@@ -26,7 +33,7 @@ import {
   Clock, Filter, User, Users, Briefcase, CreditCard,
   BarChart2, Wrench, FileText, Settings, Shield,
   AlignJustify, ChevronRight, Bell, HelpCircle, Search, Utensils, Coffee,
-  MapPin, LoaderCircle, Calendar, ClipboardList, Save, Paperclip,
+  MapPin, LoaderCircle, Calendar, CalendarX, ClipboardList, Save, Paperclip,
 } from "lucide-react";
 
 // ─── Autosave hook ───────────────────────────────────────────────────────────
@@ -2917,7 +2924,7 @@ function JurisdictionSettings({ onOpenAttestationQuestions }: { onOpenAttestatio
 
 // ─── Nav Sidebar ──────────────────────────────────────────────────────────────
 type NavPage =
-  | "timesheets" | "clock_in" | "timesheet_summary" | "time_off" | "compliance_dashboard"
+  | "timesheets" | "clock_in" | "clock_in_mobile" | "timesheet_summary" | "time_off" | "compliance_dashboard"
   | "employees" | "jobs" | "expenses" | "reports" | "equipment" | "documents" | "global_admin"
   | "s_settings" | "s_permissions" | "s_time_off_setup" | "s_notifications"
   | "s_tenant_images" | "s_hour_rules" | "s_timesheet_settings" | "s_rate_level" | "s_auto_job";
@@ -2942,6 +2949,7 @@ const NAV_SECTIONS: NavSection[] = [
     children: [
       { key: "timesheets",         label: "Timesheets" },
       { key: "clock_in",           label: "Clock In and Out" },
+      { key: "clock_in_mobile",    label: "Clock In/Out Mobile" },
       { key: "timesheet_summary",  label: "Timesheet Summary" },
       { key: "time_off",           label: "Time Off" },
       { key: "compliance_dashboard", label: "Compliance Dashboard" },
@@ -3798,8 +3806,13 @@ const ATTESTATION_MODAL_TABS = [
   { label: "Audit Trail", icon: "history" },
 ] as const;
 
-function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, auditEntries = [], submittedBy = "Employee" }: {
+function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, auditEntries = [], submittedBy = "Employee", stepLabel, days, isAttested, onChangeDay }: {
   day: { label: string; date: number };
+  stepLabel?: string;
+  // When given, the date picker lists these days with their status and switching loads that day.
+  days?: { label: string; date: number }[];
+  isAttested?: (date: number) => boolean;
+  onChangeDay?: (day: { label: string; date: number }) => void;
   onClose: () => void;
   onSubmit: (entries?: AttestationAuditEntry[]) => void;
   showAuditTrail?: boolean;
@@ -3814,8 +3827,14 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
   );
   const [modalTabIndex, setModalTabIndex] = useState(0);
 
-  const dateStr = `Tue 2026/07/${day.date}`;
-  const canSubmit = attestationCanSubmit(questions, answers, mealPenalty);
+  const dayDateStr = (d: { label: string; date: number }) => `${d.label} 2026/07/${d.date}`;
+  const dateStr = dayDateStr(day);
+  const dayOptions = (days ?? [day]).map(d => ({
+    value: String(d.date),
+    label: isAttested ? `${dayDateStr(d)} · ${isAttested(d.date) ? "Attested" : "Needs attestation"}` : dayDateStr(d),
+  }));
+  const dayAttested = isAttested?.(day.date) ?? false;
+  const canSubmit = !dayAttested && attestationCanSubmit(questions, answers, mealPenalty);
   const hasInProgressAnswers = questions.some((q) => answers[q.id]?.answer);
   const previewRows = showAuditTrail
     ? attestationAnswersToPreviewRows(questions, answers, submittedBy)
@@ -3869,11 +3888,25 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
 
   const formBody = (
     <>
-      <ModusWcSelect
-        aria-label="Attestation date"
-        value={dateStr}
-        options={[{ label: dateStr, value: dateStr }]}
-      />
+      <div className="flex flex-col gap-[8px]">
+        <ModusWcSelect
+          aria-label="Attestation date"
+          value={String(day.date)}
+          options={dayOptions}
+          disabled={!onChangeDay || dayOptions.length < 2}
+          onInputChange={(e) => {
+            const next = (days ?? []).find(d => String(d.date) === readInputString(e));
+            if (next && next.date !== day.date) onChangeDay?.(next);
+          }}
+        />
+        {isAttested && (
+          <div>
+            <ModusWcBadge key={dayAttested ? "attested" : "pending"} color={dayAttested ? "success" : "warning"} variant="filled" size="sm">
+              {dayAttested ? "Attested" : "Needs attestation"}
+            </ModusWcBadge>
+          </div>
+        )}
+      </div>
 
       <div>
         <div className="flex items-center gap-[8px] mb-[10px]">
@@ -3898,7 +3931,17 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
         </div>
       </div>
 
-      {questions.map((q) => {
+      {dayAttested ? (
+        <div className="flex items-start gap-[10px] rounded-[8px] px-[14px] py-[12px]" style={{ background: "#e8f7ed", border: "1px solid #bbe6ca" }}>
+          <ModusWcIcon name="check_circle" variant="solid" size="sm" decorative customClass="attest-done-icon" />
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "#15803d", fontFamily: OS, ...OS_FVS }}>Attestation completed</p>
+            <p style={{ fontSize: 13, color: "#3f7d55", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
+              Your answers for {dateStr} are on file. Pick another day above to attest it.
+            </p>
+          </div>
+        </div>
+      ) : questions.map((q) => {
         const entry = answers[q.id] ?? { answer: null, comment: "" };
         const commentNeeded = attestationCommentRequired(q, entry.answer);
         const showRestBreakJobPhase =
@@ -3959,7 +4002,10 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
         }>
         {/* Header */}
         <div className="flex items-center justify-between px-[24px] py-[20px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
-          <p style={{ fontSize: 24, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Hello Adam!</p>
+          <div>
+            <p style={{ fontSize: 24, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Hello Adam!</p>
+            {stepLabel && <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{stepLabel}</p>}
+          </div>
           <button type="button" onClick={onClose}
             className="flex h-[32px] w-[32px] items-center justify-center rounded-full hover:bg-[#f1f1f6] transition-colors"
             style={{ background: "transparent", border: "none", cursor: "pointer" }}>
@@ -4007,26 +4053,20 @@ function AttestationModal({ day, onClose, onSubmit, showAuditTrail = false, audi
         </div>
 
         <div className="flex items-center justify-end gap-[10px] px-[24px] py-[16px]" style={{ borderTop: "1px solid #e0e1e9" }}>
-          <button type="button" onClick={onClose}
-            className="px-[20px] py-[9px] rounded-[6px] font-semibold transition-colors"
-            style={{ background: "#ffffff", border: "1px solid #e0e1e9", color: "#464b52", fontSize: 14, fontFamily: OS, ...OS_FVS, cursor: "pointer" }}>
-            Cancel
-          </button>
-          <button type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="px-[20px] py-[9px] rounded-[6px] font-semibold transition-colors"
-            style={{
-              background: canSubmit ? "#0063a3" : "#cbced4",
-              color: "#ffffff",
-              border: "none",
-              fontSize: 14,
-              fontFamily: OS,
-              ...OS_FVS,
-              cursor: canSubmit ? "pointer" : "not-allowed",
-            }}>
-            Submit
-          </button>
+          <ModusWcButton key={dayAttested ? "close" : "cancel"} color="tertiary" variant="outlined" size="md" onButtonClick={onClose}>
+            {dayAttested ? "Close" : "Cancel"}
+          </ModusWcButton>
+          {dayAttested ? (
+            <ModusWcButton key="completed" color="primary" variant="filled" size="md" disabled>
+              <ModusWcIcon name="check" variant="outlined" size="sm" decorative />
+              Attestation completed
+            </ModusWcButton>
+          ) : (
+            <ModusWcButton key="submit" color="primary" variant="filled" size="md" disabled={!canSubmit} onButtonClick={handleSubmit}>
+              <ModusWcIcon name="check" variant="outlined" size="sm" decorative />
+              {isAttested ? "Complete attestation" : "Submit"}
+            </ModusWcButton>
+          )}
         </div>
       </div>
     </div>
@@ -4143,6 +4183,16 @@ type TimesheetBreakMealRow = {
   end: string | null;
   startLoc?: TimesheetPunchPin;
   endLoc?: TimesheetPunchPin;
+};
+
+// One per job worked today; a job switch closes the open segment and starts the next.
+type TodayWorkRow = TimesheetBreakMealRow & {
+  startedAt: Date;
+  endedAt: Date | null;
+  crew: string;
+  dept: string;
+  job: string;
+  phase: string;
 };
 
 const MOBILE_CARD: React.CSSProperties = {
@@ -4335,7 +4385,7 @@ function MobileTimesheetSection({
       <div className="rounded-[10px] overflow-hidden" style={{ border: "1px solid #e0e1e9" }}>
         <div style={{ padding: "12px 14px", background: "#0e416c" }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: OS, ...OS_FVS }}>
-            Timesheet for Pay Period August 1 – August 7, 2026
+            Timesheet for Pay Period {PAY_PERIODS[0].label}
           </p>
         </div>
         <div className="flex flex-col gap-[10px]" style={{ padding: "12px", background: "#f7f7f8" }}>
@@ -4413,6 +4463,10 @@ const CLOCK_CREW_OPTIONS  = ["740 - Adam Hazey's Crew", "Crew B", "Crew C"];
 const CLOCK_DEPT_OPTIONS  = ["3300 - Job Cost", "3400 - Operations", "3500 - Admin"];
 const CLOCK_JOB_OPTIONS   = Object.keys(JOB_SITES);
 const CLOCK_PHASE_OPTIONS = ["5554 - Renewal - Asphalt", "5555 - Phase B", "5556 - Phase C"];
+const CLOCK_TRADE_OPTIONS      = ["Electrician", "Lineman", "Equipment Operator", "Laborer"];
+const CLOCK_WAGE_CODE_OPTIONS  = ["REG - Regular", "PW - Prevailing Wage", "SHOP - Shop Rate"];
+const CLOCK_RATE_LEVEL_OPTIONS = ["Apprentice", "Journeyman", "Foreman", "General Foreman"];
+const CLOCK_EQUIPMENT_OPTIONS  = ["T-104 - Bucket Truck", "EX-22 - Mini Excavator", "TR-09 - Trencher"];
 
 type GeoFix = { lat: number; lng: number; accuracyMeters: number };
 
@@ -4469,8 +4523,129 @@ type EnrichedTimesheetEntry = ClockTimesheetEntry & {
   clockOutLoc?: TimesheetPunchPin;
 };
 
+type TimesheetEntryType = "work" | "break" | "meal";
+
+const ENTRY_TYPE_TILE: Record<TimesheetEntryType, { label: string; Icon: typeof Briefcase; color: string; tint: string }> = {
+  work: { label: "Work", Icon: Briefcase, color: "#0063a3", tint: "#e0eefa" },
+  break: { label: "Break", Icon: Coffee, color: "#b45309", tint: "#fef3c7" },
+  meal: { label: "Meal", Icon: Utensils, color: "#15803d", tint: "#dcf5e4" },
+};
+
+function EntryTypeTile({ type }: { type: TimesheetEntryType }) {
+  const { label, Icon, color, tint } = ENTRY_TYPE_TILE[type];
+  return (
+    <div className="flex flex-col items-center gap-[3px]">
+      <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[6px]" style={{ background: tint }}>
+        <Icon size={15} style={{ color }} aria-hidden />
+      </div>
+      <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
 const getMockTimesheetEntries = (): EnrichedTimesheetEntry[] =>
   CLOCK_MOCK_ENTRIES.map((entry) => ({ ...entry, ...mockEntryLocations(entry) }));
+
+const closedPeriodEntries = (days: { date: string; start: string; end: string; ot: number; withBreak?: boolean }[]): EnrichedTimesheetEntry[] =>
+  days.flatMap(({ date, start, end, ot, withBreak }) => {
+    const work: ClockTimesheetEntry = { ...CLOCK_MOCK_ENTRIES[0], date, start, end, ot };
+    return withBreak ? [work, { ...work, phase: "Break", reg: 0, ot: 0, travel: 0 }] : [work];
+  }).map((entry) => ({ ...entry, ...mockEntryLocations(entry) }));
+
+/*
+  Only the current period takes live punches and attestations; earlier periods
+  are closed, so their days are already attested and read-only.
+*/
+type PayPeriod = { id: string; label: string; current: boolean; entries: EnrichedTimesheetEntry[] };
+
+const PAY_PERIODS: PayPeriod[] = [
+  { id: "2026-07-22", label: "July 22 – July 28, 2026", current: true, entries: getMockTimesheetEntries() },
+  {
+    id: "2026-07-15", label: "July 15 – July 21, 2026", current: false,
+    entries: closedPeriodEntries([
+      { date: "Tue, Jul 15", start: "7:05 AM", end: "3:50 PM", ot: 0.75, withBreak: true },
+      { date: "Wed, Jul 16", start: "6:57 AM", end: "3:30 PM", ot: 0.55 },
+      { date: "Thu, Jul 17", start: "7:00 AM", end: "4:05 PM", ot: 1.08 },
+      { date: "Fri, Jul 18", start: "6:52 AM", end: "3:20 PM", ot: 0.47 },
+      { date: "Mon, Jul 21", start: "7:03 AM", end: "3:41 PM", ot: 0.63 },
+    ]),
+  },
+  {
+    id: "2026-07-08", label: "July 8 – July 14, 2026", current: false,
+    entries: closedPeriodEntries([
+      { date: "Tue, Jul 8", start: "6:59 AM", end: "3:35 PM", ot: 0.6 },
+      { date: "Wed, Jul 9", start: "7:04 AM", end: "4:12 PM", ot: 1.13, withBreak: true },
+      { date: "Thu, Jul 10", start: "7:01 AM", end: "3:44 PM", ot: 0.72 },
+      { date: "Mon, Jul 14", start: "6:55 AM", end: "3:25 PM", ot: 0.5 },
+    ]),
+  },
+  { id: "2026-07-01", label: "July 1 – July 7, 2026", current: false, entries: [] },
+];
+
+const WEEKLY_OT_THRESHOLD = 40;
+// Within this many regular hours of the weekly limit, the bar turns amber as a heads-up.
+const WEEKLY_OT_WARNING_HOURS = 4;
+
+/*
+  One row of the pay-period table. modus-wc-table has no row grouping, so the
+  day is carried on every row and only the first row of a day draws it.
+*/
+type TimesheetRow = {
+  id: string;
+  dayStart: boolean;
+  dayTitle: string;
+  dayMeta: string;
+  attest?: { label: string; date: number };
+  closed: boolean;
+  type: TimesheetEntryType;
+  live: boolean;
+  start: string;
+  end: string | null;
+  startLoc?: TimesheetPunchPin;
+  endLoc?: TimesheetPunchPin;
+  jobNum: string;
+  dept: string;
+  job: string;
+  phase: string;
+  rule: string;
+  hours: number;
+  ot: number;
+  ot2: number;
+  qty: number;
+  travel: number;
+  perDiem: number;
+};
+
+const TIMESHEET_ENTRY_MODAL_ID = "timesheet-entry-modal";
+
+// "7:02 AM" → minutes after midnight, for ordering today's punches.
+const clockMinutes = (t: string) => {
+  const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return 0;
+  return ((Number(m[1]) % 12) + (m[3].toUpperCase() === "PM" ? 12 : 0)) * 60 + Number(m[2]);
+};
+
+// Table cells are plain DOM, so the React tiles are rendered once and reused as markup.
+const ENTRY_TYPE_TILE_HTML = Object.fromEntries(
+  (Object.keys(ENTRY_TYPE_TILE) as TimesheetEntryType[]).map(t => [t, renderToStaticMarkup(<EntryTypeTile type={t} />)]),
+) as Record<TimesheetEntryType, string>;
+
+const cellEl = (className: string, text?: string) => {
+  const el = document.createElement("div");
+  el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+};
+
+const modusEl = (tag: string, attrs: Record<string, string>, text?: string) => {
+  const el = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  if (text !== undefined) el.textContent = text;
+  return el;
+};
+
 
 /*
   Web Mercator, enough of it to lay out OpenStreetMap tiles by hand. A map
@@ -4684,31 +4859,150 @@ function PunchLocationModalContent({
   );
 }
 
-function ClockDisplay({ elapsed, clocked }: { elapsed: number; clocked: ClockState }) {
+const JOB_MODAL_ID = "clock-job-details-modal";
+const CLOCK_OUT_MODAL_ID = "clock-out-confirm-modal";
+const PUNCH_UNDO_MS = 10_000;
+
+function PunchUndoToast({ punch, onUndo, onDismiss }: {
+  punch: { id: number; message: string } | null;
+  onUndo: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[200]" aria-live="polite" aria-atomic="false">
+      {punch && (
+        <ModusWcToast key={punch.id} position="bottom-center" customClass="pointer-events-auto">
+          <ModusWcAlert variant="success" alertTitle={punch.message} dismissible onDismissClick={onDismiss}>
+            <ModusWcButton slot="button" color="tertiary" variant="outlined" size="sm" onButtonClick={onUndo}>
+              Undo
+            </ModusWcButton>
+          </ModusWcAlert>
+        </ModusWcToast>
+      )}
+    </div>
+  );
+}
+
+type ClockOutSummaryData = { startedAt: string; worked: string; job: string; phase: string; breaks: number; meals: number };
+
+// The columns trimmed from the pay-period table, plus where each punch was made.
+function TimesheetEntryDetails({ row, onOpenMap }: { row: TimesheetRow; onOpenMap: (pin: TimesheetPunchPin) => void }) {
+  const hrs = (n: number) => (n > 0 ? n.toFixed(2) : "—");
+  const fields: [string, string][] = [
+    ["Start", row.start],
+    ["End", row.live ? "In progress" : row.end ?? "—"],
+    ["Job #", row.jobNum],
+    ["Department", row.dept],
+    ["Job", row.job],
+    ["Phase", row.phase],
+    ["Pay rule", row.rule],
+    ["Regular", hrs(row.hours)],
+    ["Overtime", hrs(row.ot)],
+    ["OT2", hrs(row.ot2)],
+    ["Quantity", row.qty > 0 ? String(row.qty) : "—"],
+    ["Travel", hrs(row.travel)],
+    ["Per diem", row.perDiem > 0 ? `$${row.perDiem}` : "—"],
+  ];
+  const punches = ([["Start location", row.startLoc], ["End location", row.endLoc]] as const).filter(([, pin]) => pin);
+  return (
+    <div className="flex flex-col gap-[12px]">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-[16px] gap-y-[8px] rounded-[8px] px-[14px] py-[12px]"
+        style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
+        {fields.map(([label, value]) => (
+          <Fragment key={label}>
+            <dt style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{label}</dt>
+            <dd style={{ fontSize: 12, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      {punches.length > 0 && (
+        <div className="flex flex-col gap-[8px]">
+          {punches.map(([label, pin]) => (
+            <div key={label} className="flex items-center justify-between gap-[12px]">
+              <div className="min-w-0">
+                <p style={{ fontSize: 12, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{label}</p>
+                <p style={{ fontSize: 11, color: pin!.flagged ? "#b45309" : "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                  {pin!.flagged ? `Off site · ${pin!.site.name}` : pin!.site.name}
+                </p>
+              </div>
+              <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => onOpenMap(pin!)}>
+                <ModusWcIcon name="map" variant="outlined" size="xs" decorative />
+                View map
+              </ModusWcButton>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClockOutSummary({ summary }: { summary: ClockOutSummaryData }) {
+  const { startedAt, worked, job, phase, breaks, meals } = summary;
+  const breakText = [
+    breaks ? `${breaks} rest ${breaks === 1 ? "break" : "breaks"}` : "",
+    meals ? `${meals} on-duty ${meals === 1 ? "meal" : "meals"}` : "",
+  ].filter(Boolean).join(" · ") || "None recorded";
+  const rows: [string, string][] = [
+    ["Shift started", startedAt],
+    ["Shift length", worked],
+    ["Job", job || "—"],
+    ["Phase", phase || "—"],
+    ["Breaks & meals", breakText],
+  ];
+  return (
+    <div className="flex flex-col gap-[12px]">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-[16px] gap-y-[8px] rounded-[8px] px-[14px] py-[12px]"
+        style={{ background: "#f7f7fb", border: "1px solid #e0e1e9" }}>
+        {rows.map(([label, value]) => (
+          <Fragment key={label}>
+            <dt style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{label}</dt>
+            <dd style={{ fontSize: 12, fontWeight: 600, color: "#252a2e", fontFamily: OS, ...OS_FVS, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      {!breaks && !meals && (
+        <div className="flex items-start gap-[8px] rounded-[8px] px-[12px] py-[10px]" style={{ background: "#fef3e2", border: "1px solid #f5d29a" }}>
+          <AlertTriangle size={15} style={{ color: "#b45309", flexShrink: 0, marginTop: 1 }} aria-hidden />
+          <p style={{ fontSize: 12, color: "#7c4a03", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
+            No rest break or meal is recorded for this shift. Your supervisor may follow up about a missed break.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type BreakTimer = { display: string; status: string; over: boolean };
+
+function ClockDisplay({ elapsed, clocked, startNote, breakTimer, color }: {
+  elapsed: number; clocked: ClockState; startNote?: string | null; breakTimer?: BreakTimer | null; color: string;
+}) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
   const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0");
   const s = (elapsed % 60).toString().padStart(2, "0");
-  const timeStr = `${h}:${m}:${s}`;
+  const timeStr = breakTimer ? breakTimer.display : `${h}:${m}:${s}`;
 
-  const statusColor = clocked === "break" ? "#d97706" : clocked === "meal" ? "#15803d" : clocked === "in" ? "#10b981" : "#6a6e79";
-  const statusLabel = clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal · Paid" : clocked === "in" ? "On the Clock" : "Not Clocked In";
+  const statusColor = breakTimer?.over ? "#b45309" : color;
+  const statusLabel = breakTimer ? breakTimer.status : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal · Paid" : clocked === "in" ? "On the Clock" : "Not Clocked In";
 
   return (
-    <div className="bg-white content-stretch flex flex-col items-start py-[8px] relative w-full">
-      <div className="flex flex-col font-normal h-[24px] justify-center leading-[0] relative shrink-0 text-[12px] text-black text-center w-full"
-        style={{ fontFamily: OS, ...OS_FVS }}>
-        <p className="leading-[20px]">{dateStr}</p>
-      </div>
-      <div className="flex flex-col font-bold h-[40px] justify-center leading-[0] relative shrink-0 text-[30px] text-black text-center w-full"
-        style={{ fontFamily: OS, ...OS_FVS }}>
-        <p className="leading-[40px]">{timeStr}</p>
-      </div>
-      <div className="content-stretch flex gap-[4px] items-center justify-center relative shrink-0 w-full mt-[4px]">
+    <div className="flex w-full flex-col items-center px-[16px] py-[18px] text-center">
+      <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{dateStr}</p>
+      <p style={{ fontSize: 44, fontWeight: 800, color: breakTimer?.over ? "#b45309" : "#252a2e", fontFamily: OS, ...OS_FVS, letterSpacing: "-1px", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
+        {timeStr}
+      </p>
+      <div className="flex items-center justify-center gap-[6px]">
         <div className="size-[8px] rounded-full shrink-0" style={{ background: statusColor }} />
-        <p className="font-bold text-[12px] leading-[20px]" style={{ color: statusColor, fontFamily: OS, ...OS_FVS }}>{statusLabel}</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: statusColor, fontFamily: OS, ...OS_FVS }}>{statusLabel}</p>
       </div>
+      {startNote && (
+        <p className="mt-[2px] text-[11px] leading-[16px]" style={{ color: "#6a6e79", fontFamily: OS, ...OS_FVS, fontVariantNumeric: "tabular-nums" }}>
+          {startNote}
+        </p>
+      )}
     </div>
   );
 }
@@ -4724,6 +5018,8 @@ function useClockSession() {
   const [breakElapsed, setBreakElapsed] = useState(0);
   const [mealElapsed, setMealElapsed] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  // startTime restarts on every job switch; the shift itself starts at the first punch.
+  const [shiftStart, setShiftStart] = useState<Date | null>(null);
   const [breakStart, setBreakStart] = useState<Date | null>(null);
   const [mealStart, setMealStart] = useState<Date | null>(null);
   const [mealRows, setMealRows] = useState<TimesheetBreakMealRow[]>([]);
@@ -4735,8 +5031,13 @@ function useClockSession() {
   const [dept, setDept] = useState("");
   const [job, setJob] = useState("");
   const [phase, setPhase] = useState("");
+  const [trade, setTrade] = useState("");
+  const [wageCode, setWageCode] = useState("");
+  const [rateLevel, setRateLevel] = useState("");
+  const [equipment, setEquipment] = useState("");
   const [travel, setTravel] = useState("");
   const [qty, setQty] = useState("");
+  const [bonus, setBonus] = useState("");
   const [perDiem, setPerDiem] = useState(false);
   const [comment, setComment] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -4751,7 +5052,45 @@ function useClockSession() {
   const [punchMapPin, setPunchMapPin] = useState<TimesheetPunchPin | null>(null);
   const [clockedInOffSite, setClockedInOffSite] = useState(false);
   const [breakRows, setBreakRows] = useState<TimesheetBreakMealRow[]>([]);
+  const [workRows, setWorkRows] = useState<TodayWorkRow[]>([]);
   const [showEarlyBreakModal, setShowEarlyBreakModal] = useState(false);
+
+  /*
+    Every punch keeps a snapshot of the state it replaced, so a mis-tap can be
+    reversed from the toast without a supervisor edit. Timers are derived from
+    their start timestamps, so restoring those resumes the clock as if the punch
+    never happened.
+  */
+  type JobFields = { crew: string; dept: string; job: string; phase: string; trade: string; wageCode: string; rateLevel: string; equipment: string };
+  const snapshotPunchState = (jobFields?: JobFields) => ({
+    clocked, startTime, shiftStart, breakStart, mealStart, elapsed, breakElapsed, mealElapsed,
+    timeline, breakRows, mealRows, workRows, clockedInOffSite,
+    ...(jobFields ?? { crew, dept, job, phase, trade, wageCode, rateLevel, equipment }),
+  });
+  type PunchSnapshot = ReturnType<typeof snapshotPunchState>;
+  const [lastPunch, setLastPunch] = useState<{ id: number; message: string; snapshot: PunchSnapshot } | null>(null);
+  const recordPunch = (message: string, snapshot: PunchSnapshot) => setLastPunch({ id: Date.now(), message, snapshot });
+  const dismissPunchToast = () => setLastPunch(null);
+  const undoLastPunch = () => {
+    if (!lastPunch) return;
+    const snap = lastPunch.snapshot;
+    setClocked(snap.clocked); setStartTime(snap.startTime); setShiftStart(snap.shiftStart);
+    setBreakStart(snap.breakStart); setMealStart(snap.mealStart);
+    setElapsed(snap.elapsed); setBreakElapsed(snap.breakElapsed); setMealElapsed(snap.mealElapsed);
+    setTimeline(snap.timeline); setBreakRows(snap.breakRows); setMealRows(snap.mealRows);
+    setWorkRows(snap.workRows);
+    setClockedInOffSite(snap.clockedInOffSite);
+    setCrew(snap.crew); setDept(snap.dept); setJob(snap.job); setPhase(snap.phase);
+    setTrade(snap.trade); setWageCode(snap.wageCode); setRateLevel(snap.rateLevel); setEquipment(snap.equipment);
+    setShowEarlyBreakModal(false);
+    setLastPunch(null);
+  };
+  useEffect(() => {
+    if (!lastPunch) return;
+    const id = setTimeout(() => setLastPunch(null), PUNCH_UNDO_MS);
+    return () => clearTimeout(id);
+  }, [lastPunch]);
+
   const MANDATORY_BREAK = 30; // seconds for testing (change to 30 * 60 for production)
 
   useEffect(() => {
@@ -4817,8 +5156,12 @@ function useClockSession() {
     return { site, fix, title, flagged: !onSite };
   };
 
+  const closeOpenWorkRow = (rows: TodayWorkRow[], end: string, endedAt: Date, endLoc?: TimesheetPunchPin) =>
+    rows.map(r => (r.end === null ? { ...r, end, endedAt, endLoc } : r));
+
   const confirmEndBreak = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    recordPunch(`Break ended at ${t}`, snapshotPunchState());
     setClocked("in"); setBreakStart(null); setShowEarlyBreakModal(false);
     setTimeline(prev => [{ time: t, label: "Break Ended", sub: `After ${fmt(breakElapsed)}`, color: "#0063a3" }, ...prev]);
     setBreakRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null
@@ -4829,8 +5172,15 @@ function useClockSession() {
   const doClockIn = () => {
     if (!site) return;
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    setClocked("in"); setStartTime(new Date()); setElapsed(0);
+    const punchedAt = new Date();
+    recordPunch(`Clocked in at ${t}`, snapshotPunchState());
+    setClocked("in"); setStartTime(punchedAt); setShiftStart(punchedAt); setElapsed(0);
     setShowOffSiteModal(false); setClockedInOffSite(!onSite);
+    setWorkRows(prev => [...prev, {
+      start: t, end: null, startedAt: punchedAt, endedAt: null,
+      startLoc: punchPinFromCurrent(`Clock in · ${t}`),
+      crew, dept, job, phase,
+    }]);
     setTimeline(prev => [{
       time: t,
       label: "Clocked In",
@@ -4846,7 +5196,7 @@ function useClockSession() {
   type SwitchJobResult = "ok" | "incomplete" | "not_in" | "no_site" | "locating" | "off_site";
 
   // Ends the current punch and starts a fresh clock-in for the job details on the form.
-  const switchJobSession = (previousJobKey: string, allowOffSite = false): SwitchJobResult => {
+  const switchJobSession = (previousJobKey: string, allowOffSite = false, previousDetails?: JobFields): SwitchJobResult => {
     if (clocked !== "in") return "not_in";
     if (!crew || !dept || !job || !phase) return "incomplete";
     const newSite = JOB_SITES[job] as JobSite | undefined;
@@ -4866,10 +5216,21 @@ function useClockSession() {
     const prevDist = prevSite && prevFix ? distanceMeters(prevFix, prevSite) : 0;
     const prevOnSite = !!prevSite && prevDist <= prevSite.radiusMeters;
 
+    recordPunch(`Switched job at ${t}`, snapshotPunchState(previousDetails));
     setShowBreakAlert(false);
+    const switchedAt = new Date();
     setClockedInOffSite(!newOnSite);
-    setStartTime(new Date());
+    setStartTime(switchedAt);
     setElapsed(0);
+    setWorkRows(prev => [
+      ...closeOpenWorkRow(prev, t, switchedAt,
+        prevSite && prevFix ? { site: prevSite, fix: prevFix, title: `Clock out · ${t}`, flagged: !prevOnSite } : undefined),
+      {
+        start: t, end: null, startedAt: switchedAt, endedAt: null,
+        startLoc: { site: newSite, fix: newFix, title: `Clock in · ${t}`, flagged: !newOnSite },
+        crew, dept, job, phase,
+      },
+    ]);
 
     setTimeline(prev => [
       {
@@ -4909,7 +5270,9 @@ function useClockSession() {
       if (!onSite) { setShowOffSiteModal(true); return; }
       doClockIn();
     } else if (clocked === "in") {
-      setClocked("out"); setStartTime(null); setElapsed(0); setClockedInOffSite(false);
+      recordPunch(`Clocked out at ${t}`, snapshotPunchState());
+      setClocked("out"); setStartTime(null); setShiftStart(null); setElapsed(0); setClockedInOffSite(false);
+      setWorkRows(prev => closeOpenWorkRow(prev, t, new Date(), punchPinFromCurrent(`Clock out · ${t}`)));
       setTimeline(prev => [{
         time: t,
         label: "Clocked Out",
@@ -4933,6 +5296,7 @@ function useClockSession() {
 
   const startOnDutyMeal = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    recordPunch(`On-duty meal started at ${t}`, snapshotPunchState());
     setClocked("meal"); setMealStart(new Date()); setMealElapsed(0);
     setShowMealModal(false); setMealAck(false); setShowBreakAlert(false);
     setTimeline(prev => [{ time: t, label: "On-Duty Meal Started", sub: "Staying on the clock", color: "#15803d" }, ...prev]);
@@ -4941,6 +5305,7 @@ function useClockSession() {
 
   const endOnDutyMeal = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    recordPunch(`On-duty meal ended at ${t}`, snapshotPunchState());
     setClocked("in"); setMealStart(null);
     setTimeline(prev => [{ time: t, label: "On-Duty Meal Ended", sub: `After ${fmt(mealElapsed)} · paid`, color: "#0063a3" }, ...prev]);
     setMealRows(prev => prev.map((r, i) => i === prev.length - 1 && r.end === null
@@ -4950,6 +5315,7 @@ function useClockSession() {
 
   const handleBreak = () => {
     const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    recordPunch(`Break started at ${t}`, snapshotPunchState());
     setClocked("break"); setBreakStart(new Date()); setBreakElapsed(0);
     setShowBreakAlert(false);
     setTimeline(prev => [{ time: t, label: "Break Started", sub: "Taking a break", color: "#d97706" }, ...prev]);
@@ -4967,17 +5333,51 @@ function useClockSession() {
   const breakRemaining = Math.max(0, MANDATORY_BREAK - breakElapsed);
   const breakRemainingFmt = `${Math.floor(breakRemaining / 60)}:${(breakRemaining % 60).toString().padStart(2, "0")}`;
 
+  // Counting down tells the employee when to be back; past zero it counts the overrun instead.
+  const mmss = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, "0")}`;
+  const breakOverBy = Math.max(0, breakElapsed - MANDATORY_BREAK);
+  const breakTimer: BreakTimer | null = clocked === "break" ? {
+    display: breakOverBy ? `+${fmt(breakOverBy)}` : fmt(breakRemaining),
+    status: breakOverBy
+      ? `${mmss(MANDATORY_BREAK)} rest break — over by ${mmss(breakOverBy)}`
+      : `${mmss(MANDATORY_BREAK)} rest break — ${mmss(breakRemaining)} left`,
+    over: breakOverBy > 0,
+  } : null;
+
+  // Ending a shift is a single tap on a large target, so it is confirmed against a summary first.
+  const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
+  const requestClockOut = () => setClockOutConfirmOpen(true);
+  const cancelClockOut = () => setClockOutConfirmOpen(false);
+  const confirmClockOut = () => {
+    setClockOutConfirmOpen(false);
+    if (clocked === "in") handleMainBtn();
+  };
+  const timeOfDay = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const shiftStartedAt = shiftStart ? timeOfDay(shiftStart) : null;
+  const jobStartedAt = startTime && shiftStart && startTime.getTime() !== shiftStart.getTime() ? timeOfDay(startTime) : null;
+  const shiftStartNote = shiftStartedAt
+    ? `Shift started ${shiftStartedAt}${jobStartedAt ? ` · This job since ${jobStartedAt}` : ""}`
+    : null;
+  const clockOutSummary: ClockOutSummaryData = {
+    startedAt: shiftStartedAt ?? "—",
+    worked: fmt(shiftStart ? Math.max(elapsed, Math.floor((Date.now() - shiftStart.getTime()) / 1000)) : elapsed),
+    job, phase,
+    breaks: breakRows.length,
+    meals: mealRows.length,
+  };
+
   return {
     clocked, setClocked, elapsed, setElapsed, breakElapsed, setBreakElapsed, mealElapsed,
     startTime, setStartTime, setBreakStart,
-    mealRows, breakRows, timeline,
+    mealRows, breakRows, workRows, timeline,
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
     showSiteMap, setShowSiteMap,
     punchMapPin, setPunchMapPin,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
-    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    trade, setTrade, wageCode, setWageCode, rateLevel, setRateLevel, equipment, setEquipment,
+    travel, setTravel, qty, setQty, bonus, setBonus, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
     locating, offSiteSim, setOffSiteSim, clockedInOffSite,
     site, fix, siteDistance, onSite,
@@ -4986,6 +5386,10 @@ function useClockSession() {
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
     handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal, switchJobSession,
+    clockOutConfirmOpen, requestClockOut, cancelClockOut, confirmClockOut, clockOutSummary,
+    shiftStartNote,
+    lastPunch, undoLastPunch, dismissPunchToast,
+    breakTimer,
   };
 }
 
@@ -5212,7 +5616,8 @@ function MobileClockView({ session }: { session: ClockSession }) {
   const {
     clocked, elapsed, breakElapsed, mealElapsed,
     timeline, job, setJob, phase, setPhase, crew, setCrew, dept, setDept,
-    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    trade, setTrade, wageCode, setWageCode, rateLevel, setRateLevel, equipment, setEquipment,
+    travel, setTravel, qty, setQty, bonus, setBonus, perDiem, setPerDiem, comment, setComment,
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
@@ -5226,17 +5631,20 @@ function MobileClockView({ session }: { session: ClockSession }) {
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
     handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal,
+    clockOutConfirmOpen, requestClockOut, cancelClockOut, confirmClockOut, clockOutSummary,
+    shiftStartNote, breakTimer,
   } = session;
 
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
   const [attestDayOpen, setAttestDayOpen] = useState<{ label: string; date: number } | null>(null);
   // A rejected punch should land the employee straight on the fields to fill.
   const onMainPress = () => {
+    if (clocked === "in") { requestClockOut(); return; }
     if (clocked === "out" && !detailsComplete) setShowDetailsSheet(true);
     handleMainBtn();
   };
   const now = new Date();
-  const statusLabel = clocked === "out" ? "Not Clocked In" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock";
+  const statusLabel = breakTimer ? breakTimer.status : clocked === "out" ? "Not Clocked In" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock";
   const activeTimer = clocked === "break" ? breakElapsed : clocked === "meal" ? mealElapsed : elapsed;
 
   const card: React.CSSProperties = MOBILE_CARD;
@@ -5402,13 +5810,18 @@ function MobileClockView({ session }: { session: ClockSession }) {
               <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
                 {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
-              <p style={{ fontSize: 40, fontWeight: 800, color: "#252a2e", fontFamily: OS, ...OS_FVS, letterSpacing: "-1px", lineHeight: 1.2 }}>
-                {fmt(activeTimer)}
+              <p style={{ fontSize: 40, fontWeight: 800, color: breakTimer?.over ? "#b45309" : "#252a2e", fontFamily: OS, ...OS_FVS, letterSpacing: "-1px", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
+                {breakTimer ? breakTimer.display : fmt(activeTimer)}
               </p>
               <div className="flex items-center justify-center gap-[6px]">
-                <div style={{ width: 8, height: 8, borderRadius: 999, background: stateColor }} />
-                <p style={{ fontSize: 12, fontWeight: 700, color: stateColor, fontFamily: OS, ...OS_FVS }}>{statusLabel}</p>
+                <div style={{ width: 8, height: 8, borderRadius: 999, background: breakTimer?.over ? "#b45309" : stateColor }} />
+                <p style={{ fontSize: 12, fontWeight: 700, color: breakTimer?.over ? "#b45309" : stateColor, fontFamily: OS, ...OS_FVS }}>{statusLabel}</p>
               </div>
+              {shiftStartNote && (
+                <p className="mt-[2px]" style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS, fontVariantNumeric: "tabular-nums" }}>
+                  {shiftStartNote}
+                </p>
+              )}
             </div>
 
             {/* Off-site flag */}
@@ -5699,6 +6112,23 @@ function MobileClockView({ session }: { session: ClockSession }) {
             </button>
           </MobileSheet>
 
+          {/* Clock-out confirmation sheet */}
+          <MobileSheet open={clockOutConfirmOpen} onClose={cancelClockOut}>
+            <p style={{ ...sheetTitle, marginBottom: 4 }}>Clock out?</p>
+            <p style={{ ...sheetBody, marginBottom: 14 }}>
+              This ends your shift. Review it before you confirm.
+            </p>
+            <div className="mb-[18px]"><ClockOutSummary summary={clockOutSummary} /></div>
+            <button type="button" onClick={confirmClockOut} className="w-full"
+              style={{ background: "#ab1f26", color: "#ffffff", border: "none", borderRadius: 8, padding: "13px 0", marginBottom: 10, fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Clock Out
+            </button>
+            <button type="button" onClick={cancelClockOut} className="w-full"
+              style={{ background: "#ffffff", color: "#0063a3", border: "1px solid #0063a3", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700, fontFamily: OS, cursor: "pointer" }}>
+              Stay Clocked In
+            </button>
+          </MobileSheet>
+
           {/* Early break sheet */}
           <MobileSheet open={showEarlyBreakModal} onClose={() => setShowEarlyBreakModal(false)}>
             <div className="flex items-center gap-[10px] mb-[12px]">
@@ -5764,7 +6194,22 @@ function MobileClockView({ session }: { session: ClockSession }) {
                 placeholder="Select department" invalid={detailsPrompt && !dept} />
             </MobileField>
 
-            <div className="grid grid-cols-2 gap-[12px]">
+            <div className="grid grid-cols-2 gap-x-[12px]">
+              <MobileField label="Trade">
+                <MobileSelect value={trade} onChange={setTrade} options={CLOCK_TRADE_OPTIONS} placeholder="Select trade" />
+              </MobileField>
+              <MobileField label="Wage Code">
+                <MobileSelect value={wageCode} onChange={setWageCode} options={CLOCK_WAGE_CODE_OPTIONS} placeholder="Select wage code" />
+              </MobileField>
+              <MobileField label="Rate Level">
+                <MobileSelect value={rateLevel} onChange={setRateLevel} options={CLOCK_RATE_LEVEL_OPTIONS} placeholder="Select rate level" />
+              </MobileField>
+              <MobileField label="Equipment">
+                <MobileSelect value={equipment} onChange={setEquipment} options={CLOCK_EQUIPMENT_OPTIONS} placeholder="Select equipment" />
+              </MobileField>
+            </div>
+
+            <div className="grid grid-cols-3 gap-[12px]">
               <MobileField label="Travel">
                 <input type="number" min={0} step={0.25} value={travel}
                   onChange={(e) => setTravel(e.target.value)} style={mobileInputStyle} />
@@ -5772,6 +6217,10 @@ function MobileClockView({ session }: { session: ClockSession }) {
               <MobileField label="Quantity">
                 <input type="number" min={0} value={qty}
                   onChange={(e) => setQty(e.target.value)} style={mobileInputStyle} />
+              </MobileField>
+              <MobileField label="Bonus">
+                <input type="number" min={0} step={0.01} value={bonus}
+                  onChange={(e) => setBonus(e.target.value)} style={mobileInputStyle} />
               </MobileField>
             </div>
 
@@ -5797,48 +6246,49 @@ function MobileClockView({ session }: { session: ClockSession }) {
   );
 }
 
-function ClockInOutPage() {
+function ClockInOutPage({ viewMode = "desktop" }: { viewMode?: "desktop" | "mobile" }) {
   const session = useClockSession();
   const {
-    clocked, setClocked, elapsed, setElapsed, breakElapsed, setBreakElapsed, mealElapsed,
+    clocked, setClocked, elapsed, setElapsed, setBreakElapsed, mealElapsed,
     setStartTime, setBreakStart,
-    mealRows, breakRows, timeline,
+    mealRows, breakRows, workRows,
     showMealModal, setShowMealModal, mealAck, setMealAck,
     showEarlyBreakModal, setShowEarlyBreakModal, showBreakAlert,
     showOffSiteModal, setShowOffSiteModal,
     showSiteMap, setShowSiteMap,
     punchMapPin, setPunchMapPin,
     crew, setCrew, dept, setDept, job, setJob, phase, setPhase,
-    travel, setTravel, qty, setQty, perDiem, setPerDiem, comment, setComment,
+    trade, setTrade, wageCode, setWageCode, rateLevel, setRateLevel, equipment, setEquipment,
+    travel, setTravel, qty, setQty, bonus, setBonus, perDiem, setPerDiem, comment, setComment,
     showForm, setShowForm,
-    locating, offSiteSim, setOffSiteSim, clockedInOffSite,
+    locating, clockedInOffSite,
     site, fix, siteDistance, onSite,
     missingDetails, detailsPrompt, setDetailsPrompt,
     attested, attestDay,
     fmt, stateColor, stateColorLight, stateColorMid, stateColorStrong, btnLabel,
     breakRemainingFmt,
     handleMainBtn, doClockIn, confirmEndBreak, handleBreak, startOnDutyMeal, switchJobSession,
+    clockOutConfirmOpen, requestClockOut, cancelClockOut, confirmClockOut, clockOutSummary,
+    shiftStartNote, lastPunch, undoLastPunch, dismissPunchToast, breakTimer,
   } = session;
-
-  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
   const [switchJobEditing, setSwitchJobEditing] = useState(false);
   const [switchJobInlineError, setSwitchJobInlineError] = useState(false);
   const [switchJobAwaitingOffSite, setSwitchJobAwaitingOffSite] = useState(false);
-  const switchJobSnapshotRef = useRef({ crew: "", dept: "", job: "", phase: "" });
+  const switchJobSnapshotRef = useRef({
+    crew: "", dept: "", job: "", phase: "", trade: "", wageCode: "", rateLevel: "", equipment: "",
+  });
 
-  const jobFieldsLocked = clocked !== "out" && !switchJobEditing;
+  const [clockInModalOpen, setClockInModalOpen] = useState(false);
+  const jobModalOpen = clockInModalOpen || switchJobEditing;
 
   useEffect(() => {
     if (clocked === "out") setSwitchJobEditing(false);
   }, [clocked]);
 
   const beginSwitchJob = () => {
-    switchJobSnapshotRef.current = { crew, dept, job, phase };
+    switchJobSnapshotRef.current = { crew, dept, job, phase, trade, wageCode, rateLevel, equipment };
     setSwitchJobInlineError(false);
     setSwitchJobEditing(true);
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
   };
 
   const cancelSwitchJob = () => {
@@ -5847,6 +6297,10 @@ function ClockInOutPage() {
     setDept(snap.dept);
     setJob(snap.job);
     setPhase(snap.phase);
+    setTrade(snap.trade);
+    setWageCode(snap.wageCode);
+    setRateLevel(snap.rateLevel);
+    setEquipment(snap.equipment);
     setSwitchJobEditing(false);
     setSwitchJobInlineError(false);
     setDetailsPrompt(false);
@@ -5865,13 +6319,15 @@ function ClockInOutPage() {
       setSwitchJobInlineError(true);
       return;
     }
-    const result = switchJobSession(snap.job);
+    const result = switchJobSession(snap.job, false, snap);
     if (result === "incomplete") {
       setSwitchJobInlineError(true);
       return;
     }
     if (result === "locating") return;
     if (result === "off_site") {
+      // The dialog sits in the top layer, so step out of it before the off-site prompt.
+      setSwitchJobEditing(false);
       setSwitchJobAwaitingOffSite(true);
       setShowOffSiteModal(true);
       return;
@@ -5882,7 +6338,7 @@ function ClockInOutPage() {
   const confirmOffSitePunch = () => {
     if (switchJobAwaitingOffSite) {
       const snap = switchJobSnapshotRef.current;
-      const result = switchJobSession(snap.job, true);
+      const result = switchJobSession(snap.job, true, snap);
       if (result === "ok") finishSwitchJobUi();
       return;
     }
@@ -5897,19 +6353,227 @@ function ClockInOutPage() {
     }
   };
 
-  // The form sits below the punch button, so pull it into view when we reject.
-  const formRef = useRef<HTMLDivElement | null>(null);
+  const openClockInModal = () => {
+    setDetailsPrompt(false);
+    setClockInModalOpen(true);
+  };
+
+  const confirmClockInFromModal = () => {
+    if (missingDetails.length) { setDetailsPrompt(true); return; }
+    if (locating) return;
+    setClockInModalOpen(false);
+    handleMainBtn();
+  };
+
+  const dismissJobModal = () => {
+    if (switchJobEditing) cancelSwitchJob();
+    setClockInModalOpen(false);
+  };
+
+  // Esc and the close icon dismiss the native dialog directly; route them through the same cancel path.
+  const dismissJobModalRef = useRef(dismissJobModal);
+  dismissJobModalRef.current = dismissJobModal;
   useEffect(() => {
-    if (detailsPrompt && viewMode === "desktop") {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [detailsPrompt, viewMode]);
+    const el = document.getElementById(JOB_MODAL_ID) as HTMLDialogElement | null;
+    if (!el) return;
+    if (jobModalOpen) { if (!el.open) el.showModal(); }
+    else if (el.open) el.close();
+    const onClose = () => dismissJobModalRef.current();
+    el.addEventListener("close", onClose);
+    return () => el.removeEventListener("close", onClose);
+  }, [jobModalOpen]);
+
+  const showClockOutModal = viewMode === "desktop" && clockOutConfirmOpen;
+  const cancelClockOutRef = useRef(cancelClockOut);
+  cancelClockOutRef.current = cancelClockOut;
+  useEffect(() => {
+    const el = document.getElementById(CLOCK_OUT_MODAL_ID) as HTMLDialogElement | null;
+    if (!el) return;
+    if (showClockOutModal) { if (!el.open) el.showModal(); }
+    else if (el.open) el.close();
+    const onClose = () => cancelClockOutRef.current();
+    el.addEventListener("close", onClose);
+    return () => el.removeEventListener("close", onClose);
+  }, [showClockOutModal]);
 
   const now = new Date();
-  const mockTimesheetEntries = getMockTimesheetEntries();
+  const [payPeriodId, setPayPeriodId] = useState(PAY_PERIODS[0].id);
+  const [payPeriodMenuOpen, setPayPeriodMenuOpen] = useState(false);
+  const payPeriodIndex = Math.max(0, PAY_PERIODS.findIndex(p => p.id === payPeriodId));
+  const payPeriod = PAY_PERIODS[payPeriodIndex];
+  const mockTimesheetEntries = payPeriod.entries;
   const totalReg = mockTimesheetEntries.reduce((s, e) => s + e.reg, 0);
   const totalOT  = mockTimesheetEntries.reduce((s, e) => s + e.ot, 0);
   const totalTravel = mockTimesheetEntries.reduce((s, e) => s + e.travel, 0);
+  // A shift still running counts toward the current week, so the bar moves while people work.
+  const liveShiftHours = payPeriod.current && (clocked === "in" || clocked === "meal") ? elapsed / 3600 : 0;
+  const weekRegular = totalReg + liveShiftHours;
+  const hoursToWeeklyOT = WEEKLY_OT_THRESHOLD - weekRegular;
+  const weekProgressTone = hoursToWeeklyOT <= 0 ? "over" : hoursToWeeklyOT <= WEEKLY_OT_WARNING_HOURS ? "near" : "ok";
+
+  const workRowHours = (r: TodayWorkRow) => ((r.endedAt ?? now).getTime() - r.startedAt.getTime()) / 3_600_000;
+  const [attestingDay, setAttestingDay] = useState<{ label: string; date: number } | null>(null);
+  const timesheetDays = [
+    ...[...new Set(mockTimesheetEntries.map(e => e.date))].map(date => {
+      const entries = mockTimesheetEntries.filter(e => e.date === date);
+      const dayNum = Number(date.split(" ").pop());
+      return {
+        key: date,
+        title: date,
+        entries,
+        entryCount: entries.length,
+        reg: entries.reduce((s, e) => s + e.reg, 0),
+        ot: entries.reduce((s, e) => s + e.ot, 0),
+        attest: payPeriod.current ? ATTESTATION_DAYS.find(d => d.date === dayNum) : undefined,
+        isToday: false,
+      };
+    }),
+    ...(payPeriod.current && (workRows.length || breakRows.length || mealRows.length) ? [{
+      key: "today",
+      title: `Today · ${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`,
+      entries: [] as typeof mockTimesheetEntries,
+      entryCount: workRows.length + breakRows.length + mealRows.length,
+      reg: workRows.reduce((s, r) => s + workRowHours(r), 0),
+      ot: 0,
+      attest: { label: now.toLocaleDateString("en-US", { weekday: "short" }), date: now.getDate() },
+      isToday: true,
+    }] : []),
+  ].reverse(); // built oldest → newest; shown most recent first
+
+  // With nothing to scroll, the two cards stretch to the taller one so an empty timesheet does not sit lopsided.
+  const emptyPeriod = timesheetDays.length === 0;
+
+  // Review walks the unsigned days oldest first; reviewTotal is non-zero only while a review is running.
+  const allAttestDays = timesheetDays.flatMap(d => (d.attest ? [d.attest] : [])).reverse();
+  const pendingAttestDays = allAttestDays.filter(d => !attested.has(d.date));
+  const [reviewTotal, setReviewTotal] = useState(0);
+  // The modal calls onClose straight after onSubmit; that close must not end the review.
+  const attestSubmittedRef = useRef(false);
+  const startAttestationReview = () => {
+    if (!pendingAttestDays.length) return;
+    setReviewTotal(pendingAttestDays.length);
+    setAttestingDay(pendingAttestDays[0]);
+  };
+
+  const timesheetRows: TimesheetRow[] = timesheetDays.flatMap(day => {
+    const base = { closed: !payPeriod.current, attest: day.attest, dayTitle: day.title, dayMeta: `${day.reg.toFixed(2)} hrs · ${day.ot.toFixed(2)} OT` };
+    const blank = { jobNum: "—", dept: "—", job: "—", rule: "—", hours: 0, ot: 0, ot2: 0, qty: 0, travel: 0, perDiem: 0 };
+    const rows: Omit<TimesheetRow, "id" | "dayStart">[] = day.isToday
+      ? [
+          ...workRows.map(wr => ({
+            ...base, ...blank, type: "work" as const, live: wr.end === null,
+            start: wr.start, end: wr.end, startLoc: wr.startLoc, endLoc: wr.endLoc,
+            jobNum: wr.crew.split(" - ")[0] || "—", dept: wr.dept, job: wr.job, phase: wr.phase, rule: "5b",
+            hours: workRowHours(wr),
+          })),
+          ...breakRows.map(br => ({
+            ...base, ...blank, type: "break" as const, live: false,
+            start: br.start, end: br.end, startLoc: br.startLoc, endLoc: br.endLoc, phase: "Rest break",
+          })),
+          ...mealRows.map(mr => ({
+            ...base, ...blank, type: "meal" as const, live: false,
+            start: mr.start, end: mr.end, startLoc: mr.startLoc, endLoc: mr.endLoc, phase: "On-duty meal · paid",
+          })),
+        ].sort((a, b) => clockMinutes(a.start) - clockMinutes(b.start))
+      : day.entries.map(e => ({
+          ...base, type: e.phase === "Break" ? "break" as const : "work" as const, live: false,
+          start: e.start, end: e.end, startLoc: e.clockInLoc, endLoc: e.clockOutLoc,
+          jobNum: e.jobNum, dept: e.dept, job: e.job, phase: e.phase, rule: e.payRule,
+          hours: e.reg, ot: e.ot, ot2: e.ot2, qty: e.qty, travel: e.travel, perDiem: e.perDiem,
+        }));
+    return rows.map((r, i) => ({ ...r, id: `${day.key}-${i}`, dayStart: i === 0 }));
+  });
+
+  const [detailRow, setDetailRow] = useState<TimesheetRow | null>(null);
+  useEffect(() => {
+    const el = document.getElementById(TIMESHEET_ENTRY_MODAL_ID) as HTMLDialogElement | null;
+    if (!el) return;
+    if (detailRow) { if (!el.open) el.showModal(); }
+    else if (el.open) el.close();
+    const onClose = () => setDetailRow(null);
+    el.addEventListener("close", onClose);
+    return () => el.removeEventListener("close", onClose);
+  }, [detailRow]);
+  const openPunchMapFromDetails = (pin: TimesheetPunchPin) => { setDetailRow(null); setPunchMapPin(pin); };
+
+  const asRow = (row: unknown) => row as TimesheetRow;
+  const timesheetColumns = [
+    {
+      id: "day", accessor: "dayTitle", header: "Date", width: "150px",
+      cellRenderer: (_: unknown, raw: unknown) => {
+        const row = asRow(raw);
+        const wrap = cellEl("ts-day");
+        if (!row.dayStart) return wrap;
+        wrap.setAttribute("data-day-start", "");
+        const titleRow = cellEl("ts-day-head");
+        const checkIcon = () => modusEl("modus-wc-icon", { name: "check_circle", variant: "outlined", size: "xs", decorative: "", "custom-class": "ts-attested" });
+        if (row.closed) {
+          const icon = checkIcon();
+          icon.setAttribute("title", "Attested");
+          titleRow.append(icon);
+        } else if (row.attest) {
+          const attest = row.attest;
+          const done = attested.has(attest.date);
+          const btn = modusEl("modus-wc-button", {
+            shape: "square", color: "tertiary", variant: "borderless", size: "xs", "custom-class": "ts-attest-btn",
+            "aria-label": done ? `View attestation for ${row.dayTitle}` : `Attest ${row.dayTitle}`,
+            title: done ? "Attested" : "Attestation needed",
+          });
+          btn.append(done ? checkIcon() : cellEl("ts-pending-dot"));
+          btn.addEventListener("click", e => e.stopPropagation());
+          btn.addEventListener("buttonClick", () => setAttestingDay(attest));
+          titleRow.append(btn);
+        }
+        titleRow.append(cellEl("ts-day-title", row.dayTitle));
+        wrap.append(titleRow, cellEl("ts-muted", row.dayMeta));
+        return wrap;
+      },
+    },
+    {
+      id: "type", accessor: "type", header: "Type", width: "56px",
+      cellRenderer: (_: unknown, raw: unknown) => {
+        const row = asRow(raw);
+        const el = cellEl("ts-type");
+        el.innerHTML = ENTRY_TYPE_TILE_HTML[row.type];
+        if (row.live) el.setAttribute("data-live", "");
+        return el;
+      },
+    },
+    ...(["start", "end"] as const).map(key => ({
+      id: key, accessor: key, header: key === "start" ? "Start" : "End", width: key === "end" ? "96px" : "72px",
+      cellRenderer: (_: unknown, raw: unknown) => {
+        const row = asRow(raw);
+        if (key === "end" && row.live) return modusEl("modus-wc-badge", { color: "primary", variant: "filled", size: "sm", "custom-class": "whitespace-nowrap" }, "In progress");
+        const el = cellEl("ts-time", (key === "start" ? row.start : row.end) ?? "—");
+        if ((key === "start" ? row.startLoc : row.endLoc)?.flagged) {
+          el.append(modusEl("modus-wc-icon", { name: "warning", variant: "outlined", size: "xs", "aria-label": "Off-site punch", "custom-class": "ts-flag" }));
+        }
+        return el;
+      },
+    })),
+    { id: "job", accessor: "job", header: "Job", cellRenderer: (v: unknown) => cellEl("ts-wrap", String(v)) },
+    { id: "phase", accessor: "phase", header: "Phase", cellRenderer: (v: unknown) => cellEl("ts-wrap", String(v)) },
+    {
+      id: "hours", accessor: "hours", header: "Hours", width: "60px",
+      cellRenderer: (_: unknown, raw: unknown) => {
+        const row = asRow(raw);
+        return cellEl(`ts-cell-num${row.live ? " ts-strong" : ""}`, row.hours > 0 ? row.hours.toFixed(2) : "—");
+      },
+    },
+    {
+      id: "ot", accessor: "ot", header: "OT", width: "52px",
+      cellRenderer: (v: unknown) => cellEl("ts-cell-num", Number(v) > 0 ? Number(v).toFixed(2) : "—"),
+    },
+    {
+      id: "details", accessor: "id", header: "", width: "40px",
+      cellRenderer: (_: unknown, raw: unknown) => {
+        const row = asRow(raw);
+        const btn = modusEl("modus-wc-button", { shape: "square", color: "tertiary", variant: "borderless", size: "xs", "aria-label": `Details for ${row.type} entry starting ${row.start}` });
+        btn.append(modusEl("modus-wc-icon", { name: "chevron_right", variant: "outlined", size: "xs", decorative: "" }));
+        return btn;
+      },
+    },
+  ];
 
   const ClockJobSelectField = ({ label, value, onChange, options, required, invalid }: {
     label: string; value: string; onChange: (v: string) => void; options: string[];
@@ -5922,7 +6586,7 @@ function ClockInOutPage() {
       value={value}
       feedback={invalid ? { level: "error", message: "Required" } : undefined}
       options={[
-        { label: `Select ${label.toLowerCase()}`, value: "", hidden: true },
+        { label: `Select ${label.toLowerCase()}`, value: "", hidden: required },
         ...options.map(o => ({ label: o, value: o })),
       ]}
       onInputChange={(e) => onChange(readInputString(e as CustomEvent))}
@@ -5940,16 +6604,8 @@ function ClockInOutPage() {
       </p>
     </div>
   );
-
-  const fmtHMS = (s: number) => {
-    const h = Math.floor(s / 3600).toString().padStart(2, "0");
-    const m = Math.floor((s % 3600) / 60).toString().padStart(2, "0");
-    const sec = (s % 60).toString().padStart(2, "0");
-    return `${h}h ${m}m ${sec}s`;
-  };
-
   return (
-    <div style={{ background: "#f1f1f6", fontFamily: OS }}>
+    <div style={{ background: "#f1f1f6", fontFamily: OS, minHeight: `calc(100vh - ${TOP_BAR_H}px)` }}>
       {/* Early break modal */}
       {viewMode === "desktop" && showEarlyBreakModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
@@ -6123,51 +6779,184 @@ function ClockInOutPage() {
         </div>
       )}
 
-      {/* Top header */}
-      <div className="flex items-center justify-between gap-[16px] px-[32px] pt-[24px] pb-[20px]"
-        style={{ borderBottom: "1px solid #e0e1e9", background: "#ffffff" }}>
-        <div>
-          <p style={{ fontSize: 22, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock In &amp; Out</p>
-          <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-            {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+      {attestingDay && (
+        <AttestationModal
+          key={attestingDay.date}
+          day={attestingDay}
+          days={allAttestDays}
+          isAttested={date => attested.has(date)}
+          onChangeDay={setAttestingDay}
+          stepLabel={reviewTotal ? `Day ${reviewTotal - pendingAttestDays.length + 1} of ${reviewTotal}` : undefined}
+          onClose={() => {
+            if (attestSubmittedRef.current) { attestSubmittedRef.current = false; return; }
+            setAttestingDay(null); setReviewTotal(0);
+          }}
+          onSubmit={() => {
+            attestSubmittedRef.current = true;
+            attestDay(attestingDay.date);
+            const next = reviewTotal ? pendingAttestDays.find(d => d.date !== attestingDay.date) : undefined;
+            setAttestingDay(next ?? null);
+            if (!next) setReviewTotal(0);
+          }}
+        />
+      )}
+
+      {/* Job details — collected when the user clocks in or switches job */}
+      <ModusWcModal modalId={JOB_MODAL_ID} customClass="clock-job-modal" backdrop="static" aria-label={switchJobEditing ? "Switch job" : "Clock in job details"}>
+        <p slot="header" style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+          {switchJobEditing ? "Switch Job" : "Job Details"}
+        </p>
+        <div slot="content" className="-mx-[20px]">
+              <div className="p-[20px]">
+              {switchJobEditing && (
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 14, lineHeight: 1.5 }}>
+                  Update crew, department, job, or phase, then confirm. Your current punch will end and a new clock-in session will start with the timer reset.
+                </p>
+              )}
+              {switchJobInlineError && switchJobEditing && (
+                <div className="mb-[14px]">
+                  <ModusWcAlert
+                    variant="error"
+                    alertTitle="Complete job details to switch"
+                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
+                  />
+                </div>
+              )}
+              {detailsPrompt && !switchJobEditing && (
+                <div className="mb-[14px]">
+                  <ModusWcAlert
+                    variant="error"
+                    alertTitle="Add job details before clocking in"
+                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
+                  />
+                </div>
+              )}
+              <div key={switchJobEditing ? "switch-job-fields" : "job-fields"} className="grid grid-cols-2 gap-x-[16px] gap-y-[10px]">
+                  <>
+                    <ClockJobSelectField label="Crew" value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !crew} />
+                    <ClockJobSelectField label="Department" value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !dept} />
+                    <ClockJobSelectField label="Job" value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !job} />
+                    <ClockJobSelectField label="Phase" value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
+                      required invalid={(detailsPrompt || switchJobInlineError) && !phase} />
+                    <ClockJobSelectField label="Trade" value={trade} onChange={setTrade} options={CLOCK_TRADE_OPTIONS} />
+                    <ClockJobSelectField label="Wage Code" value={wageCode} onChange={setWageCode} options={CLOCK_WAGE_CODE_OPTIONS} />
+                    <ClockJobSelectField label="Rate Level" value={rateLevel} onChange={setRateLevel} options={CLOCK_RATE_LEVEL_OPTIONS} />
+                    <ClockJobSelectField label="Equipment" value={equipment} onChange={setEquipment} options={CLOCK_EQUIPMENT_OPTIONS} />
+                  </>
+                <ModusWcNumberInput
+                  label="Travel"
+                  size="sm"
+                  min={0}
+                  step={0.25}
+                  value={travel}
+                  onInputChange={(e) => setTravel(e.target.value)}
+                />
+                <ModusWcNumberInput
+                  label="Quantity"
+                  size="sm"
+                  min={0}
+                  value={qty}
+                  onInputChange={(e) => setQty(e.target.value)}
+                />
+                <ModusWcNumberInput
+                  label="Bonus"
+                  size="sm"
+                  min={0}
+                  step={0.01}
+                  value={bonus}
+                  onInputChange={(e) => setBonus(e.target.value)}
+                />
+                <div style={{ alignSelf: "end", paddingBottom: 6 }}>
+                  <ModusWcCheckbox
+                    aria-label="Per Diem"
+                    label="Per Diem"
+                    size="sm"
+                    value={perDiem}
+                    onInputChange={() => setPerDiem(v => !v)}
+                  />
+                </div>
+                <div className="col-span-full">
+                  <ModusWcTextInput
+                    label="Comment"
+                    size="sm"
+                    value={comment}
+                    placeholder="Optional note..."
+                    onInputChange={(e) => setComment(e.target.value)}
+                  />
+                </div>
+              </div>
+              </div>
+
+        </div>
+        <div slot="footer" className="flex justify-end gap-[12px]">
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={dismissJobModal}>
+            Cancel
+          </ModusWcButton>
+          <ModusWcButton color="primary" variant="filled" size="sm" disabled={!!site && locating}
+            onButtonClick={switchJobEditing ? confirmSwitchJob : confirmClockInFromModal}>
+            <ModusWcIcon name={switchJobEditing ? "swap" : "timer"} variant="outlined" size="xs" decorative />
+            {switchJobEditing ? "Confirm Switch" : "Clock In"}
+          </ModusWcButton>
+        </div>
+      </ModusWcModal>
+
+      <PunchUndoToast punch={lastPunch} onUndo={undoLastPunch} onDismiss={dismissPunchToast} />
+
+      <ModusWcModal modalId={CLOCK_OUT_MODAL_ID} customClass="clock-out-modal" aria-label="Confirm clock out">
+        <p slot="header" style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Clock out?</p>
+        <div slot="content" className="flex flex-col gap-[12px]">
+          <p style={{ fontSize: 13, color: "#464b52", fontFamily: OS, ...OS_FVS, lineHeight: 1.5 }}>
+            This ends your shift and records your clock-out time and location. Review your shift before you confirm.
           </p>
+          <ClockOutSummary summary={clockOutSummary} />
         </div>
-        {/* One shift, two renderings — the switcher keeps the running clock. */}
-        <div className="flex shrink-0 items-center gap-[2px] rounded-[6px] p-[3px]" style={{ background: "#f1f1f6", border: "1px solid #e0e1e9" }}>
-          {([
-            { value: "desktop", label: "Desktop" },
-            { value: "mobile",  label: "Mobile" },
-          ] as const).map(opt => (
-            <button key={opt.value} type="button" onClick={() => setViewMode(opt.value)}
-              aria-pressed={viewMode === opt.value}
-              style={{
-                fontSize: 12, fontFamily: OS, fontWeight: viewMode === opt.value ? 700 : 400,
-                padding: "5px 14px", borderRadius: 4, cursor: "pointer", border: "none",
-                background: viewMode === opt.value ? "#ffffff" : "transparent",
-                color: viewMode === opt.value ? "#0e416c" : "#6a6e79",
-                boxShadow: viewMode === opt.value ? "0 1px 2px rgba(0,0,0,0.12)" : "none",
-              }}>
-              {opt.label}
-            </button>
-          ))}
+        <div slot="footer" className="flex justify-end gap-[8px]">
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={cancelClockOut}>
+            Stay clocked in
+          </ModusWcButton>
+          <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={confirmClockOut}>
+            <ModusWcIcon name="sign_out" variant="outlined" size="xs" decorative />
+            Clock Out
+          </ModusWcButton>
         </div>
-      </div>
+      </ModusWcModal>
+
+      <ModusWcModal modalId={TIMESHEET_ENTRY_MODAL_ID} customClass="timesheet-entry-modal" aria-label="Time entry details">
+        <p slot="header" style={{ fontSize: 17, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+          {detailRow ? `${ENTRY_TYPE_TILE[detailRow.type].label} entry · ${detailRow.dayTitle}` : "Time entry"}
+        </p>
+        <div slot="content">
+          {detailRow && (
+            <TimesheetEntryDetails row={detailRow} onOpenMap={openPunchMapFromDetails} />
+          )}
+        </div>
+        <div slot="footer" className="flex justify-end">
+          <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => setDetailRow(null)}>
+            Close
+          </ModusWcButton>
+        </div>
+      </ModusWcModal>
 
       {viewMode === "mobile" && <MobileClockView session={session} />}
 
       {viewMode === "desktop" && (
-      <div className="flex" style={{ minHeight: 520, overflow: switchJobEditing ? "visible" : "hidden" }}>
-        {/* ── Left panel: concentric circle clock ── */}
-        <div className="flex flex-col items-center justify-start flex-1 pt-[56px] pb-[48px] px-[32px]"
-          style={{ minWidth: 0, overflow: switchJobEditing ? "visible" : "hidden" }}>
+      <div className={`flex ${emptyPeriod ? "items-stretch" : "items-start"}`} style={{ overflowX: "clip" }}>
+        {/* ── Left panel: clock card, pinned below the top bar while the timesheet scrolls ── */}
+        <div className="flex flex-col shrink-0 sticky py-[24px] pl-[24px]"
+          style={{ width: 404, top: TOP_BAR_H, maxHeight: `calc(100vh - ${TOP_BAR_H}px)` }}>
+          <div className={`flex flex-col min-h-0 ${emptyPeriod ? "flex-1" : ""}`}>
+          <div className="flex flex-col items-center shrink-0">
           {/* Clock display */}
-          <div className="w-full mb-[24px]" style={{ maxWidth: 420 }}>
-            <ClockDisplay elapsed={elapsed} clocked={clocked} />
+          <div className="w-full mb-[12px]" style={MOBILE_CARD}>
+            <ClockDisplay elapsed={elapsed} clocked={clocked} startNote={shiftStartNote} breakTimer={breakTimer} color={stateColor} />
           </div>
 
           {/* Off-site clock-in flag */}
           {clocked !== "out" && clockedInOffSite && (
-            <div className="w-full flex items-center gap-[12px] mb-[24px] px-[16px] py-[12px] rounded-[8px]"
+            <div className="w-full flex items-center gap-[12px] mb-[12px] px-[14px] py-[10px] rounded-[8px]"
               style={{ background: "#fffbeb", border: "1px solid #fbbf24", maxWidth: 420 }}>
               <MapPin size={18} style={{ color: "#d97706", flexShrink: 0 }} />
               <div className="flex-1">
@@ -6181,7 +6970,7 @@ function ClockInOutPage() {
 
           {/* Break alert banner */}
           {showBreakAlert && (
-            <div className="w-full flex items-center gap-[12px] mb-[24px] px-[16px] py-[12px] rounded-[8px]"
+            <div className="w-full flex items-center gap-[12px] mb-[12px] px-[14px] py-[10px] rounded-[8px]"
               style={{ background: "#fffbeb", border: "1px solid #fbbf24", maxWidth: 420 }}>
               <AlertTriangle size={18} style={{ color: "#d97706", flexShrink: 0 }} />
               <div className="flex-1">
@@ -6199,7 +6988,7 @@ function ClockInOutPage() {
           )}
 
           {clocked === "meal" && (
-            <div className="w-full flex items-center gap-[12px] mb-[24px] px-[16px] py-[12px] rounded-[8px]"
+            <div className="w-full flex items-center gap-[12px] mb-[12px] px-[14px] py-[10px] rounded-[8px]"
               style={{ background: "#e8f7ed", border: "1px solid #bbe6ca", maxWidth: 420 }}>
               <Utensils size={18} style={{ color: "#15803d", flexShrink: 0 }} />
               <div className="flex-1">
@@ -6213,429 +7002,204 @@ function ClockInOutPage() {
 
           {/* Concentric rings */}
           <ClockRingStyles />
-          <div className="relative flex items-center justify-center" style={{ width: 260, height: 260, flexShrink: 0 }}>
-            <div className="ring-outer absolute rounded-full" style={{ width: 260, height: 260, background: stateColorLight }} />
-            <div className="ring-mid absolute rounded-full" style={{ width: 200, height: 200, background: stateColorMid }} />
-            <div className="ring-inner absolute rounded-full" style={{ width: 148, height: 148, background: stateColorStrong }} />
+          <div className="relative flex items-center justify-center my-[16px]" style={{ width: 216, height: 216, flexShrink: 0 }}>
+            <div className="ring-outer absolute rounded-full" style={{ width: 216, height: 216, background: stateColorLight }} />
+            <div className="ring-mid absolute rounded-full" style={{ width: 168, height: 168, background: stateColorMid }} />
+            <div className="ring-inner absolute rounded-full" style={{ width: 126, height: 126, background: stateColorStrong }} />
             {/* Main button */}
-            <button type="button" onClick={handleMainBtn}
+            <button type="button" onClick={clocked === "out" ? openClockInModal : clocked === "in" ? requestClockOut : handleMainBtn}
               className="relative flex items-center justify-center rounded-full font-black transition-transform active:scale-95"
-              style={{ width: 104, height: 104, background: stateColor, border: "none", cursor: "pointer", color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontFamily: OS, fontWeight: 900, boxShadow: `0 4px 24px ${stateColorStrong}`, textAlign: "center", lineHeight: 1.2 }}>
+              style={{ width: 92, height: 92, background: stateColor, border: "none", cursor: "pointer", color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontFamily: OS, fontWeight: 900, boxShadow: `0 4px 24px ${stateColorStrong}`, textAlign: "center", lineHeight: 1.2 }}>
               {btnLabel}
             </button>
           </div>
 
           {/* Sub-action buttons */}
           {clocked === "in" && (
-            <div className="flex items-center gap-[40px] mt-[32px]">
-              <button type="button"
-                onClick={beginSwitchJob}
-                className="flex flex-col items-center gap-[6px]"
-                style={{ background: "transparent", border: "none", cursor: "pointer" }}>
-                <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-                  <Briefcase size={20} style={{ color: "#464b52" }} />
-                </div>
-                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Switch Job</p>
-              </button>
-              <button type="button" onClick={handleBreak}
-                className="flex flex-col items-center gap-[6px]"
-                style={{ background: "transparent", border: "none", cursor: "pointer" }}>
-                <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#464b52" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 8h1a4 4 0 0 1 0 8h-1" />
-                    <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
-                    <line x1="6" y1="2" x2="6" y2="4" />
-                    <line x1="10" y1="2" x2="10" y2="4" />
-                    <line x1="14" y1="2" x2="14" y2="4" />
-                  </svg>
-                </div>
-                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Take Break</p>
-              </button>
-              <button type="button" onClick={() => { setMealAck(false); setShowMealModal(true); }}
-                className="flex flex-col items-center gap-[6px]"
-                style={{ background: "transparent", border: "none", cursor: "pointer" }}>
-                <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-                  <Utensils size={20} style={{ color: "#464b52" }} />
-                </div>
-                <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>On-Duty Meal</p>
-              </button>
+            <div className="grid w-full grid-cols-3 gap-[10px] mb-[12px]">
+              {([
+                { label: "Switch Job", icon: <Briefcase size={19} style={{ color: "#464b52" }} />, onPress: beginSwitchJob },
+                { label: "Take Break", icon: <Coffee size={19} style={{ color: "#464b52" }} />, onPress: handleBreak },
+                { label: "On-Duty Meal", icon: <Utensils size={19} style={{ color: "#464b52" }} />, onPress: () => { setMealAck(false); setShowMealModal(true); } },
+              ]).map(a => (
+                <button key={a.label} type="button" onClick={a.onPress}
+                  className="flex flex-col items-center gap-[6px] transition-colors hover:bg-[#f7f8fa]"
+                  style={{ ...MOBILE_CARD, cursor: "pointer", padding: "12px 4px" }}>
+                  {a.icon}
+                  <p style={{ fontSize: 12, color: "#464b52", fontFamily: OS, ...OS_FVS, textAlign: "center" }}>{a.label}</p>
+                </button>
+              ))}
             </div>
           )}
+          </div>
 
-          {/* Job form — always visible on desktop; core job fields lock while clocked in until Switch Job */}
-          <div ref={formRef}
-            className={`mt-[28px] w-full bg-white rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] ${switchJobEditing ? "clock-switch-job-editing overflow-visible" : "overflow-hidden"}`}
-            style={{ maxWidth: 420, position: "relative", zIndex: switchJobEditing ? 40 : undefined }}>
-              <div className="p-[20px]">
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#0e416c", fontFamily: OS, ...OS_FVS, marginBottom: 14 }}>
-                {switchJobEditing ? "Switch Job" : "Job Details"}
-              </p>
-              {switchJobEditing && (
-                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS, marginBottom: 14, lineHeight: 1.5 }}>
-                  Update crew, department, job, or phase, then confirm. Your current punch will end and a new clock-in session will start with the timer reset.
-                </p>
-              )}
-              {switchJobInlineError && switchJobEditing && (
-                <div className="mb-[14px]">
-                  <ModusWcAlert
-                    variant="error"
-                    alertTitle="Complete job details to switch"
-                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
-                  />
+          {/* Current job — details are picked in the Clock In modal and locked until Switch Job */}
+          {clocked !== "out" && (
+            <div className="flex min-h-0 flex-col" style={{ ...MOBILE_CARD, overflow: "hidden" }}>
+              <div className="flex shrink-0 items-center gap-[10px]" style={{ padding: "12px 16px", borderBottom: "1px solid #eef0f3" }}>
+                <div className="flex items-center justify-center shrink-0" style={{ width: 30, height: 30, borderRadius: 8, background: "#e8f2fa" }}>
+                  <Briefcase size={16} style={{ color: "#0063a3" }} />
                 </div>
-              )}
-              {detailsPrompt && !jobFieldsLocked && !switchJobEditing && (
-                <div className="mb-[14px]">
-                  <ModusWcAlert
-                    variant="error"
-                    alertTitle="Add job details before clocking in"
-                    alertDescription={`Still needed: ${missingDetails.join(", ")}.`}
-                  />
-                </div>
-              )}
-              <div key={switchJobEditing ? "switch-job-fields" : "job-fields"} className="grid grid-cols-2 gap-[12px] relative" style={{ zIndex: 50 }}>
-                {jobFieldsLocked ? (
-                  <>
-                    <ReadOnlyJobField label="Crew" value={crew} />
-                    <ReadOnlyJobField label="Department" value={dept} />
-                    <div className="col-span-2">
-                      <ReadOnlyJobField label="Job" value={job} />
-                    </div>
-                    <div className="col-span-2">
-                      <ReadOnlyJobField label="Phase" value={phase} />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <ClockJobSelectField label="Crew" value={crew} onChange={setCrew} options={CLOCK_CREW_OPTIONS}
-                      required invalid={(detailsPrompt || switchJobInlineError) && !crew} />
-                    <ClockJobSelectField label="Department" value={dept} onChange={setDept} options={CLOCK_DEPT_OPTIONS}
-                      required invalid={(detailsPrompt || switchJobInlineError) && !dept} />
-                    <div className="col-span-2">
-                      <ClockJobSelectField label="Job" value={job} onChange={setJob} options={CLOCK_JOB_OPTIONS}
-                        required invalid={(detailsPrompt || switchJobInlineError) && !job} />
-                    </div>
-                    <ClockJobSelectField label="Phase" value={phase} onChange={setPhase} options={CLOCK_PHASE_OPTIONS}
-                      required invalid={(detailsPrompt || switchJobInlineError) && !phase} />
-                  </>
-                )}
-                <ModusWcNumberInput
-                  label="Travel"
-                  size="sm"
-                  min={0}
-                  step={0.25}
-                  value={travel}
-                  onInputChange={(e) => setTravel(e.target.value)}
-                />
-                <ModusWcNumberInput
-                  label="Quantity"
-                  size="sm"
-                  min={0}
-                  value={qty}
-                  onInputChange={(e) => setQty(e.target.value)}
-                />
-                <div style={{ alignSelf: "center" }}>
-                  <ModusWcCheckbox
-                    aria-label="Per Diem"
-                    label="Per Diem"
-                    size="sm"
-                    value={perDiem}
-                    onInputChange={() => setPerDiem(v => !v)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <ModusWcTextInput
-                    label="Comment"
-                    size="sm"
-                    value={comment}
-                    placeholder="Optional note..."
-                    onInputChange={(e) => setComment(e.target.value)}
-                  />
-                </div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Current Job</p>
               </div>
-              {switchJobEditing && (
-                <div className="flex justify-end gap-[12px] mt-[16px] pt-[16px]" style={{ borderTop: "1px solid #eef0f3" }}>
-                  <ModusWcButton color="primary" variant="outlined" size="sm" onButtonClick={cancelSwitchJob}>
-                    Cancel
-                  </ModusWcButton>
-                  <ModusWcButton color="primary" variant="filled" size="sm" onButtonClick={confirmSwitchJob}>
-                    Confirm
-                  </ModusWcButton>
-                </div>
-              )}
+              <div className="grid min-h-0 grid-cols-2 gap-x-[16px] gap-y-[8px] overflow-y-auto px-[16px] py-[12px]">
+                <div className="col-span-full"><ReadOnlyJobField label="Job" value={job} /></div>
+                <div className="col-span-full"><ReadOnlyJobField label="Phase" value={phase} /></div>
+                <ReadOnlyJobField label="Crew" value={crew} />
+                <ReadOnlyJobField label="Department" value={dept} />
+                {([["Trade", trade], ["Wage Code", wageCode], ["Rate Level", rateLevel], ["Equipment", equipment]] as const)
+                  .filter(([, value]) => value)
+                  .map(([label, value]) => <ReadOnlyJobField key={label} label={label} value={value} />)}
               </div>
-
-              {/* Site strip only when clocked out — hidden during inline switch so it does not cover open selects */}
-              {clocked === "out" && (
-                <div className="px-[20px] py-[14px]" style={{
-                  borderTop: "1px solid #eef0f3",
-                  background: !site || locating ? "#f7f7f8" : onSite ? "#e8f7ed" : "#fffbeb",
-                }}>
-                  <div className="flex items-center gap-[12px]">
-                    {locating && site
-                      ? <LoaderCircle size={18} className="shrink-0 animate-spin" style={{ color: "#6a6e79" }} />
-                      : site && fix ? (
-                        <button type="button" onClick={() => setShowSiteMap(true)}
-                          title="View on map" aria-label={`View ${site.name} on a map`}
-                          className="shrink-0 flex items-center justify-center"
-                          style={{
-                            width: 34, height: 34, padding: 0, borderRadius: 999, cursor: "pointer",
-                            background: "#ffffff", border: `1px solid ${onSite ? "#b7e0c4" : "#f4d6a4"}`,
-                          }}>
-                          <MapPin size={18} style={{ color: onSite ? "#15803d" : "#d97706" }} />
-                        </button>
-                      ) : <MapPin size={18} className="shrink-0" style={{ color: !site ? "#a3a3a3" : onSite ? "#15803d" : "#d97706" }} />}
-                    <div className="flex-1" style={{ minWidth: 0 }}>
-                      {!site ? (
-                        <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-                          Select a job to check its site.
-                        </p>
-                      ) : locating ? (
-                        <p style={{ fontSize: 13, fontWeight: 700, color: "#464b52", fontFamily: OS, ...OS_FVS }}>
-                          Getting your location…
-                        </p>
-                      ) : (
-                        <>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: onSite ? "#15803d" : "#92400e", fontFamily: OS, ...OS_FVS }}>
-                            {onSite ? `On site · ${site.name}` : `${formatDistance(siteDistance)} from ${site.name}`}
-                          </p>
-                          <p style={{ fontSize: 12, color: onSite ? "#3f7d55" : "#b45309", fontFamily: OS, ...OS_FVS }}>
-                            {onSite
-                              ? `${formatDistance(siteDistance)} from site center · accurate to ${fix?.accuracyMeters} m`
-                              : `Outside the ${site.radiusMeters} m job site radius`}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {site && fix && !locating && (
-                    <p className="mt-[8px]" style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>
-                      {formatCoords(fix)} · {site.address}
-                    </p>
-                  )}
-                  {/* Prototype control: real device coordinates never land on a mock site. */}
-                  {site && (
-                    <div className="mt-[10px] pt-[10px] flex items-center gap-[8px]" style={{ borderTop: "1px dashed #d4d6dd" }}>
-                      <p style={{ fontSize: 11, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Simulate:</p>
-                      {([{ label: "On site", value: false }, { label: "Off site", value: true }] as const).map(opt => (
-                        <button key={opt.label} type="button" onClick={() => setOffSiteSim(opt.value)}
-                          aria-pressed={offSiteSim === opt.value}
-                          style={{
-                            fontSize: 11, fontFamily: OS, borderRadius: 4, padding: "2px 8px", cursor: "pointer",
-                            background: offSiteSim === opt.value ? "#0063a3" : "#ffffff",
-                            color: offSiteSim === opt.value ? "#ffffff" : "#464b52",
-                            border: `1px solid ${offSiteSim === opt.value ? "#0063a3" : "#cbced4"}`,
-                          }}>
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
-
-          {/* Timesheet table — inside left panel, below circle/form */}
-          <div className="w-full mt-[32px] rounded-[8px] overflow-hidden"
-            style={{
-              border: "1px solid #e0e1e9",
-              pointerEvents: switchJobEditing ? "none" : undefined,
-              position: "relative",
-              zIndex: switchJobEditing ? 0 : undefined,
-            }}>
-            <div className="px-[16px] py-[12px]" style={{ background: "#0e416c" }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#ffffff", fontFamily: OS, ...OS_FVS }}>
-                Timesheet for Pay Period August 1 – August 7, 2026
-              </p>
-            </div>
-            <AttestationPanel days={ATTESTATION_DAYS} attested={attested} onAttest={attestDay} />
-            <div>
-              <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
-                <thead>
-                  <tr style={{ background: "#e0e1e9" }}>
-                    {["Date", "Job #", "Start", "End", "Dept", "Job", "Phase", "Rule", "Reg", "OT", "OT2", "Qty", "Travel", "Per Diem"].map(h => (
-                      <th key={h} className="px-[6px] py-[6px] text-left" style={{ borderBottom: "1px solid #cbced4" }}>
-                        <p style={{ fontSize: 10, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{h}</p>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockTimesheetEntries.map((e, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: "1px solid #e0e1e9" }}>
-                      <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.date}</p></td>
-                      <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.jobNum}</p></td>
-                      <td className="px-[6px] py-[6px]">
-                        <p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.start}</p>
-                        <TimesheetMapButton pin={e.clockInLoc} onOpen={setPunchMapPin} />
-                      </td>
-                      <td className="px-[6px] py-[6px]">
-                        <p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{e.end}</p>
-                        <TimesheetMapButton pin={e.clockOutLoc} onOpen={setPunchMapPin} />
-                      </td>
-                      <td className="px-[6px] py-[6px]" style={{ maxWidth: 90 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.dept}</p></td>
-                      <td className="px-[6px] py-[6px]" style={{ maxWidth: 120 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.job}</p></td>
-                      <td className="px-[6px] py-[6px]" style={{ maxWidth: 110 }}><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS, wordBreak: "break-word" }}>{e.phase}</p></td>
-                      <td className="px-[6px] py-[6px]"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.payRule}</p></td>
-                      <td className="px-[6px] py-[6px] text-right"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.reg > 0 ? e.reg.toFixed(2) : "—"}</p></td>
-                      <td className="px-[6px] py-[6px] text-right"><p style={{ fontSize: 11, color: e.ot > 0 ? "#0063a3" : "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.ot > 0 ? e.ot.toFixed(2) : "—"}</p></td>
-                      <td className="px-[6px] py-[6px] text-right"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.ot2 > 0 ? e.ot2.toFixed(2) : "—"}</p></td>
-                      <td className="px-[6px] py-[6px] text-right"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.qty > 0 ? e.qty : "—"}</p></td>
-                      <td className="px-[6px] py-[6px] text-right"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.travel > 0 ? e.travel.toFixed(2) : "—"}</p></td>
-                      <td className="px-[6px] py-[6px] text-center"><p style={{ fontSize: 11, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.perDiem > 0 ? `$${e.perDiem}` : "—"}</p></td>
-                    </tr>
-                  ))}
-                  {breakRows.map((br, i) => (
-                    <tr key={`break-${i}`} style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>
-                        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]">
-                        <p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{br.start}</p>
-                        <TimesheetMapButton pin={br.startLoc} onOpen={setPunchMapPin} />
-                      </td>
-                      <td className="px-[10px] py-[8px]">
-                        <p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>
-                          {br.end ?? "—"}
-                        </p>
-                        {br.end && <TimesheetMapButton pin={br.endLoc} onOpen={setPunchMapPin} />}
-                      </td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#92400e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]">
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "2px 6px", fontFamily: OS }}>Break</span>
-                      </td>
-                      <td colSpan={7} className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#b45309", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                    </tr>
-                  ))}
-                  {mealRows.map((mr, i) => (
-                    <tr key={`meal-${i}`} style={{ background: "#f2fbf5", borderBottom: "1px solid #bbe6ca" }}>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>
-                        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]">
-                        <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.start}</p>
-                        <TimesheetMapButton pin={mr.startLoc} onOpen={setPunchMapPin} />
-                      </td>
-                      <td className="px-[10px] py-[8px]">
-                        <p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>{mr.end ?? "—"}</p>
-                        {mr.end && <TimesheetMapButton pin={mr.endLoc} onOpen={setPunchMapPin} />}
-                      </td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td className="px-[10px] py-[8px]"><p style={{ fontSize: 12, color: "#15803d", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                      <td colSpan={8} className="px-[10px] py-[8px]">
-                        <div className="flex items-center gap-[8px]">
-                          <span style={{ fontSize: 11, fontWeight: 600, color: "#15803d", background: "#cdecd8", borderRadius: 4, padding: "2px 6px", fontFamily: OS, whiteSpace: "nowrap" }}>On-duty meal</span>
-                          <span style={{ fontSize: 12, color: "#3f7d55", fontFamily: OS, ...OS_FVS, whiteSpace: "nowrap" }}>Paid — counts toward hours</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: "#f1f1f6", borderTop: "2px solid #e0e1e9" }}>
-                    <td colSpan={8} className="px-[10px] py-[8px]"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Totals</p></td>
-                    <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{totalReg.toFixed(2)}</p></td>
-                    <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#0063a3", fontFamily: OS, ...OS_FVS }}>{totalOT.toFixed(2)}</p></td>
-                    <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                    <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>—</p></td>
-                    <td className="px-[10px] py-[8px] text-right"><p style={{ fontSize: 12, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{totalTravel.toFixed(2)}</p></td>
-                    <td className="px-[10px] py-[8px]" />
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          )}
           </div>
         </div>
 
-        {/* ── Right panel: stats + timeline ── */}
-        <div className="flex flex-col overflow-y-auto" style={{ width: 300, flexShrink: 0, borderLeft: "1px solid #e0e1e9", background: "#ffffff", padding: "28px 20px", gap: 0 }}>
-          <p style={{ fontSize: 18, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS, marginBottom: 24 }}>
-            Today · {now.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-          </p>
-
-          {/* Stats rows */}
-          {[
-            { label: "Total Hours", value: clocked !== "out" ? fmtHMS(elapsed) : "00h 00m 00s", bold: true },
-          ].map(row => (
-            <div key={row.label} className="flex items-baseline justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
-              <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{row.label}</p>
-              <p style={{ fontSize: row.bold ? 22 : 14, fontWeight: row.bold ? 700 : 400, color: "#252a2e", fontFamily: OS, ...OS_FVS, letterSpacing: row.bold ? "-0.5px" : 0 }}>{row.value}</p>
-            </div>
-          ))}
-          <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
-            <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Current Status</p>
-            <div className="flex items-center gap-[8px]">
-              <p style={{ fontSize: 14, fontWeight: 600, color: stateColor, fontFamily: OS, ...OS_FVS }}>
-                {clocked === "out" ? "Not active yet!" : clocked === "break" ? "On Break" : clocked === "meal" ? "On-Duty Meal" : "On the Clock"}
-              </p>
-              <div className="h-[8px] w-[8px] rounded-full" style={{ background: stateColor }} />
-            </div>
-          </div>
-          {clocked === "break" && (
-            <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#fffbeb" }}>
-              <p style={{ fontSize: 13, color: "#92400e", fontFamily: OS, ...OS_FVS }}>Break Duration</p>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#d97706", fontFamily: OS, ...OS_FVS, letterSpacing: "-0.5px" }}>{fmt(breakElapsed)}</p>
-            </div>
-          )}
-          {clocked === "meal" && (
-            <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9", background: "#f2fbf5" }}>
-              <div>
-                <p style={{ fontSize: 13, color: "#15803d", fontFamily: OS, ...OS_FVS }}>Meal Duration</p>
-                <p style={{ fontSize: 11, color: "#3f7d55", fontFamily: OS, ...OS_FVS }}>Paid — counts toward hours</p>
-              </div>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#15803d", fontFamily: OS, ...OS_FVS, letterSpacing: "-0.5px" }}>{fmt(mealElapsed)}</p>
-            </div>
-          )}
-          <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
-            <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Job</p>
-            <p style={{ fontSize: 13, color: clocked === "out" ? "#cbced4" : "#252a2e", fontFamily: OS, ...OS_FVS, maxWidth: 200, textAlign: "right" }}>
-              {clocked === "out" ? "No Job Selected" : job.split(" - ")[0]}
-            </p>
-          </div>
-          <div className="flex items-center justify-between py-[16px]" style={{ borderBottom: "1px solid #e0e1e9" }}>
-            <p style={{ fontSize: 13, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>Phase</p>
-            <p style={{ fontSize: 13, color: clocked === "out" ? "#cbced4" : "#252a2e", fontFamily: OS, ...OS_FVS }}>
-              {clocked === "out" ? "—" : phase.split(" - ")[0]}
-            </p>
-          </div>
-
-          {/* Timeline */}
-          {timeline.length > 0 && (
-            <div className="mt-[24px]">
-              <div className="flex items-center justify-between mb-[16px]">
-                <p style={{ fontSize: 15, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>Earlier Today</p>
-              </div>
-              <div className="flex flex-col gap-[0px]">
-                {timeline.map((e, i) => (
-                  <div key={i} className="flex gap-[12px]">
-                    <div className="flex flex-col items-center">
-                      <div className="h-[10px] w-[10px] rounded-full shrink-0 mt-[4px]" style={{ background: e.color }} />
-                      {i < timeline.length - 1 && <div className="w-[1px] flex-1 mt-[2px]" style={{ background: "#e0e1e9", minHeight: 28 }} />}
-                    </div>
-                    <div className="pb-[16px]">
-                      <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.time}</p>
-                      <div className="flex items-center gap-[8px]">
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>{e.label}</p>
-                        {e.flagged && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", background: "#fde68a", borderRadius: 4, padding: "1px 6px", fontFamily: OS, whiteSpace: "nowrap" }}>
-                            Flagged
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.sub}</p>
-                      {e.location && (
-                        <div className="flex items-center gap-[4px] mt-[2px]">
-                          <MapPin size={11} style={{ color: e.flagged ? "#b45309" : "#6a6e79", flexShrink: 0 }} />
-                          <p style={{ fontSize: 11, color: e.flagged ? "#b45309" : "#6a6e79", fontFamily: OS, ...OS_FVS }}>{e.location}</p>
-                        </div>
-                      )}
-                    </div>
+        {/* ── Middle: pay-period timesheet ── */}
+        <div className={`flex-1 pt-[24px] px-[24px] ${emptyPeriod ? "flex flex-col pb-[24px]" : "pb-[48px]"}`} style={{ minWidth: 0 }}>
+          <div className={`flex w-full flex-col rounded-[8px] overflow-hidden ${emptyPeriod ? "flex-1" : ""}`}
+            style={{
+              background: "var(--modus-wc-color-base-page, #ffffff)",
+              border: "1px solid var(--modus-wc-color-base-200, #e0e1e9)",
+            }}>
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-[12px] gap-y-[8px] px-[16px] py-[10px]"
+              style={{ borderBottom: "1px solid var(--modus-wc-color-base-200, #e0e1e9)" }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--modus-wc-color-base-content, #252a2e)", fontFamily: OS, ...OS_FVS }}>
+                Timesheet
+              </h2>
+              <div className="flex items-center gap-[4px]">
+                <ModusWcButton shape="square" color="tertiary" variant="borderless" size="sm"
+                  aria-label="Previous pay period" disabled={payPeriodIndex === PAY_PERIODS.length - 1}
+                  onButtonClick={() => setPayPeriodId(PAY_PERIODS[payPeriodIndex + 1].id)}>
+                  <ModusWcIcon name="chevron_left" variant="outlined" size="xs" decorative />
+                </ModusWcButton>
+                <ModusWcDropdownMenu
+                  buttonAriaLabel={`Pay period: ${payPeriod.label}`}
+                  buttonVariant="outlined"
+                  buttonColor="tertiary"
+                  buttonSize="sm"
+                  menuSize="sm"
+                  menuPlacement="bottom-end"
+                  menuOffset={4}
+                  menuStrategy="fixed"
+                  customClass="pay-period-menu"
+                  menuVisible={payPeriodMenuOpen}
+                  onMenuVisibilityChange={(e) => setPayPeriodMenuOpen(e.detail.isVisible)}>
+                  <div slot="button" className="flex items-center gap-[6px]">
+                    <span>{payPeriod.label}</span>
+                    {payPeriod.current && <span className="pay-period-menu-tag">Current</span>}
+                    <ModusWcIcon name="expand_more" variant="outlined" size="xs" decorative />
                   </div>
+                  <div slot="menu">
+                    {PAY_PERIODS.map(p => (
+                      <ModusWcMenuItem key={p.id} size="sm" value={p.id} label={p.label}
+                        subLabel={p.current ? "Current pay period" : undefined}
+                        selected={p.id === payPeriod.id}
+                        onItemSelect={(e) => { setPayPeriodId(e.detail.value); setPayPeriodMenuOpen(false); }} />
+                    ))}
+                  </div>
+                </ModusWcDropdownMenu>
+                <ModusWcButton shape="square" color="tertiary" variant="borderless" size="sm"
+                  aria-label="Next pay period" disabled={payPeriodIndex === 0}
+                  onButtonClick={() => setPayPeriodId(PAY_PERIODS[payPeriodIndex - 1].id)}>
+                  <ModusWcIcon name="chevron_right" variant="outlined" size="xs" decorative />
+                </ModusWcButton>
+              </div>
+            </div>
+            {/* Attestation status for the whole pay period */}
+            {payPeriod.current && !emptyPeriod && (
+              <div role="status" className="flex flex-wrap items-center justify-between gap-[12px] px-[16px] py-[8px]"
+                style={pendingAttestDays.length
+                  ? { background: "#fffbeb", borderBottom: "1px solid #fde68a" }
+                  : { background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+                <div className="flex items-center gap-[8px]">
+                  {pendingAttestDays.length
+                    ? <span className="ts-pending-dot" aria-hidden />
+                    : <ModusWcIcon name="check_circle" variant="outlined" size="xs" decorative customClass="ts-attested" />}
+                  <p style={{ fontSize: 12, fontWeight: 600, color: pendingAttestDays.length ? "#92400e" : "#6a6e79", fontFamily: OS, ...OS_FVS }}>
+                    {pendingAttestDays.length
+                      ? `${pendingAttestDays.length} ${pendingAttestDays.length === 1 ? "day needs" : "days need"} attestation`
+                      : "All days attested"}
+                  </p>
+                </div>
+                {pendingAttestDays.length > 0 && (
+                  <ModusWcButton color="tertiary" variant="outlined" size="xs" onButtonClick={startAttestationReview}>
+                    Review
+                  </ModusWcButton>
+                )}
+              </div>
+            )}
+            {/* Stats strip: week toward overtime, then pay-period overtime, travel and attestation */}
+            <div className="flex flex-wrap items-center gap-x-[16px] gap-y-[8px] px-[16px] py-[10px]" style={{ background: "#ffffff", borderBottom: "1px solid #e0e1e9" }}>
+              <div className="flex min-w-[280px] flex-1 items-center gap-[10px]">
+                <p className="shrink-0" style={{ fontSize: 11, fontWeight: 600, color: "#6a6e79", fontFamily: OS, ...OS_FVS, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {payPeriod.current ? "This week" : "Week total"}
+                </p>
+                <p className="shrink-0" style={{ fontSize: 12, color: "#464b52", fontFamily: OS, ...OS_FVS, fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#252a2e" }}>{weekRegular.toFixed(2)}</span> / {WEEKLY_OT_THRESHOLD} hrs
+                </p>
+                <div className="min-w-[80px] flex-1">
+                  <ModusWcProgress
+                    aria-label={`${weekRegular.toFixed(2)} of ${WEEKLY_OT_THRESHOLD} regular hours this week`}
+                    value={Math.min(weekRegular, WEEKLY_OT_THRESHOLD)}
+                    max={WEEKLY_OT_THRESHOLD}
+                    customClass={`week-ot-progress week-ot-progress--${weekProgressTone}`}
+                  />
+                </div>
+                <p className="shrink-0" style={{
+                  fontSize: 12, fontWeight: 600, fontFamily: OS, ...OS_FVS, fontVariantNumeric: "tabular-nums",
+                  color: weekProgressTone === "over" ? "#b91c1c" : weekProgressTone === "near" ? "#b45309" : "#6a6e79",
+                }}>
+                  {weekProgressTone === "over"
+                    ? (-hoursToWeeklyOT >= 0.01 ? `${(-hoursToWeeklyOT).toFixed(2)} hrs over limit` : "At weekly limit")
+                    : `${hoursToWeeklyOT.toFixed(2)} hrs to OT`}
+                </p>
+              </div>
+              <div className="flex items-center">
+                {([
+                  ["OT", totalOT.toFixed(2), "#252a2e"],
+                  ["Travel", totalTravel.toFixed(2), "#252a2e"],
+                  ...(payPeriod.current
+                    ? [["Attested", `${allAttestDays.length - pendingAttestDays.length}/${allAttestDays.length}`, pendingAttestDays.length ? "#b45309" : "#252a2e"]]
+                    : timesheetDays.length ? [["Attested", "All", "#252a2e"]] : []),
+                ] as [string, string, string][]).map(([label, value, color], i) => (
+                  <p key={label} className="px-[12px]" style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS, fontVariantNumeric: "tabular-nums", borderLeft: i ? "1px solid #e0e1e9" : undefined }}>
+                    {label} <span style={{ fontWeight: 700, color }}>{value}</span>
+                  </p>
                 ))}
               </div>
             </div>
-          )}
+
+            <div className="min-w-0 overflow-x-auto bg-white">
+              <ModusWcTable
+                customClass="timesheet-table"
+                caption={`Time entries for ${payPeriod.label}`}
+                density="compact"
+                hover
+                columns={timesheetColumns}
+                data={timesheetRows}
+                onRowClick={(e) => setDetailRow(e.detail.row as TimesheetRow)}
+              />
+            </div>
+
+            {timesheetDays.length === 0 && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-[10px] px-[24px] py-[32px] text-center" style={{ background: "#ffffff" }}>
+                <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full" style={{ background: "#f1f1f6" }}>
+                  <CalendarX size={22} style={{ color: "#6a6e79" }} aria-hidden />
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#252a2e", fontFamily: OS, ...OS_FVS }}>
+                  No time entries for this pay period
+                </p>
+                <p style={{ fontSize: 12, color: "#6a6e79", fontFamily: OS, ...OS_FVS, maxWidth: 380, lineHeight: 1.5 }}>
+                  No hours were recorded for {payPeriod.label.replace(/, \d{4}$/, "")}. Pick another pay period to review its entries and attestations.
+                </p>
+                <ModusWcButton color="tertiary" variant="outlined" size="sm" onButtonClick={() => setPayPeriodId(PAY_PERIODS[0].id)}>
+                  Go to current pay period
+                </ModusWcButton>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       )}
@@ -10331,7 +10895,9 @@ export default function App() {
       <div className="min-w-0" style={{ marginLeft: contentLeft, marginTop: TOP_BAR_H, minHeight: `calc(100vh - ${TOP_BAR_H}px)` }}>
         {/* Time */}
         {activePage === "timesheets"        && <PlaceholderPage title="Timesheets" />}
-        {activePage === "clock_in"          && <ClockInOutPage />}
+        {(activePage === "clock_in" || activePage === "clock_in_mobile") && (
+          <ClockInOutPage viewMode={activePage === "clock_in_mobile" ? "mobile" : "desktop"} />
+        )}
         {activePage === "timesheet_summary" && <TimesheetSummary />}
         {activePage === "time_off"          && <PlaceholderPage title="Time Off" />}
         {activePage === "compliance_dashboard" && <ComplianceDashboard />}
